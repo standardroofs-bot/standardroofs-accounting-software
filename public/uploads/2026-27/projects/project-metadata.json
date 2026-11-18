@@ -1,0 +1,33 @@
+{
+  "projectName": "Standard Roofs Books (SR-Books)",
+  "shortCode": "SR-Books",
+  "client": "Standard Roofs",
+  "location": "Erode, Tamil Nadu, India",
+  "financialYear": "2026-27",
+  "currency": "INR",
+  "currencySymbol": "₹",
+  "gstStateCode": "33",
+  "companyGSTIN": "33AABCS1234F1Z5",
+  "startingInvoiceNumber": 33,
+  "invoicePrefix": "SR/26-27/",
+  "storageType": "LOCAL_DISK",
+  "localStoragePath": "E:/standardroof accounting software/public/uploads/2026-27/",
+  "modules": [
+    "dashboard",
+    "chart_of_accounts",
+    "cash_book",
+    "banking",
+    "vouchers",
+    "customers",
+    "projects",
+    "gst_tax_invoices",
+    "suppliers",
+    "expenses",
+    "contractors",
+    "labour_muster",
+    "machines_and_tools",
+    "audit_trail"
+  ],
+  "createdAt": "2026-11-18T09:34:00.000Z",
+  "status": "ACTIVE_PRODUCTION"
+}

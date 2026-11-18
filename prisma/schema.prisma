@@ -1,0 +1,1386 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// -------------------------------------------------------------
+// ENUMS
+// -------------------------------------------------------------
+
+enum UserRole {
+  SUPER_ADMIN
+  MANAGING_DIRECTOR
+  ACCOUNTANT
+  HR_MANAGER
+  ACCOUNTS_EXECUTIVE
+  PROJECT_MANAGER
+  SITE_SUPERVISOR
+  VIEWER
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum AccountSubType {
+  CURRENT_ASSET
+  BANK
+  CASH
+  FIXED_ASSET
+  CURRENT_LIABILITY
+  DUTIES_AND_TAXES
+  DIRECT_INCOME
+  INDIRECT_INCOME
+  DIRECT_EXPENSE
+  INDIRECT_EXPENSE
+  EQUITY
+}
+
+enum VoucherType {
+  INVOICE
+  PAYMENT
+  RECEIPT
+  CONTRA
+  EXPENSE
+  PURCHASE
+  JOURNAL_VOUCHER
+  REVERSAL
+  FLEET_TRIP
+  INVENTORY_MOVEMENT
+  STAFF_PAYROLL
+  CAPITAL_TRANSACTION
+  LOAN_DISBURSEMENT
+  LOAN_EMI
+  FIXED_ASSET_ACQUISITION
+  DEPRECIATION
+  CREDIT_NOTE
+  DEBIT_NOTE
+  ADVANCE_PAYMENT
+}
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum CashFlowType {
+  CASH_INFLOW
+  CASH_OUTFLOW
+}
+
+enum ClosingStatus {
+  BALANCED
+  DISCREPANCY
+}
+
+enum BankTransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER_IN
+  TRANSFER_OUT
+  INTEREST
+  CHARGE
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+}
+
+enum MachineStatus {
+  AVAILABLE
+  ALLOCATED
+  IN_SERVICE
+  SPARE
+  SCRAP
+}
+
+enum MachineGroup {
+  SRM01
+  SRM02
+  SRM03
+  SRM04
+  SRM05
+  SRM06
+  OFFICE
+  SPARE
+  SERVICE
+  SCRAP
+}
+
+enum PayCycle {
+  MONTHLY
+  FIFTEEN_DAYS
+  DAILY
+}
+
+enum RoleType {
+  PERMANENT_STAFF
+  DAILY_LABOUR
+  SITE_FITTER
+}
+
+// -------------------------------------------------------------
+// USER & RBAC
+// -------------------------------------------------------------
+
+model User {
+  id                     String            @id @default(cuid())
+  name                   String
+  email                  String            @unique
+  passwordHash           String
+  role                   UserRole          @default(VIEWER)
+  phone                  String?
+  permissions            Json?
+  active                 Boolean           @default(true)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  journalEntriesCreated  JournalEntry[]    @relation("JournalCreatedBy")
+  cashBookEntries        CashBookEntry[]   @relation("CashBookCreatedBy")
+  dailyClosings          DailyCashClosing[] @relation("DailyClosingClosedBy")
+  machineMovementsIssued MachineMovement[] @relation("MachineIssuedBy")
+  machineMovementsApproved MachineMovement[] @relation("MachineApprovedBy")
+  expensesApproved       ExpenseClaim[]    @relation("ExpenseApprovedBy")
+  auditLogs              AuditLog[]
+  importBatches          ImportBatch[]
+}
+
+// -------------------------------------------------------------
+// FINANCIAL YEAR & SEQUENCING
+// -------------------------------------------------------------
+
+model FinancialYear {
+  id             String            @id @default(cuid())
+  name           String            @unique // "2026-27"
+  startDate      DateTime
+  endDate        DateTime
+  isLocked       Boolean           @default(false)
+  isClosed       Boolean           @default(false)
+  isCurrent      Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  voucherSequences VoucherSequence[]
+  journalEntries   JournalEntry[]
+  cashBookEntries  CashBookEntry[]
+  dailyClosings    DailyCashClosing[]
+  invoices         Invoice[]
+  purchaseBills    PurchaseBill[]
+}
+
+model VoucherSequence {
+  id              String        @id @default(cuid())
+  financialYearId String
+  voucherType     String        // INVOICE, CASH_RECEIPT, CASH_PAYMENT, BANK_RECEIPT, BANK_PAYMENT, CONTRA, JOURNAL_VOUCHER, PURCHASE_BILL, EXPENSE
+  prefix          String        // SR/26-27/, CR/26-27/, CP/26-27/, etc.
+  nextNumber      Int           @default(1)
+  paddingLength   Int           @default(4)
+  formatPattern   String        @default("{PREFIX}{NUMBER}")
+  updatedAt       DateTime      @updatedAt
+
+  financialYear   FinancialYear @relation(fields: [financialYearId], references: [id], onDelete: Cascade)
+
+  @@unique([financialYearId, voucherType])
+}
+
+// -------------------------------------------------------------
+// CHART OF ACCOUNTS
+// -------------------------------------------------------------
+
+model Account {
+  id              String          @id @default(cuid())
+  code            String          @unique // e.g. 1010, 2010, 4010
+  name            String
+  type            AccountType
+  subType         AccountSubType
+  description     String?
+  isSystem        Boolean         @default(false)
+  active          Boolean         @default(true)
+  openingBalance  Decimal         @default(0.00) @db.Decimal(15, 2)
+  currentBalance  Decimal         @default(0.00) @db.Decimal(15, 2)
+  parentAccountId String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  parentAccount   Account?        @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  childAccounts   Account[]       @relation("AccountHierarchy")
+  journalLines    JournalLine[]
+  bankAccounts    BankAccount[]
+  expenses        ExpenseClaim[]
+}
+
+// -------------------------------------------------------------
+// DOUBLE-ENTRY BOOKKEEPING
+// -------------------------------------------------------------
+
+model JournalEntry {
+  id               String          @id @default(cuid())
+  entryNumber      String          @unique // JV/26-27/0001
+  date             DateTime
+  voucherType      VoucherType
+  referenceNumber  String?
+  narration        String
+  financialYearId  String
+  totalDebit       Decimal         @default(0.00) @db.Decimal(15, 2)
+  totalCredit      Decimal         @default(0.00) @db.Decimal(15, 2)
+  status           JournalStatus   @default(POSTED)
+  isReversal       Boolean         @default(false)
+  reversalOfId     String?         @unique
+  reversalReason   String?
+  createdById      String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  financialYear    FinancialYear   @relation(fields: [financialYearId], references: [id])
+  createdBy        User            @relation("JournalCreatedBy", fields: [createdById], references: [id])
+  reversalOf       JournalEntry?   @relation("ReversalRelation", fields: [reversalOfId], references: [id])
+  reversedBy       JournalEntry?   @relation("ReversalRelation")
+  lines            JournalLine[]
+  cashBookEntry    CashBookEntry?
+  bankTransactions BankTransaction[]
+  invoice          Invoice?
+  invoicePayments  InvoicePayment[]
+  purchaseBill     PurchaseBill?
+  expenseClaim     ExpenseClaim?
+  labourMusters    LabourMuster[]
+  labourAdvances   LabourAdvance[]
+  vehicleTrip        VehicleTripLog?
+  materialMovement   MaterialStockMovement?
+  staffPayroll       StaffPayroll?
+  capitalTransaction CapitalTransaction?
+  businessLoan       BusinessLoan?
+  loanEmiPayment     LoanEmiPayment?
+  fixedAsset         FixedAsset?
+  creditDebitNotes   CreditDebitNote[]
+  customerAdvances   CustomerAdvance[]
+  supplierAdvances   SupplierAdvance[]
+  importBatchId      String?
+  importBatch        ImportBatch?    @relation(fields: [importBatchId], references: [id])
+}
+
+model JournalLine {
+  id             String       @id @default(cuid())
+  journalEntryId String
+  accountId      String
+  debit          Decimal      @default(0.00) @db.Decimal(15, 2)
+  credit         Decimal      @default(0.00) @db.Decimal(15, 2)
+  narration      String?
+  projectId      String?
+  customerId     String?
+  supplierId     String?
+  contractorId   String?
+  createdAt      DateTime     @default(now())
+
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account        Account      @relation(fields: [accountId], references: [id])
+  project        Project?     @relation(fields: [projectId], references: [id])
+  customer       Customer?    @relation(fields: [customerId], references: [id])
+  supplier       Supplier?    @relation(fields: [supplierId], references: [id])
+  contractor     Contractor?  @relation(fields: [contractorId], references: [id])
+}
+
+// -------------------------------------------------------------
+// DAILY CASH BOOK & DENOMINATION CLOSING
+// -------------------------------------------------------------
+
+model CashBookEntry {
+  id               String        @id @default(cuid())
+  voucherNumber    String        @unique // CP/26-27/0001 or CR/26-27/0001
+  date             DateTime
+  type             CashFlowType
+  amount           Decimal       @db.Decimal(15, 2)
+  purpose          String
+  category         String        // Site Expenses, Fuel, Material Purchase, Customer Receipt, etc.
+  counterpartyName String?
+  receiptUrl       String?
+  projectId        String?
+  isOfficeExpense  Boolean       @default(false)
+  teamName         String?
+  importBatchId    String?
+  financialYearId  String
+  journalEntryId   String?       @unique
+  createdById      String
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  financialYear    FinancialYear @relation(fields: [financialYearId], references: [id])
+  journalEntry     JournalEntry? @relation(fields: [journalEntryId], references: [id])
+  project          Project?      @relation(fields: [projectId], references: [id])
+  createdBy        User          @relation("CashBookCreatedBy", fields: [createdById], references: [id])
+  importBatch      ImportBatch?  @relation(fields: [importBatchId], references: [id])
+}
+
+model DailyCashClosing {
+  id                   String        @id @default(cuid())
+  closingDate          DateTime
+  systemOpeningBalance Decimal       @db.Decimal(15, 2)
+  totalInflow          Decimal       @db.Decimal(15, 2)
+  totalOutflow         Decimal       @db.Decimal(15, 2)
+  systemClosingBalance Decimal       @db.Decimal(15, 2)
+
+  // Denominations Breakdown
+  count500             Int           @default(0)
+  count200             Int           @default(0)
+  count100             Int           @default(0)
+  count50              Int           @default(0)
+  count20              Int           @default(0)
+  count10              Int           @default(0)
+  count5               Int           @default(0)
+  count2               Int           @default(0)
+  count1               Int           @default(0)
+
+  physicalClosingTotal Decimal       @db.Decimal(15, 2)
+  discrepancyAmount    Decimal       @default(0.00) @db.Decimal(15, 2)
+  status               ClosingStatus @default(BALANCED)
+  notes                String?
+  closedById           String
+  financialYearId      String
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  financialYear        FinancialYear @relation(fields: [financialYearId], references: [id])
+  closedBy             User          @relation("DailyClosingClosedBy", fields: [closedById], references: [id])
+
+  @@unique([closingDate, financialYearId])
+}
+
+// -------------------------------------------------------------
+// BANKING
+// -------------------------------------------------------------
+
+model BankAccount {
+  id             String            @id @default(cuid())
+  accountName    String            // e.g. HDFC Current A/c, ICICI CC A/c
+  bankName       String
+  accountNumber  String            @unique
+  ifscCode       String
+  branchName     String
+  openingBalance Decimal           @default(0.00) @db.Decimal(15, 2)
+  currentBalance Decimal           @default(0.00) @db.Decimal(15, 2)
+  accountId      String            // Linked Chart of Accounts account
+  active         Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  account          Account               @relation(fields: [accountId], references: [id])
+  transactions     BankTransaction[]
+  expenses         ExpenseClaim[]
+  statementImports BankStatementImport[]
+  capitalTrans     CapitalTransaction[]
+  loans            BusinessLoan[]
+  emiPayments      LoanEmiPayment[]
+}
+
+model BankTransaction {
+  id               String              @id @default(cuid())
+  voucherNumber    String              @unique // BP/26-27/0001 or BR/26-27/0001
+  date             DateTime
+  bankAccountId    String
+  type             BankTransactionType
+  amount           Decimal             @db.Decimal(15, 2)
+  referenceNumber  String?             // UTR / Cheque / NEFT ref
+  chequeNumber     String?
+  payeeOrPayer     String
+  purpose          String
+  receiptUrl       String?
+  isReconciled     Boolean             @default(false)
+  reconciledAt     DateTime?
+  bankStatementRef String?
+  journalEntryId   String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  bankAccount      BankAccount         @relation(fields: [bankAccountId], references: [id])
+  journalEntry     JournalEntry?       @relation(fields: [journalEntryId], references: [id])
+}
+
+model BankStatementImport {
+  id              String        @id @default(cuid())
+  bankAccountId   String
+  fileName        String
+  importDate      DateTime      @default(now())
+  totalLines      Int           @default(0)
+  reconciledLines Int           @default(0)
+  notes           String?
+  createdAt       DateTime      @default(now())
+
+  bankAccount     BankAccount   @relation(fields: [bankAccountId], references: [id])
+}
+
+// -------------------------------------------------------------
+// CUSTOMERS, PROJECTS & GST INVOICES (TN STATE CODE 33)
+// -------------------------------------------------------------
+
+model Customer {
+  id                 String        @id @default(cuid())
+  name               String
+  companyName        String?
+  gstNumber          String?       // 15-digit GSTIN
+  panNumber          String?
+  state              String        @default("Tamil Nadu")
+  stateCode          String        @default("33") // 33 for TN
+  billingAddress     String
+  shippingAddress    String?
+  email              String?
+  phone              String?
+  creditDays         Int           @default(30)
+  openingBalance     Decimal       @default(0.00) @db.Decimal(15, 2)
+  outstandingBalance Decimal       @default(0.00) @db.Decimal(15, 2)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  projects           Project[]
+  invoices           Invoice[]
+  estimates          Estimate[]
+  journalLines       JournalLine[]
+  creditDebitNotes   CreditDebitNote[]
+  advances           CustomerAdvance[]
+}
+
+model Project {
+  id                   String                @id @default(cuid())
+  code                 String                @unique // SR-PRJ-2026-001
+  name                 String
+  customerId           String
+  siteLocation         String
+  city                 String                @default("Erode")
+  state                String                @default("Tamil Nadu")
+  stateCode            String                @default("33")
+  roofType             String                @default("PEB") // Clay Tile, PEB, Tensile, UPVC, Solar, Other
+  totalSqFt            Decimal               @default(0.00) @db.Decimal(15, 2)
+  startDate            DateTime?
+  targetCompletionDate DateTime?
+  contractValue        Decimal               @default(0.00) @db.Decimal(15, 2)
+  status               ProjectStatus         @default(IN_PROGRESS)
+  description          String?
+  assignedTeams        String?               @default("[\"SRM01\"]")
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  customer             Customer              @relation(fields: [customerId], references: [id])
+  invoices             Invoice[]
+  estimates            Estimate[]
+  purchaseBills        PurchaseBill[]
+  expenses             ExpenseClaim[]
+  cashBookEntries      CashBookEntry[]
+  journalLines         JournalLine[]
+  machineAllocations   MachineAllocation[]
+  contractorMilestones ContractorMilestone[]
+  vehicleTrips         VehicleTripLog[]
+  materialMovements    MaterialStockMovement[]
+  siteMaterialIssues   SiteMaterialIssue[]
+}
+
+model Invoice {
+  id                      String           @id @default(cuid())
+  invoiceNumber           String           @unique // SR/26-27/0033
+  sequenceNumber          Int              // 33
+  invoiceType             String           @default("TAX_INVOICE") // TAX_INVOICE, PROFORMA_INVOICE, ADVANCE_INVOICE, FINAL_INVOICE, CREDIT_NOTE, DEBIT_NOTE
+  date                    DateTime
+  dueDate                 DateTime?
+  customerId              String
+  projectId               String?
+  financialYearId         String
+  placeOfSupply           String           @default("Tamil Nadu")
+  placeOfSupplyStateCode  String           @default("33")
+  isInterState            Boolean          @default(false)
+  subTotal                Decimal          @default(0.00) @db.Decimal(15, 2)
+  cgstTotal               Decimal          @default(0.00) @db.Decimal(15, 2)
+  sgstTotal               Decimal          @default(0.00) @db.Decimal(15, 2)
+  igstTotal               Decimal          @default(0.00) @db.Decimal(15, 2)
+  totalAmount             Decimal          @default(0.00) @db.Decimal(15, 2)
+  amountPaid              Decimal          @default(0.00) @db.Decimal(15, 2)
+  tdsDeducted             Decimal          @default(0.00) @db.Decimal(15, 2)
+  balanceDue              Decimal          @default(0.00) @db.Decimal(15, 2)
+  status                  String           @default("UNPAID") // DRAFT, SENT, UNPAID, PARTIAL, PAID, OVERDUE, CANCELLED
+  notes                   String?
+  terms                   String?
+  receiptUrl              String?
+  journalEntryId          String?          @unique
+  importBatchId           String?
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+
+  customer                Customer         @relation(fields: [customerId], references: [id])
+  project                 Project?         @relation(fields: [projectId], references: [id])
+  financialYear           FinancialYear    @relation(fields: [financialYearId], references: [id])
+  journalEntry            JournalEntry?    @relation(fields: [journalEntryId], references: [id])
+  importBatch             ImportBatch?     @relation(fields: [importBatchId], references: [id])
+  items                   InvoiceItem[]
+  payments                InvoicePayment[]
+  creditDebitNotes        CreditDebitNote[]
+}
+
+model InvoiceItem {
+  id            String   @id @default(cuid())
+  invoiceId     String
+  description   String
+  hsnSacCode    String   // SAC 9954, HSN 7210, etc.
+  quantity      Decimal  @default(1.00) @db.Decimal(15, 2)
+  unit          String   @default("SQFT") // SQFT, RFT, MT, NOS, LOT
+  unitPrice     Decimal  @db.Decimal(15, 2)
+  discount      Decimal  @default(0.00) @db.Decimal(15, 2)
+  taxableAmount Decimal  @db.Decimal(15, 2)
+  gstRate       Decimal  @default(18.00) @db.Decimal(5, 2)
+  cgstRate      Decimal  @default(9.00) @db.Decimal(5, 2)
+  cgstAmount    Decimal  @default(0.00) @db.Decimal(15, 2)
+  sgstRate      Decimal  @default(9.00) @db.Decimal(5, 2)
+  sgstAmount    Decimal  @default(0.00) @db.Decimal(15, 2)
+  igstRate      Decimal  @default(0.00) @db.Decimal(5, 2)
+  igstAmount    Decimal  @default(0.00) @db.Decimal(15, 2)
+  totalAmount   Decimal  @db.Decimal(15, 2)
+  createdAt     DateTime @default(now())
+
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model InvoicePayment {
+  id              String        @id @default(cuid())
+  invoiceId       String
+  paymentDate     DateTime      @default(now())
+  amount          Decimal       @db.Decimal(15, 2)
+  tdsAmount       Decimal       @default(0.00) @db.Decimal(15, 2) // TDS u/s 194C
+  paymentMode     String        @default("NEFT") // CASH, NEFT, RTGS, UPI, CHEQUE
+  referenceNumber String?
+  notes           String?
+  journalEntryId  String?
+  importBatchId   String?
+  createdAt       DateTime      @default(now())
+
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  journalEntry    JournalEntry? @relation(fields: [journalEntryId], references: [id])
+  importBatch     ImportBatch?  @relation(fields: [importBatchId], references: [id])
+}
+
+// -------------------------------------------------------------
+// SUPPLIERS & PURCHASE BILLS
+// -------------------------------------------------------------
+
+model Supplier {
+  id                 String         @id @default(cuid())
+  name               String
+  companyName        String?
+  gstNumber          String?
+  panNumber          String?
+  state              String         @default("Tamil Nadu")
+  stateCode          String         @default("33")
+  address            String?
+  email              String?
+  phone              String?
+  paymentTerms       String?        // 15 days, 30 days, Immediate
+  bankName           String?
+  accountNumber      String?
+  ifscCode           String?
+  outstandingBalance Decimal        @default(0.00) @db.Decimal(15, 2)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  journalLines       JournalLine[]
+  purchaseBills      PurchaseBill[]
+  expenses           ExpenseClaim[]
+  materialMovements  MaterialStockMovement[]
+  fixedAssets        FixedAsset[]
+  creditDebitNotes   CreditDebitNote[]
+  advances           SupplierAdvance[]
+}
+
+model PurchaseBill {
+  id                  String         @id @default(cuid())
+  billNumber          String         @unique // PB/26-27/0001
+  vendorInvoiceNumber String?        // Vendor's Tax Invoice No
+  date                DateTime
+  dueDate             DateTime?
+  supplierId          String
+  projectId           String?
+  financialYearId     String
+  subTotal            Decimal        @default(0.00) @db.Decimal(15, 2)
+  cgstTotal           Decimal        @default(0.00) @db.Decimal(15, 2)
+  sgstTotal           Decimal        @default(0.00) @db.Decimal(15, 2)
+  igstTotal           Decimal        @default(0.00) @db.Decimal(15, 2)
+  totalAmount         Decimal        @default(0.00) @db.Decimal(15, 2)
+  amountPaid          Decimal        @default(0.00) @db.Decimal(15, 2)
+  balanceDue          Decimal        @default(0.00) @db.Decimal(15, 2)
+  status              String         @default("UNPAID") // UNPAID, PARTIAL, PAID
+  receiptUrl          String?
+  journalEntryId      String?        @unique
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  supplier            Supplier       @relation(fields: [supplierId], references: [id])
+  project             Project?       @relation(fields: [projectId], references: [id])
+  financialYear       FinancialYear  @relation(fields: [financialYearId], references: [id])
+  journalEntry        JournalEntry?  @relation(fields: [journalEntryId], references: [id])
+  items               PurchaseItem[]
+  fixedAssets         FixedAsset[]
+  creditDebitNotes    CreditDebitNote[]
+}
+
+model PurchaseItem {
+  id             String       @id @default(cuid())
+  purchaseBillId String
+  description    String
+  hsnSacCode     String
+  quantity       Decimal      @default(1.00) @db.Decimal(15, 2)
+  unit           String       @default("TON") // TON, SQFT, NOS, MTR
+  unitPrice      Decimal      @db.Decimal(15, 2)
+  taxableAmount  Decimal      @db.Decimal(15, 2)
+  gstRate        Decimal      @default(18.00) @db.Decimal(5, 2)
+  cgstAmount     Decimal      @default(0.00) @db.Decimal(15, 2)
+  sgstAmount     Decimal      @default(0.00) @db.Decimal(15, 2)
+  igstAmount     Decimal      @default(0.00) @db.Decimal(15, 2)
+  totalAmount    Decimal      @db.Decimal(15, 2)
+  createdAt      DateTime     @default(now())
+
+  purchaseBill   PurchaseBill @relation(fields: [purchaseBillId], references: [id], onDelete: Cascade)
+}
+
+// -------------------------------------------------------------
+// SITE & OFFICE EXPENSES
+// -------------------------------------------------------------
+
+model ExpenseClaim {
+  id             String        @id @default(cuid())
+  voucherNumber  String        @unique // EXP/26-27/0001
+  date           DateTime      @default(now())
+  accountId      String        // Linked expense account
+  paymentMode    String        @default("CASH") // CASH, BANK
+  bankAccountId  String?
+  projectId      String?
+  employeeId     String?
+  supplierId     String?
+  amount         Decimal       @db.Decimal(15, 2)
+  purpose        String
+  category       String?       // MATERIAL, LABOUR, CONTRACTOR, TRANSPORT, FOOD_STAY, OFFICE_OVERHEAD, SITE_MISC
+  isOfficeExpense Boolean      @default(false)
+  teamName       String?       // SRM01-SRM06, Team Thenarrusu, Team Saran, Office
+  receiptUrl     String?
+  status         String        @default("APPROVED") // PENDING, APPROVED, POSTED
+  approvedById   String?
+  approvedAt     DateTime?
+  journalEntryId String?       @unique
+  importBatchId  String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  account        Account       @relation(fields: [accountId], references: [id])
+  bankAccount    BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  project        Project?      @relation(fields: [projectId], references: [id])
+  employee       EmployeeOrLabour? @relation(fields: [employeeId], references: [id])
+  supplier       Supplier?     @relation(fields: [supplierId], references: [id])
+  approvedBy     User?         @relation("ExpenseApprovedBy", fields: [approvedById], references: [id])
+  journalEntry   JournalEntry? @relation(fields: [journalEntryId], references: [id])
+  importBatch    ImportBatch?  @relation(fields: [importBatchId], references: [id])
+}
+
+// -------------------------------------------------------------
+// CONTRACTORS & WORK-STAGE MILESTONES
+// -------------------------------------------------------------
+
+model Contractor {
+  id            String                @id @default(cuid())
+  code          String?               @unique // CON001, SRM01-CONT
+  name          String
+  specialty     String                // Roofing Installation, Fabrication, Sheeting
+  panNumber     String?
+  phone         String?
+  bankAccountNo String?
+  ifscCode      String?
+  contractValue Decimal               @default(0.00) @db.Decimal(15, 2)
+  active        Boolean               @default(true)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  milestones    ContractorMilestone[]
+  journalLines  JournalLine[]
+}
+
+model ContractorMilestone {
+  id                   String        @id @default(cuid())
+  contractorId         String
+  projectId            String
+  milestoneType        String        // STAGE_10_ADVANCE, STAGE_40_PROGRESS, STAGE_75_STRUCTURE, STAGE_100_COMPLETION
+  milestonePercentage  Decimal       @db.Decimal(5, 2) // 10.00, 40.00, 75.00, 100.00
+  milestoneAmount      Decimal       @db.Decimal(15, 2)
+  tdsRate              Decimal       @default(1.00) @db.Decimal(5, 2) // 1% for Ind/HUF, 2% for Co/Firm u/s 194C
+  tdsAmount            Decimal       @default(0.00) @db.Decimal(15, 2)
+  netPayable           Decimal       @default(0.00) @db.Decimal(15, 2)
+  status               String        @default("PENDING") // PENDING, APPROVED, PAID
+  workStageDescription String
+  certifiedBy          String?
+  approvedDate         DateTime?
+  journalEntryId       String?
+  teamName             String?
+  importBatchId        String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  contractor           Contractor    @relation(fields: [contractorId], references: [id])
+  project              Project       @relation(fields: [projectId], references: [id])
+  importBatch          ImportBatch?  @relation(fields: [importBatchId], references: [id])
+}
+
+// -------------------------------------------------------------
+// SMART EXCEL ACCOUNTS IMPORT BATCHES & ROLLBACK
+// -------------------------------------------------------------
+
+model ImportBatch {
+  id           String   @id @default(cuid())
+  batchNumber  String   @unique // BATCH-2026-0001
+  fileName     String
+  fileType     String   @default("ACCOUNTS_EXCEL") // ACCOUNTS_EXCEL, CUSTOMERS, SUPPLIERS, etc.
+  totalRows    Int      @default(0)
+  totalInflow  Decimal  @default(0.00) @db.Decimal(15, 2)
+  totalOutflow Decimal  @default(0.00) @db.Decimal(15, 2)
+  sitesCount   Int      @default(0)
+  status       String   @default("COMMITTED") // COMMITTED, ROLLED_BACK
+  notes        String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdBy            User?                 @relation(fields: [createdById], references: [id])
+  invoices             Invoice[]
+  expenses             ExpenseClaim[]
+  cashBookEntries      CashBookEntry[]
+  journalEntries       JournalEntry[]
+  invoicePayments      InvoicePayment[]
+  contractorMilestones ContractorMilestone[]
+}
+
+// -------------------------------------------------------------
+// EMPLOYEES & 15-DAY LABOUR MUSTER
+// -------------------------------------------------------------
+
+model EmployeeOrLabour {
+  id                 String          @id @default(cuid())
+  employeeCode       String          @unique // EMP001, LAB001
+  name               String
+  roleType           RoleType        @default(DAILY_LABOUR)
+  payCycle           PayCycle        @default(FIFTEEN_DAYS) // 15-day pay cycle default
+  baseWage           Decimal         @default(0.00) @db.Decimal(15, 2) // 15-day cycle base wage
+  cashAdvanceBalance Decimal         @default(0.00) @db.Decimal(15, 2)
+  phone              String?
+  bankAccountNo      String?
+  ifscCode           String?
+  active             Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  expenses           ExpenseClaim[]
+  musters            LabourMuster[]
+  advances           LabourAdvance[]
+  payrolls           StaffPayroll[]
+}
+
+model LabourMuster {
+  id               String            @id @default(cuid())
+  employeeId       String
+  periodStart      DateTime
+  periodEnd        DateTime
+  daysWorked       Decimal           @default(15.00) @db.Decimal(5, 2)
+  overtimeHours    Decimal           @default(0.00) @db.Decimal(5, 2)
+  grossWage        Decimal           @db.Decimal(15, 2)
+  advanceDeduction Decimal           @default(0.00) @db.Decimal(15, 2)
+  netPayout        Decimal           @db.Decimal(15, 2)
+  paymentMode      String            @default("CASH") // CASH, BANK
+  status           String            @default("PAID") // DRAFT, PAID
+  payoutDate       DateTime          @default(now())
+  journalEntryId   String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  employee         EmployeeOrLabour  @relation(fields: [employeeId], references: [id])
+  journalEntry     JournalEntry?     @relation(fields: [journalEntryId], references: [id])
+}
+
+model LabourAdvance {
+  id             String            @id @default(cuid())
+  employeeId     String
+  date           DateTime          @default(now())
+  amount         Decimal           @db.Decimal(15, 2)
+  purpose        String
+  status         String            @default("OUTSTANDING") // OUTSTANDING, DEDUCTED
+  journalEntryId String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  employee       EmployeeOrLabour  @relation(fields: [employeeId], references: [id])
+  journalEntry   JournalEntry?     @relation(fields: [journalEntryId], references: [id])
+}
+
+// -------------------------------------------------------------
+// MACHINE & TOOL ASSETS TRACKING (SRM01 - SRM06)
+// -------------------------------------------------------------
+
+model MachineAsset {
+  id              String              @id @default(cuid())
+  assetCode       String              @unique // SRM01 ... SRM06, SRM-OFF-01, etc.
+  sNo             Int?
+  name            String
+  category        String              // Power Tools, Bits & Scales, Bags & Safety, Heavy Vehicles
+  modelNumber     String?
+  serialNumber    String?
+  purchaseDate    DateTime?
+  purchaseCost    Decimal             @default(0.00) @db.Decimal(15, 2)
+  currentStatus   MachineStatus       @default(AVAILABLE)
+  currentLocation String              @default("Office")
+  
+  // Matrix counts directly matching 2026_SRMachines_Tracking_System.xlsx
+  srFinalCount    Int                 @default(0)
+  totalCount      Int                 @default(0)
+  officeCount     Int                 @default(0)
+  srm01Count      Int                 @default(0)
+  srm02Count      Int                 @default(0)
+  srm03Count      Int                 @default(0)
+  srm04Count      Int                 @default(0)
+  srm05Count      Int                 @default(0)
+  srm06Count      Int                 @default(0)
+  spareCount      Int                 @default(0)
+  serviceCount    Int                 @default(0)
+  scrapCount      Int                 @default(0)
+  notes           String?
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  allocations     MachineAllocation[]
+  movements       MachineMovement[]
+  repairs         MachineServiceRepair[]
+}
+
+model MachineAllocation {
+  id              String        @id @default(cuid())
+  machineId       String
+  projectId       String?
+  allocationGroup MachineGroup  @default(OFFICE) // SRM01 - SRM06, OFFICE, SPARE, SERVICE, SCRAP
+  allocatedDate   DateTime      @default(now())
+  releaseDate     DateTime?
+  status          String        @default("ACTIVE") // ACTIVE, RELEASED
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  machine         MachineAsset  @relation(fields: [machineId], references: [id])
+  project         Project?      @relation(fields: [projectId], references: [id])
+}
+
+model MachineMovement {
+  id                     String        @id @default(cuid())
+  machineId              String
+  fromLocation           String
+  toLocation             String
+  movementDate           DateTime      @default(now())
+  purpose                String
+  issuedById             String
+  approvedById           String
+  repairCost             Decimal?      @db.Decimal(15, 2)
+  repairExpenseAccountId String?
+  status                 String        @default("RECEIVED") // PENDING, DISPATCHED, RECEIVED
+  notes                  String?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  machine                MachineAsset  @relation(fields: [machineId], references: [id])
+  issuedBy               User          @relation("MachineIssuedBy", fields: [issuedById], references: [id])
+  approvedBy             User          @relation("MachineApprovedBy", fields: [approvedById], references: [id])
+}
+
+model MachineServiceRepair {
+  id               String       @id @default(cuid())
+  machineId        String
+  vendorName       String       // Mechanic / Service Vendor
+  faultDescription String
+  repairCost       Decimal      @default(0.00) @db.Decimal(15, 2)
+  status           String       @default("IN_SERVICE") // IN_SERVICE, REPAIRED, SCRAPPED
+  sentDate         DateTime     @default(now())
+  expectedReturn   DateTime?
+  returnedDate     DateTime?
+  journalEntryId   String?
+  notes            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  machine          MachineAsset @relation(fields: [machineId], references: [id])
+}
+
+model SiteMaterialIssue {
+  id               String       @id @default(cuid())
+  date             DateTime     @default(now())
+  team             String       @default("SRM01") // SRM01 .. SRM06, OFFICE
+  siteName         String?      // e.g. Gem Hospital, Vellalar Edu. Trust, etc.
+  projectId        String?
+  productName      String
+  quantity         Decimal      @db.Decimal(15, 2)
+  returnedQty      Decimal      @default(0.00) @db.Decimal(15, 2)
+  isReturnable     Boolean      @default(false)
+  issuedBy         String       @default("Gowri Sankar")
+  approvedBy       String       @default("Siva Kumar")
+  condition        String       @default("Good") // Good, Worn, Damaged
+  notes            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  project          Project?     @relation(fields: [projectId], references: [id])
+}
+
+// -------------------------------------------------------------
+// AUDIT LOG
+// -------------------------------------------------------------
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  action        String   // CREATE, UPDATE, POST, REVERSAL
+  entityType    String   // JournalEntry, CashBookEntry, Invoice, MachineMovement
+  entityId      String
+  oldValues     String?  @db.Text
+  newValues     String?  @db.Text
+  performedById String
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  performedBy   User     @relation(fields: [performedById], references: [id])
+}
+
+// -------------------------------------------------------------
+// FLEET & CARGO VEHICLES (2 COMPANY VEHICLES & DRIVERS)
+// -------------------------------------------------------------
+
+model CargoVehicle {
+  id              String           @id @default(cuid())
+  vehicleNumber   String           @unique // e.g., TN-33-AX-1234
+  vehicleType     String           // Bolero Pickup, Eicher 14ft, Tata Ace
+  modelName       String?
+  odometerKm      Int              @default(0)
+  insuranceExpiry DateTime?
+  fitnessExpiry   DateTime?        // FC expiry
+  permitExpiry    DateTime?
+  status          String           @default("ACTIVE") // ACTIVE, MAINTENANCE, INACTIVE
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  trips           VehicleTripLog[]
+}
+
+model Driver {
+  id              String           @id @default(cuid())
+  name            String
+  licenseNumber   String?
+  phone           String
+  salaryType      String           @default("MONTHLY") // MONTHLY, TRIP_BATA
+  monthlySalary   Decimal          @default(0.00) @db.Decimal(15, 2)
+  tripBataRate    Decimal          @default(0.00) @db.Decimal(15, 2)
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  trips           VehicleTripLog[]
+}
+
+model VehicleTripLog {
+  id              String        @id @default(cuid())
+  tripNumber      String        @unique // TRP/26-27/0001
+  date            DateTime      @default(now())
+  vehicleId       String
+  driverId        String
+  projectId       String?
+  fromLocation    String        @default("Erode Yard")
+  toLocation      String        // Project site location
+  materialCarried String?
+  startKm         Int
+  closingKm       Int
+  totalKm         Int
+  fuelLiters      Decimal       @default(0.00) @db.Decimal(10, 2)
+  fuelCost        Decimal       @default(0.00) @db.Decimal(15, 2)
+  tollCost        Decimal       @default(0.00) @db.Decimal(15, 2)
+  driverBata      Decimal       @default(0.00) @db.Decimal(15, 2)
+  maintenanceCost Decimal       @default(0.00) @db.Decimal(15, 2)
+  totalCost       Decimal       @default(0.00) @db.Decimal(15, 2)
+  paymentMode     String        @default("CASH") // CASH, BANK
+  bankAccountId   String?
+  journalEntryId  String?       @unique
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  vehicle         CargoVehicle  @relation(fields: [vehicleId], references: [id])
+  driver          Driver        @relation(fields: [driverId], references: [id])
+  project         Project?      @relation(fields: [projectId], references: [id])
+  journalEntry    JournalEntry? @relation(fields: [journalEntryId], references: [id])
+}
+
+// -------------------------------------------------------------
+// MATERIAL & YARD STOCK INVENTORY (ROOFING RAW MATERIALS)
+// -------------------------------------------------------------
+
+model MaterialItem {
+  id              String                  @id @default(cuid())
+  itemCode        String                  @unique // MAT-001, etc.
+  name            String                  // MS Hollow Sections, C/Z Purlins, Kerala Clay Tiles, UPVC Sheets, Galvalume Sheets, Screws, Ridge Caps, Paint/Primer
+  category        String                  // Steel, Tiles, Sheets, Fasteners, Coatings
+  unit            String                  // MT, Kg, Sq.Ft, Nos, Boxes, Liters
+  currentStock    Decimal                 @default(0.00) @db.Decimal(15, 2)
+  minAlertStock   Decimal                 @default(10.00) @db.Decimal(15, 2)
+  unitCost        Decimal                 @default(0.00) @db.Decimal(15, 2)
+  yardLocation    String                  @default("Erode Main Yard")
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  movements       MaterialStockMovement[]
+}
+
+model MaterialStockMovement {
+  id              String        @id @default(cuid())
+  movementNumber  String        @unique // STK/26-27/0001
+  date            DateTime      @default(now())
+  materialId      String
+  movementType    String        // STOCK_IN, SITE_ISSUE, DAMAGE_RETURN
+  quantity        Decimal       @db.Decimal(15, 2)
+  unitCost        Decimal       @default(0.00) @db.Decimal(15, 2)
+  totalValue      Decimal       @default(0.00) @db.Decimal(15, 2)
+  projectId       String?       // Destination site
+  supplierId      String?       // Source vendor if stock in
+  referenceNo     String?       // Bill or Delivery Challan No
+  notes           String?
+  journalEntryId  String?       @unique
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  material        MaterialItem  @relation(fields: [materialId], references: [id])
+  project         Project?      @relation(fields: [projectId], references: [id])
+  supplier        Supplier?     @relation(fields: [supplierId], references: [id])
+  journalEntry    JournalEntry? @relation(fields: [journalEntryId], references: [id])
+}
+
+// -------------------------------------------------------------
+// OFFICE STAFF MONTHLY PAYROLL
+// -------------------------------------------------------------
+
+model StaffPayroll {
+  id               String            @id @default(cuid())
+  payrollNumber    String            @unique // PAY/26-27/0001
+  employeeId       String
+  monthYear        String            // e.g., "April 2026"
+  basicSalary      Decimal           @db.Decimal(15, 2)
+  allowances       Decimal           @default(0.00) @db.Decimal(15, 2)
+  advancesDeducted Decimal           @default(0.00) @db.Decimal(15, 2)
+  tdsDeduction     Decimal           @default(0.00) @db.Decimal(15, 2)
+  netPayable       Decimal           @db.Decimal(15, 2)
+  paymentMode      String            @default("BANK") // CASH, BANK
+  bankAccountId    String?
+  status           String            @default("PAID") // DRAFT, APPROVED, PAID
+  payoutDate       DateTime          @default(now())
+  journalEntryId   String?           @unique
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  employee         EmployeeOrLabour  @relation(fields: [employeeId], references: [id])
+  journalEntry     JournalEntry?     @relation(fields: [journalEntryId], references: [id])
+}
+
+// -------------------------------------------------------------
+// COMPANY PROFILE & SYSTEM SETTINGS
+// -------------------------------------------------------------
+
+model CompanySettings {
+  id               String   @id @default("sr_company_config")
+  companyName      String   @default("Standard Roofs")
+  tagline          String?  @default("Roofing & PEB Structure Specialists")
+  gstin            String   @default("33AABCS1234F1Z5")
+  pan              String?  @default("AABCS1234F")
+  state            String   @default("Tamil Nadu")
+  stateCode        String   @default("33")
+  address          String   @default("12/4, Perundurai Road, Near Collectorate, Erode - 638011, Tamil Nadu")
+  phone            String   @default("+91 98427 12345")
+  email            String   @default("accounts@standardroofs.com")
+  bankName         String   @default("HDFC Bank")
+  bankBranch       String   @default("Erode Main Branch")
+  bankAccountNo    String   @default("50200012345678")
+  bankIfsc         String   @default("HDFC0001234")
+  invoiceFormat    String   @default("PREFIX") // PREFIX (SR/26-27/0033) or PLAIN (33)
+  invoiceNextNo    Int      @default(33)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// -------------------------------------------------------------
+// CAPITAL TRANSACTIONS (PARTNER CAPITAL & DRAWINGS)
+// -------------------------------------------------------------
+
+model CapitalTransaction {
+  id              String        @id @default(cuid())
+  voucherNumber   String        @unique // CAP/26-27/0001
+  partnerName     String        // Managing Director / Partner Name
+  transactionType String        // CAPITAL_INFUSION, PARTNER_DRAWING
+  amount          Decimal       @db.Decimal(15, 2)
+  date            DateTime      @default(now())
+  paymentMode     String        @default("BANK") // BANK, CASH
+  bankAccountId   String?
+  notes           String?
+  journalEntryId  String?       @unique
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  bankAccount     BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  journalEntry    JournalEntry? @relation(fields: [journalEntryId], references: [id])
+}
+
+// -------------------------------------------------------------
+// BUSINESS LOANS & VEHICLE/EQUIPMENT EMIS
+// -------------------------------------------------------------
+
+model BusinessLoan {
+  id                 String           @id @default(cuid())
+  loanCode           String           @unique // LN-001, LN-VEH-01
+  lenderName         String           // HDFC Bank, ICICI Bank, Tata Capital, Cholamandalam
+  loanType           String           // VEHICLE_LOAN, EQUIPMENT_LOAN, WORKING_CAPITAL_CC_OD, TERM_LOAN
+  accountNumber      String?
+  principalAmount    Decimal          @db.Decimal(15, 2)
+  outstandingBalance Decimal          @db.Decimal(15, 2)
+  interestRate       Decimal          @db.Decimal(5, 2) // Annual interest rate %
+  tenureMonths       Int
+  monthlyEmiAmount   Decimal          @db.Decimal(15, 2)
+  emiDueDay          Int              @default(5) // Day of month EMI is deducted
+  disbursementDate   DateTime
+  bankAccountId      String?
+  status             String           @default("ACTIVE") // ACTIVE, CLOSED
+  notes              String?
+  journalEntryId     String?          @unique
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  bankAccount        BankAccount?     @relation(fields: [bankAccountId], references: [id])
+  journalEntry       JournalEntry?    @relation(fields: [journalEntryId], references: [id])
+  emiPayments        LoanEmiPayment[]
+}
+
+model LoanEmiPayment {
+  id                 String        @id @default(cuid())
+  receiptNumber      String        @unique // EMI/26-27/0001
+  loanId             String
+  paymentDate        DateTime      @default(now())
+  emiMonth           String        // e.g. "April 2026"
+  principalComponent Decimal       @db.Decimal(15, 2)
+  interestComponent  Decimal       @db.Decimal(15, 2)
+  totalEmiAmount     Decimal       @db.Decimal(15, 2)
+  paymentMode        String        @default("BANK") // BANK, CASH
+  bankAccountId      String?
+  journalEntryId     String?       @unique
+  notes              String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  loan               BusinessLoan  @relation(fields: [loanId], references: [id])
+  bankAccount        BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  journalEntry       JournalEntry? @relation(fields: [journalEntryId], references: [id])
+}
+
+// -------------------------------------------------------------
+// FIXED ASSETS REGISTER & ANNUAL DEPRECIATION
+// -------------------------------------------------------------
+
+model FixedAsset {
+  id                     String        @id @default(cuid())
+  assetCode              String        @unique // FA-001, FA-VEH-01
+  name                   String        // Bolero Pickup, 14ft Eicher, Sheet Roll Forming Machine, Inverter Arc Welder
+  category               String        // VEHICLE, PEB_MACHINERY, OFFICE_EQUIPMENT, SHED_STRUCTURE
+  purchaseDate           DateTime
+  purchaseCost           Decimal       @db.Decimal(15, 2)
+  currentBookValue       Decimal       @db.Decimal(15, 2)
+  depreciationRateAnnual Decimal       @default(15.00) @db.Decimal(5, 2) // e.g. 15% WDV
+  accumulatedDepr        Decimal       @default(0.00) @db.Decimal(15, 2)
+  supplierId             String?
+  purchaseBillId         String?
+  status                 String        @default("ACTIVE") // ACTIVE, RETIRED, SOLD
+  notes                  String?
+  journalEntryId         String?       @unique
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  supplier               Supplier?     @relation(fields: [supplierId], references: [id])
+  purchaseBill           PurchaseBill? @relation(fields: [purchaseBillId], references: [id])
+  journalEntry           JournalEntry? @relation(fields: [journalEntryId], references: [id])
+}
+
+// -------------------------------------------------------------
+// ESTIMATES / QUOTATIONS (ZOHO BOOKS WORKFLOW)
+// -------------------------------------------------------------
+
+model Estimate {
+  id                     String         @id @default(cuid())
+  estimateNumber         String         @unique // EST/26-27/0001
+  date                   DateTime       @default(now())
+  expiryDate             DateTime?
+  customerId             String
+  projectId              String?
+  status                 String         @default("SENT") // DRAFT, SENT, APPROVED, CONVERTED, REJECTED
+  roofType               String         @default("PEB") // Clay Tile, PEB, Tensile, UPVC, Solar
+  totalSqFt              Decimal        @default(0.00) @db.Decimal(15, 2)
+  subTotal               Decimal        @default(0.00) @db.Decimal(15, 2)
+  cgstTotal              Decimal        @default(0.00) @db.Decimal(15, 2)
+  sgstTotal              Decimal        @default(0.00) @db.Decimal(15, 2)
+  igstTotal              Decimal        @default(0.00) @db.Decimal(15, 2)
+  totalAmount            Decimal        @default(0.00) @db.Decimal(15, 2)
+  terms                  String?
+  notes                  String?
+  convertedInvoiceId     String?        @unique
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  customer               Customer       @relation(fields: [customerId], references: [id])
+  project                Project?       @relation(fields: [projectId], references: [id])
+  items                  EstimateItem[]
+}
+
+model EstimateItem {
+  id          String   @id @default(cuid())
+  estimateId  String
+  description String
+  hsnCode     String?  @default("9954")
+  quantity    Decimal  @db.Decimal(15, 2)
+  unit        String   @default("Sq.Ft")
+  unitRate    Decimal  @db.Decimal(15, 2)
+  discount    Decimal  @default(0.00) @db.Decimal(15, 2)
+  gstRate     Decimal  @default(18.00) @db.Decimal(5, 2)
+  cgstAmount  Decimal  @default(0.00) @db.Decimal(15, 2)
+  sgstAmount  Decimal  @default(0.00) @db.Decimal(15, 2)
+  igstAmount  Decimal  @default(0.00) @db.Decimal(15, 2)
+  totalAmount Decimal  @db.Decimal(15, 2)
+
+  estimate    Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
+// -------------------------------------------------------------
+// CREDIT & DEBIT NOTES (ZOHO BOOKS COMPLETE WORKFLOW)
+// -------------------------------------------------------------
+
+model CreditDebitNote {
+  id             String        @id @default(cuid())
+  noteNumber     String        @unique // CN/26-27/0001 or DN/26-27/0001
+  type           String        // CREDIT_NOTE, DEBIT_NOTE
+  date           DateTime      @default(now())
+  customerId     String?
+  supplierId     String?
+  invoiceId      String?
+  purchaseBillId String?
+  reason         String        // Material Return, Rate Difference, Quality Rejection, Cancellation
+  subTotal       Decimal       @default(0.00) @db.Decimal(15, 2)
+  cgstTotal      Decimal       @default(0.00) @db.Decimal(15, 2)
+  sgstTotal      Decimal       @default(0.00) @db.Decimal(15, 2)
+  igstTotal      Decimal       @default(0.00) @db.Decimal(15, 2)
+  totalAmount    Decimal       @default(0.00) @db.Decimal(15, 2)
+  status         String        @default("ISSUED") // DRAFT, ISSUED, APPLIED
+  journalEntryId String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  customer       Customer?     @relation(fields: [customerId], references: [id])
+  supplier       Supplier?     @relation(fields: [supplierId], references: [id])
+  invoice        Invoice?      @relation(fields: [invoiceId], references: [id])
+  purchaseBill   PurchaseBill? @relation(fields: [purchaseBillId], references: [id])
+  journalEntry   JournalEntry? @relation(fields: [journalEntryId], references: [id])
+}
+
+// -------------------------------------------------------------
+// ADVANCE PAYMENTS & RETAINERS
+// -------------------------------------------------------------
+
+model CustomerAdvance {
+  id               String        @id @default(cuid())
+  receiptNumber    String        @unique // ADV-CR/26-27/0001
+  date             DateTime      @default(now())
+  customerId       String
+  projectId        String?
+  amount           Decimal       @db.Decimal(15, 2)
+  paymentMode      String        @default("BANK") // BANK, CASH
+  bankAccountId    String?
+  referenceNumber  String?
+  allocatedAmount  Decimal       @default(0.00) @db.Decimal(15, 2)
+  remainingBalance Decimal       @db.Decimal(15, 2)
+  status           String        @default("ACTIVE") // ACTIVE, FULLY_ADJUSTED
+  notes            String?
+  journalEntryId   String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  customer         Customer      @relation(fields: [customerId], references: [id])
+  journalEntry     JournalEntry? @relation(fields: [journalEntryId], references: [id])
+}
+
+model SupplierAdvance {
+  id               String        @id @default(cuid())
+  paymentNumber    String        @unique // ADV-DR/26-27/0001
+  date             DateTime      @default(now())
+  supplierId       String
+  projectId        String?
+  amount           Decimal       @db.Decimal(15, 2)
+  paymentMode      String        @default("BANK") // BANK, CASH
+  bankAccountId    String?
+  referenceNumber  String?
+  allocatedAmount  Decimal       @default(0.00) @db.Decimal(15, 2)
+  remainingBalance Decimal       @db.Decimal(15, 2)
+  status           String        @default("ACTIVE") // ACTIVE, FULLY_ADJUSTED
+  notes            String?
+  journalEntryId   String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  supplier         Supplier      @relation(fields: [supplierId], references: [id])
+  journalEntry     JournalEntry? @relation(fields: [journalEntryId], references: [id])
+}
+
+// -------------------------------------------------------------
+// RECURRING INVOICES & EXPENSES
+// -------------------------------------------------------------
+
+model RecurringTemplate {
+  id                String    @id @default(cuid())
+  templateName      String
+  type              String    // INVOICE, EXPENSE
+  frequency         String    @default("MONTHLY") // WEEKLY, MONTHLY, QUARTERLY, ANNUAL
+  nextDueDate       DateTime
+  customerId        String?
+  supplierId        String?
+  category          String?   // Office Rent, Vehicle EMI, Crane Rental, Retainer Fee
+  amount            Decimal   @db.Decimal(15, 2)
+  description       String
+  active            Boolean   @default(true)
+  lastGeneratedDate DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// -------------------------------------------------------------
+// ROOFING SERVICES & MATERIAL PRICE CATALOG
+// -------------------------------------------------------------
+
+model RoofingPriceItem {
+  id          String   @id @default(cuid())
+  itemCode    String   @unique // ROOF-CLAY-01, ROOF-PEB-01, ROOF-UPVC-01
+  name        String
+  category    String   @default("ROOFING_SERVICE") // ROOFING_SERVICE, RAW_MATERIAL, ACCESSORY
+  roofType    String   @default("PEB") // PEB, Clay Tile, Tensile, UPVC, Solar
+  hsnSacCode  String   @default("9954")
+  unit        String   @default("Sq.Ft") // Sq.Ft, MT, Nos, Kg, Box
+  defaultRate Decimal  @db.Decimal(15, 2)
+  gstRate     Decimal  @default(18.00) @db.Decimal(5, 2)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+
