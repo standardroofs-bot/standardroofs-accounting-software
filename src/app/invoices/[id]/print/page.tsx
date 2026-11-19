@@ -68,20 +68,27 @@ export default async function InvoicePrintPage({
       <PrintButton backUrl={`/invoices/${invoice.id}`} title="Print / Save as PDF (A4)" />
 
       {/* A4 Document Outer Border Box */}
-      <div className="max-w-[210mm] min-h-[297mm] mx-auto bg-white border border-gray-400 shadow-xl print:border print:border-gray-400 print:shadow-none print:p-0 text-xs font-sans relative">
-        {/* On-screen Status Ribbon (Hidden on print) */}
-        <div className="print:hidden absolute -top-3 -left-3 z-10">
-          <span
-            className={`px-3 py-1 rounded text-xs font-bold uppercase shadow-sm tracking-wider ${
+      <div className="max-w-[210mm] min-h-[297mm] mx-auto bg-white border border-gray-400 shadow-xl print:border print:border-gray-400 print:shadow-none print:p-0 text-xs font-sans relative overflow-hidden">
+        {/* Zoho-style Diagonal Corner Ribbon (Hidden on print) */}
+        <div className="print:hidden absolute -top-8 -left-8 w-28 h-28 pointer-events-auto group z-20 overflow-hidden">
+          <div
+            className={`absolute top-6 left-[-28px] w-36 -rotate-45 text-center py-1 text-[10px] font-bold tracking-wider shadow uppercase ${
               invoice.status === "PAID"
                 ? "bg-emerald-600 text-white"
+                : invoice.status === "DRAFT"
+                ? "bg-slate-500 text-white"
                 : invoice.status === "VOID"
                 ? "bg-rose-600 text-white"
                 : "bg-blue-600 text-white"
             }`}
           >
-            {invoice.status}
-          </span>
+            {invoice.status === "DRAFT" ? "Draft" : invoice.status}
+          </div>
+          {invoice.status === "DRAFT" && (
+            <div className="hidden group-hover:block absolute top-10 left-6 z-30 bg-slate-900 text-white text-[11px] p-2.5 rounded shadow-xl w-60 leading-tight">
+              A Draft status indicates that the invoice can undergo further modifications and its amount is yet to reflect in your sales figures.
+            </div>
+          )}
         </div>
 
         {/* 1. Header Block */}
@@ -217,7 +224,10 @@ export default async function InvoicePrintPage({
                   })}
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-950">
-                  {Number(item.taxableAmount || item.totalAmount).toLocaleString("en-IN", {
+                  {Number(
+                    item.taxableAmount ||
+                      Number(item.quantity) * Number(item.unitPrice) - Number(item.discount || 0)
+                  ).toLocaleString("en-IN", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}

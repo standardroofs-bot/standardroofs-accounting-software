@@ -39,6 +39,10 @@ export async function POST(request: Request) {
       customerId,
       projectId,
       invoiceType = "TAX_INVOICE",
+      status = "UNPAID",
+      orderNumber,
+      salesperson,
+      subject,
       date,
       dueDate,
       notes,
@@ -145,12 +149,14 @@ export async function POST(request: Request) {
     const invoiceNumber = voucherInfo.voucherNumber;
     const sequenceNumber = voucherInfo.sequenceNumber;
 
-    // Post Double-Entry Journal Entry for genuine Tax Invoices
+    // Post Double-Entry Journal Entry for genuine Tax Invoices (Skipped for DRAFT)
     let journalEntryId: string | null = null;
+    const isDraft = status === "DRAFT";
     const isActualFinancialDoc =
-      invoiceType === "TAX_INVOICE" ||
-      invoiceType === "FINAL_INVOICE" ||
-      invoiceType === "ADVANCE_INVOICE";
+      !isDraft &&
+      (invoiceType === "TAX_INVOICE" ||
+        invoiceType === "FINAL_INVOICE" ||
+        invoiceType === "ADVANCE_INVOICE");
 
     if (isActualFinancialDoc) {
       const journalLines: any[] = [
@@ -256,6 +262,9 @@ export async function POST(request: Request) {
         invoiceNumber,
         sequenceNumber,
         invoiceType,
+        orderNumber: orderNumber || null,
+        salesperson: salesperson || null,
+        subject: subject || null,
         date: date ? new Date(date) : new Date(),
         dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + (customer.creditDays || 0) * 86400000),
         customerId,
@@ -271,7 +280,7 @@ export async function POST(request: Request) {
         adjustment: adjDecimal.toFixed(2),
         totalAmount: grandTotal.toFixed(2),
         balanceDue: grandTotal.toFixed(2),
-        status: "UNPAID",
+        status: isDraft ? "DRAFT" : "UNPAID",
         notes: notes || null,
         terms: terms || "Due on Receipt",
         shippingAddress: resolvedShipping,
@@ -287,13 +296,15 @@ export async function POST(request: Request) {
       },
     });
 
-    // Update Customer outstanding balance
-    await prisma.customer.update({
-      where: { id: customer.id },
-      data: {
-        outstandingBalance: toDecimal(customer.outstandingBalance).plus(grandTotal).toFixed(2),
-      },
-    });
+    // Update Customer outstanding balance only if not draft
+    if (!isDraft) {
+      await prisma.customer.update({
+        where: { id: customer.id },
+        data: {
+          outstandingBalance: toDecimal(customer.outstandingBalance).plus(grandTotal).toFixed(2),
+        },
+      });
+    }
 
     return NextResponse.json({ success: true, invoice });
   } catch (error: any) {

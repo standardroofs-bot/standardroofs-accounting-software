@@ -524,6 +524,9 @@ model Invoice {
   tdsDeducted             Decimal          @default(0.00) @db.Decimal(15, 2)
   balanceDue              Decimal          @default(0.00) @db.Decimal(15, 2)
   status                  String           @default("UNPAID") // DRAFT, SENT, UNPAID, PARTIAL, PAID, OVERDUE, CANCELLED
+  orderNumber             String?
+  salesperson             String?
+  subject                 String?
   notes                   String?
   terms                   String?
   shippingAddress         String?

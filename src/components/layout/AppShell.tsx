@@ -7,9 +7,12 @@ import { Header } from "./Header";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isAuthPage = pathname === "/login" || pathname === "/login/";
+  const isStandalonePage =
+    pathname === "/login" ||
+    pathname === "/login/" ||
+    pathname.includes("/print");
 
-  if (isAuthPage) {
+  if (isStandalonePage) {
     return <main className="min-h-screen w-full">{children}</main>;
   }
 
