@@ -269,9 +269,6 @@ export default function NewInvoicePage() {
     }
 
     subTotal += taxable;
-    cgstTotal += cgst;
-    sgstTotal += sgst;
-    igstTotal += igst;
 
     return {
       ...l,
@@ -282,6 +279,18 @@ export default function NewInvoicePage() {
       total: taxable + taxAmount,
     };
   });
+
+  // Calculate taxes on aggregate taxable amount (Zoho Books standard)
+  subTotal = Number(subTotal.toFixed(2));
+  if (isInterState) {
+    igstTotal = Number((subTotal * 0.18).toFixed(2));
+    cgstTotal = 0;
+    sgstTotal = 0;
+  } else {
+    cgstTotal = Number((subTotal * 0.09).toFixed(2));
+    sgstTotal = Number((subTotal * 0.09).toFixed(2));
+    igstTotal = 0;
+  }
 
   const unadjustedTotal = subTotal + cgstTotal + sgstTotal + igstTotal;
 

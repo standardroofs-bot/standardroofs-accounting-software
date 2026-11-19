@@ -1,25 +1,25 @@
 import { prisma } from "../src/lib/prisma";
 
 async function main() {
-  const entries = await prisma.journalEntry.findMany({
-    where: {
-      entryNumber: {
-        contains: "0033",
-      },
-    },
+  const invoices = await prisma.invoice.findMany({
+    include: { items: true, customer: true },
+    orderBy: { sequenceNumber: "desc" },
   });
-  console.log("Journal entries with 0033:", entries);
-
-  // Also check all journal entries >= 33 or containing SR/26-27
-  const srEntries = await prisma.journalEntry.findMany({
-    where: {
-      entryNumber: {
-        contains: "SR/26-27",
-      },
-    },
-    select: { id: true, entryNumber: true, narration: true },
-  });
-  console.log("SR journal entries:", srEntries);
+  console.log(`Found ${invoices.length} invoices:`);
+  for (const inv of invoices) {
+    console.log({
+      id: inv.id,
+      invoiceNumber: inv.invoiceNumber,
+      sequenceNumber: inv.sequenceNumber,
+      customer: inv.customer?.name,
+      subTotal: inv.subTotal,
+      cgst: inv.cgstTotal,
+      sgst: inv.sgstTotal,
+      adj: inv.adjustment,
+      total: inv.totalAmount,
+      status: inv.status,
+    });
+  }
 }
 
 main()

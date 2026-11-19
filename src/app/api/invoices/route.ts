@@ -116,9 +116,6 @@ export async function POST(request: Request) {
       const gstRes = calculateGST(taxable, effectiveStateCode, rate);
 
       subTotal = subTotal.plus(taxable);
-      cgstTotal = cgstTotal.plus(gstRes.cgstAmount);
-      sgstTotal = sgstTotal.plus(gstRes.sgstAmount);
-      igstTotal = igstTotal.plus(gstRes.igstAmount);
 
       return {
         description: it.description || "Roofing Material / Works",
@@ -139,6 +136,17 @@ export async function POST(request: Request) {
         totalAmount: gstRes.totalAmount.toFixed(2),
       };
     });
+
+    // In Zoho Books, GST is calculated on aggregate taxable amount to avoid rounding creep
+    if (isInterState) {
+      igstTotal = toDecimal(subTotal.times(0.18).toFixed(2, Decimal.ROUND_HALF_UP));
+      cgstTotal = new Decimal(0);
+      sgstTotal = new Decimal(0);
+    } else {
+      cgstTotal = toDecimal(subTotal.times(0.09).toFixed(2, Decimal.ROUND_HALF_UP));
+      sgstTotal = toDecimal(subTotal.times(0.09).toFixed(2, Decimal.ROUND_HALF_UP));
+      igstTotal = new Decimal(0);
+    }
 
     const adjDecimal = toDecimal(adjustment || 0);
     const unadjustedGrandTotal = subTotal.plus(cgstTotal).plus(sgstTotal).plus(igstTotal);

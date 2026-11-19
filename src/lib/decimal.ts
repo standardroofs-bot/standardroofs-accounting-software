@@ -68,16 +68,16 @@ function convertThreeDigits(num: number): string {
   const rem = num % 100;
   const hStr = h > 0 ? `${ONES[h]} Hundred` : "";
   const remStr = convertTwoDigits(rem);
-  if (hStr && remStr) return `${hStr} and ${remStr}`;
+  if (hStr && remStr) return `${hStr} ${remStr}`;
   return hStr || remStr;
 }
 
 /**
- * Convert number/Decimal to Indian Rupees words: e.g. "One Lakh Fifty Thousand Rupees Only"
+ * Convert number/Decimal to Indian Rupees words: e.g. "Seventeen Thousand Seven Hundred Five Only"
  */
 export function numberToWordsINR(amount: string | number | Decimal | null | undefined): string {
   const d = toDecimal(amount);
-  if (d.isZero()) return "Zero Rupees Only";
+  if (d.isZero()) return "Zero Only";
 
   const isNeg = d.isNegative();
   const absD = d.abs();
@@ -85,7 +85,7 @@ export function numberToWordsINR(amount: string | number | Decimal | null | unde
   let n = parseInt(intStr, 10);
   const paise = parseInt(decStr, 10);
 
-  if (n === 0 && paise === 0) return "Zero Rupees Only";
+  if (n === 0 && paise === 0) return "Zero Only";
 
   let words = "";
 
@@ -111,17 +111,8 @@ export function numberToWordsINR(amount: string | number | Decimal | null | unde
   }
 
   words = words.trim();
-  const rupeePart = words ? `${words} Rupees` : "";
-  const paisePart = paise > 0 ? `${convertTwoDigits(paise)} Paise` : "";
-
-  let result = "";
-  if (rupeePart && paisePart) {
-    result = `${rupeePart} and ${paisePart} Only`;
-  } else if (rupeePart) {
-    result = `${rupeePart} Only`;
-  } else {
-    result = `${paisePart} Only`;
-  }
+  const paisePart = paise > 0 ? ` and ${convertTwoDigits(paise)} Paise` : "";
+  const result = `${words}${paisePart} Only`;
 
   return isNeg ? `Minus ${result}` : result;
 }

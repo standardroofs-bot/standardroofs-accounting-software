@@ -75,6 +75,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/public") ||
     pathname.startsWith("/uploads") ||
     pathname.startsWith("/images") ||
+    pathname.includes("/print") ||
     PUBLIC_PATHS.includes(pathname)
   ) {
     return NextResponse.next();

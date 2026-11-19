@@ -526,7 +526,9 @@ export default function InvoiceDetailPage({
         <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-200 dark:border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="text-xs text-slate-600 dark:text-slate-400 max-w-lg">
             <span className="font-bold text-slate-800 dark:text-slate-200 block mb-0.5">Amount in Words:</span>
-            <span className="italic">{numberToWordsINR(invoice.totalAmount)}</span>
+            <span className="italic font-bold text-slate-900 dark:text-slate-100">
+              Indian Rupee {numberToWordsINR(invoice.totalAmount)}
+            </span>
           </div>
 
           <div className="w-full md:w-80 space-y-1.5 text-xs font-mono">
