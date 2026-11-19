@@ -247,7 +247,7 @@ export default async function InvoicePrintPage({
                     {idx + 1}
                   </td>
                   <td className="py-2.5 px-3 border-r border-[#8c8c8c]">
-                    <div className="font-semibold text-[#111111] leading-snug">{item.description}</div>
+                    <div className="font-normal text-[#111827] leading-snug">{item.description}</div>
                     {item.subDescription && (
                       <div className="text-[10px] text-[#666666] mt-0.5 font-normal">
                         {item.subDescription}
@@ -316,38 +316,38 @@ export default async function InvoicePrintPage({
           <div className="col-span-5 flex flex-col justify-between">
             {/* Totals Table */}
             <div className="p-3 space-y-1.5 text-[11px] border-b border-[#8c8c8c]">
-              <div className="flex justify-between py-0.5 text-[#444444]">
-                <span>Sub Total</span>
-                <span className="text-[#111111]">
+              <div className="flex justify-end items-center py-0.5 text-[#444444]">
+                <span className="text-right pr-6">Sub Total</span>
+                <span className="text-right text-[#111111] min-w-[90px]">
                   {subTotalNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
 
-              <div className="flex justify-between py-0.5 text-[#444444]">
-                <span>Total Taxable Amount</span>
-                <span className="text-[#111111]">
+              <div className="flex justify-end items-center py-0.5 text-[#444444]">
+                <span className="text-right pr-6">Total Taxable Amount</span>
+                <span className="text-right text-[#111111] min-w-[90px]">
                   {subTotalNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
 
               {invoice.isInterState ? (
-                <div className="flex justify-between py-0.5 text-[#444444]">
-                  <span>IGST18 (18%)</span>
-                  <span className="text-[#111111]">
+                <div className="flex justify-end items-center py-0.5 text-[#444444]">
+                  <span className="text-right pr-6">IGST18 (18%)</span>
+                  <span className="text-right text-[#111111] min-w-[90px]">
                     {igstNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               ) : (
                 <>
-                  <div className="flex justify-between py-0.5 text-[#444444]">
-                    <span>CGST9 (9%)</span>
-                    <span className="text-[#111111]">
+                  <div className="flex justify-end items-center py-0.5 text-[#444444]">
+                    <span className="text-right pr-6">CGST9 (9%)</span>
+                    <span className="text-right text-[#111111] min-w-[90px]">
                       {cgstNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="flex justify-between py-0.5 text-[#444444]">
-                    <span>SGST9 (9%)</span>
-                    <span className="text-[#111111]">
+                  <div className="flex justify-end items-center py-0.5 text-[#444444]">
+                    <span className="text-right pr-6">SGST9 (9%)</span>
+                    <span className="text-right text-[#111111] min-w-[90px]">
                       {sgstNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -355,9 +355,9 @@ export default async function InvoicePrintPage({
               )}
 
               {/* Adjustment Row */}
-              <div className="flex justify-between py-0.5 text-[#444444]">
-                <span>Adjustment</span>
-                <span className="text-[#111111]">
+              <div className="flex justify-end items-center py-0.5 text-[#444444]">
+                <span className="text-right pr-6">Adjustment</span>
+                <span className="text-right text-[#111111] min-w-[90px]">
                   {adjNum < 0
                     ? `(-) ${Math.abs(adjNum).toFixed(2)}`
                     : adjNum > 0
@@ -367,27 +367,29 @@ export default async function InvoicePrintPage({
               </div>
 
               {/* Total ₹ */}
-              <div className="flex justify-between py-1 text-[13px] font-bold border-t border-[#d1d5db] text-[#111111]">
-                <span>Total</span>
-                <span>
+              <div className="flex justify-end items-center py-1 text-[13px] font-bold border-t border-[#d1d5db] text-[#111111]">
+                <span className="text-right pr-6">Total</span>
+                <span className="text-right min-w-[90px]">
                   ₹{totalNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
 
               {/* Balance Due */}
-              <div className="flex justify-between py-1 text-[12px] font-bold text-[#111111]">
-                <span>Balance Due</span>
-                <span>
+              <div className="flex justify-end items-center py-1 text-[12px] font-bold text-[#111111]">
+                <span className="text-right pr-6">Balance Due</span>
+                <span className="text-right min-w-[90px]">
                   ₹{balanceDueNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
 
             {/* Signature Box: Sivakumar D (Manager) centered at top, Authorized Signature at bottom */}
-            <div className="p-4 text-center text-[11px] flex flex-col justify-between flex-1 min-h-[140px]">
-              <span className="font-semibold text-[#111111] block">Sivakumar D (Manager)</span>
-              <div className="h-14"></div>
-              <span className="font-medium text-[#666666] block text-[10px]">Authorized Signature</span>
+            <div className="p-3 flex-1 flex flex-col justify-end">
+              <div className="mr-3 mb-3 border border-[#8c8c8c] p-4 text-center text-[11px] flex flex-col justify-between min-h-[130px]">
+                <span className="font-semibold text-[#111111] block">Sivakumar D (Manager)</span>
+                <div className="h-12"></div>
+                <span className="font-medium text-[#666666] block text-[10px]">Authorized Signature</span>
+              </div>
             </div>
           </div>
         </div>

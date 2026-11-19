@@ -63,7 +63,7 @@ async function main() {
   }
 
   // Delete test customers created during testing if they have no remaining invoices
-  const testCustomerNames = ["Kavin", "Sujithra M", "Rajesh Kumar", "Lucas Sinclair"];
+  const testCustomerNames = ["Sabari", "Kavin", "Sujithra M", "Rajesh Kumar", "Lucas Sinclair"];
   for (const name of testCustomerNames) {
     const custs = await prisma.customer.findMany({ where: { name } });
     for (const c of custs) {
