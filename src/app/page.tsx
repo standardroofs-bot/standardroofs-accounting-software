@@ -25,6 +25,9 @@ import {
   Clock,
   Briefcase,
   AlertTriangle,
+  ExternalLink,
+  Printer,
+  Archive,
 } from "lucide-react";
 import Link from "next/link";
 import { AccountType } from "@prisma/client";
@@ -57,9 +60,9 @@ export default async function DashboardPage() {
     where: { type: AccountType.EXPENSE },
   });
 
-  // Receivables & Invoices
+  // Receivables & Invoices (Exclude archived invoices)
   const invoices = await prisma.invoice.findMany({
-    where: { status: { not: "VOID" } },
+    where: { status: { not: "VOID" }, isArchived: false },
     select: { balanceDue: true, dueDate: true, status: true, totalAmount: true },
   });
   let totalReceivables = toDecimal(0);
@@ -76,6 +79,14 @@ export default async function DashboardPage() {
         currentReceivables = currentReceivables.plus(bal);
       }
     }
+  });
+
+  // Recent Invoices (Active)
+  const recentInvoices = await prisma.invoice.findMany({
+    where: { isArchived: false },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+    include: { customer: true },
   });
 
   // Payables & Vendor Bills
@@ -180,7 +191,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className="space-y-6 font-sans pb-12">
       {/* Executive Command & Zoho 1-Click Action Bar */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -205,19 +216,27 @@ export default async function DashboardPage() {
         {/* Action Shortcuts */}
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            href="/estimates"
-            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition active:scale-95"
-          >
-            <Plus size={14} />
-            <span>+ Create Quote {nextSerialDisplay}</span>
-          </Link>
-
-          <Link
             href="/invoices/new"
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 rounded-xl text-xs font-bold shadow-sm transition active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition active:scale-95"
           >
             <Receipt size={14} />
             <span>+ Tax Invoice #{nextInvoiceNo}</span>
+          </Link>
+
+          <Link
+            href="/estimates"
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 rounded-xl text-xs font-bold shadow-sm transition active:scale-95"
+          >
+            <Plus size={14} />
+            <span>+ Create Quote</span>
+          </Link>
+
+          <Link
+            href="/customers"
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold border border-slate-300 dark:border-slate-700 shadow-sm transition active:scale-95"
+          >
+            <Building size={14} />
+            <span>+ Customer</span>
           </Link>
 
           <Link
@@ -233,150 +252,132 @@ export default async function DashboardPage() {
             className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold shadow-sm transition active:scale-95"
           >
             <Landmark size={14} />
-            <span>+ Categorize ICICI ({pendingUncatCount})</span>
+            <span>Banking ICICI</span>
           </Link>
         </div>
       </div>
 
-      {/* Zoho Books Side-by-Side Summary Cards: Total Receivables vs Total Payables */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Total Receivables Card (Zoho Books Style) */}
+      {/* 4 Core Financial KPI Cards (Receivables, Payables, Liquidity, P&L) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Receivables */}
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Total Receivables
               </span>
-              <Link
-                href="/invoices/new"
-                className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
-              >
-                + New Invoice #{nextInvoiceNo}
+              <Link href="/invoices" className="text-xs text-blue-600 font-bold hover:underline">
+                Invoices &rarr;
               </Link>
             </div>
-
-            <div className="mt-3">
-              <div className="text-3xl font-black text-slate-900 dark:text-slate-100 font-mono tracking-tight">
-                {formatINR(totalReceivables)}
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Total Unpaid Customer Invoices
-              </p>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono mt-2">
+              {formatINR(totalReceivables)}
             </div>
-
-            {/* Current vs Overdue Split Bar */}
-            <div className="mt-5 space-y-2">
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden flex">
-                <div
-                  className="bg-emerald-500 h-full transition-all duration-500"
-                  style={{
-                    width: totalReceivables.isZero()
-                      ? "50%"
-                      : `${currentReceivables.dividedBy(totalReceivables).times(100).toNumber()}%`,
-                  }}
-                  title="Current Receivables"
-                />
-                <div
-                  className="bg-amber-500 h-full transition-all duration-500"
-                  style={{
-                    width: totalReceivables.isZero()
-                      ? "50%"
-                      : `${overdueReceivables.dividedBy(totalReceivables).times(100).toNumber()}%`,
-                  }}
-                  title="Overdue Receivables"
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-xs font-mono pt-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                  <span className="text-slate-600 dark:text-slate-400 font-sans">Current:</span>
-                  <strong className="text-slate-900 dark:text-slate-100">{formatINR(currentReceivables)}</strong>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                  <span className="text-slate-600 dark:text-slate-400 font-sans">Overdue:</span>
-                  <strong className="text-amber-600 dark:text-amber-400">{formatINR(overdueReceivables)}</strong>
-                </div>
-              </div>
-            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Current: {formatINR(currentReceivables)} • Overdue: {formatINR(overdueReceivables)}
+            </p>
           </div>
-
-          <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-            <span>Customer Accounts Receivable (Ledger 1030)</span>
-            <Link href="/invoices" className="text-blue-600 font-bold hover:underline">
-              View Invoices &rarr;
-            </Link>
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full mt-4 overflow-hidden flex">
+            <div
+              className="bg-emerald-500 h-full"
+              style={{
+                width: totalReceivables.isZero()
+                  ? "100%"
+                  : `${currentReceivables.dividedBy(totalReceivables).times(100).toNumber()}%`,
+              }}
+            />
+            <div
+              className="bg-amber-500 h-full"
+              style={{
+                width: totalReceivables.isZero()
+                  ? "0%"
+                  : `${overdueReceivables.dividedBy(totalReceivables).times(100).toNumber()}%`,
+              }}
+            />
           </div>
         </div>
 
-        {/* Total Payables Card (Zoho Books Style) */}
+        {/* Total Payables */}
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Total Payables
               </span>
-              <Link
-                href="/bills"
-                className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
-              >
-                + New Bill
+              <Link href="/bills" className="text-xs text-blue-600 font-bold hover:underline">
+                Bills &rarr;
               </Link>
             </div>
-
-            <div className="mt-3">
-              <div className="text-3xl font-black text-slate-900 dark:text-slate-100 font-mono tracking-tight">
-                {formatINR(totalPayables)}
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Total Unpaid Vendor Bills
-              </p>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono mt-2">
+              {formatINR(totalPayables)}
             </div>
-
-            {/* Current vs Overdue Split Bar */}
-            <div className="mt-5 space-y-2">
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden flex">
-                <div
-                  className="bg-blue-500 h-full transition-all duration-500"
-                  style={{
-                    width: totalPayables.isZero()
-                      ? "50%"
-                      : `${currentPayables.dividedBy(totalPayables).times(100).toNumber()}%`,
-                  }}
-                  title="Current Payables"
-                />
-                <div
-                  className="bg-rose-500 h-full transition-all duration-500"
-                  style={{
-                    width: totalPayables.isZero()
-                      ? "50%"
-                      : `${overduePayables.dividedBy(totalPayables).times(100).toNumber()}%`,
-                  }}
-                  title="Overdue Payables"
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-xs font-mono pt-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
-                  <span className="text-slate-600 dark:text-slate-400 font-sans">Current:</span>
-                  <strong className="text-slate-900 dark:text-slate-100">{formatINR(currentPayables)}</strong>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
-                  <span className="text-slate-600 dark:text-slate-400 font-sans">Overdue:</span>
-                  <strong className="text-rose-600 dark:text-rose-400">{formatINR(overduePayables)}</strong>
-                </div>
-              </div>
-            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Current: {formatINR(currentPayables)} • Overdue: {formatINR(overduePayables)}
+            </p>
           </div>
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full mt-4 overflow-hidden flex">
+            <div
+              className="bg-blue-500 h-full"
+              style={{
+                width: totalPayables.isZero()
+                  ? "100%"
+                  : `${currentPayables.dividedBy(totalPayables).times(100).toNumber()}%`,
+              }}
+            />
+            <div
+              className="bg-rose-500 h-full"
+              style={{
+                width: totalPayables.isZero()
+                  ? "0%"
+                  : `${overduePayables.dividedBy(totalPayables).times(100).toNumber()}%`,
+              }}
+            />
+          </div>
+        </div>
 
-          <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-            <span>Creditor Accounts Payable (Ledger 2010)</span>
-            <Link href="/payments-made" className="text-blue-600 font-bold hover:underline">
-              View Payments Made &rarr;
-            </Link>
+        {/* Cash & Bank Liquidity */}
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Cash & Bank Liquidity
+              </span>
+              <Link href="/banking" className="text-xs text-blue-600 font-bold hover:underline">
+                Reconcile &rarr;
+              </Link>
+            </div>
+            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono mt-2">
+              {formatINR(totalLiquidity)}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              ICICI A/C ...3161: ₹24,03,272.00
+            </p>
+          </div>
+          <div className="w-full bg-emerald-500/20 h-1.5 rounded-full mt-4 overflow-hidden">
+            <div className="bg-emerald-500 h-full w-full" />
+          </div>
+        </div>
+
+        {/* Net Profit & Margin */}
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Net Operating Profit
+              </span>
+              <Link href="/reports" className="text-xs text-blue-600 font-bold hover:underline">
+                P&L Report &rarr;
+              </Link>
+            </div>
+            <div className="text-2xl font-black text-teal-600 dark:text-teal-400 font-mono mt-2">
+              {formatINR(netSurplus)}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Income: {formatINR(totalIncome)} • Exp: {formatINR(totalExpense)}
+            </p>
+          </div>
+          <div className="w-full bg-teal-500/20 h-1.5 rounded-full mt-4 overflow-hidden">
+            <div className="bg-teal-500 h-full w-full" />
           </div>
         </div>
       </div>
@@ -450,104 +451,106 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Income & Expense + Top Expenses Breakdown + Site Operations */}
+      {/* Main Operational 2-Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column (7 cols): Income vs Expense & Top Expenses */}
+        {/* Left Column (7 cols): Recent Invoices & Top Expenses */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Income vs Expenses Card */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
+          {/* Recent Invoices Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                <TrendingUp size={16} className="text-emerald-600" /> Income vs. Direct Site Expenses
+                <Receipt size={16} className="text-blue-600" /> Recent Sales Tax Invoices
+              </h3>
+              <Link href="/invoices" className="text-xs text-blue-600 font-bold hover:underline">
+                View All &rarr;
+              </Link>
+            </div>
+
+            {recentInvoices.length === 0 ? (
+              <div className="py-6 text-center text-slate-400 text-xs">
+                No invoices created yet. Click <strong>+ Tax Invoice</strong> to issue your first invoice.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {recentInvoices.map((inv) => (
+                  <div key={inv.id} className="py-2.5 flex items-center justify-between text-xs">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/invoices/${inv.id}`}
+                          className="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          {inv.invoiceNumber}
+                        </Link>
+                        <span className="text-slate-400 font-medium">• {inv.customer.name}</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 mt-0.5 block">
+                        Date: {new Date(inv.date).toLocaleDateString("en-IN")}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <span className="font-mono font-bold text-slate-900 dark:text-slate-100 block">
+                          {formatINR(inv.totalAmount)}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold uppercase ${
+                            inv.status === "PAID"
+                              ? "text-emerald-600"
+                              : inv.status === "PARTIAL"
+                              ? "text-blue-600"
+                              : "text-amber-600"
+                          }`}
+                        >
+                          {inv.status}
+                        </span>
+                      </div>
+                      <Link
+                        href={`/invoices/${inv.id}/print`}
+                        target="_blank"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        title="Print Invoice"
+                      >
+                        <Printer size={14} />
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Top Operating Expenses Breakdown */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <TrendingDown size={16} className="text-rose-600" /> Operating Expenses Breakdown
               </h3>
               <Link href="/reports" className="text-xs text-blue-600 font-bold hover:underline">
                 P&L Statement &rarr;
               </Link>
             </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900">
-                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase block">Total Income</span>
-                <div className="text-lg font-black text-emerald-700 dark:text-emerald-300 font-mono mt-1">
-                  {formatINR(totalIncome)}
-                </div>
-                <span className="text-[10px] text-emerald-600/80 block mt-0.5">Project Contracts</span>
-              </div>
-
-              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900">
-                <span className="text-[10px] font-bold text-rose-700 dark:text-rose-400 uppercase block">Total Expenses</span>
-                <div className="text-lg font-black text-rose-700 dark:text-rose-300 font-mono mt-1">
-                  {formatINR(totalExpense)}
-                </div>
-                <span className="text-[10px] text-rose-600/80 block mt-0.5">Steel & Site Work</span>
-              </div>
-
-              <div className="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/30 border border-teal-100 dark:border-teal-900">
-                <span className="text-[10px] font-bold text-teal-700 dark:text-teal-400 uppercase block">Net Margin</span>
-                <div className="text-lg font-black text-teal-700 dark:text-teal-300 font-mono mt-1">
-                  {formatINR(netSurplus)}
-                </div>
-                <span className="text-[10px] text-teal-600/80 block mt-0.5">Operating Profit</span>
-              </div>
-            </div>
-
-            {/* Top Expenses Breakdown */}
-            <div className="pt-2 space-y-2.5">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
-                Top Operating Expenses Breakdown
-              </span>
-              <div className="space-y-2">
-                {topExpenseAccounts.map((a, idx) => (
-                  <div key={a.code} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold flex items-center justify-center text-[10px]">
-                        {idx + 1}
-                      </span>
-                      <span className="font-medium text-slate-800 dark:text-slate-200">{a.name}</span>
-                      <span className="font-mono text-[10px] text-slate-400">({a.code})</span>
-                    </div>
-                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
-                      {formatINR(a.amount)}
+            <div className="space-y-2">
+              {topExpenseAccounts.map((a, idx) => (
+                <div key={a.code} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold flex items-center justify-center text-[10px]">
+                      {idx + 1}
                     </span>
+                    <span className="font-medium text-slate-800 dark:text-slate-200">{a.name}</span>
+                    <span className="font-mono text-[10px] text-slate-400">({a.code})</span>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Recent General Ledger Vouchers */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                <FileSpreadsheet size={16} className="text-blue-600" /> Recent Double-Entry Vouchers
-              </h3>
-              <Link href="/vouchers" className="text-xs text-blue-600 font-bold hover:underline">
-                View All Vouchers &rarr;
-              </Link>
-            </div>
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {recentVouchers.map((v) => (
-                <div key={v.id} className="py-2.5 flex items-center justify-between text-xs">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-blue-600">{v.entryNumber}</span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 font-semibold">
-                        {v.voucherType}
-                      </span>
-                    </div>
-                    <p className="text-slate-500 text-[11px] mt-0.5">{v.narration}</p>
-                  </div>
-                  <div className="text-right font-mono">
-                    <span className="font-bold text-slate-900 dark:text-slate-100 block">{formatINR(v.totalDebit)}</span>
-                    <span className="text-[10px] text-emerald-600 font-semibold">{v.status}</span>
-                  </div>
+                  <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                    {formatINR(a.amount)}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Right Column (5 cols): Active Roofing Sites & SRM Team Custody */}
+        {/* Right Column (5 cols): Active Roofing Sites & SRM Machine Custody */}
         <div className="lg:col-span-5 space-y-6">
           {/* Active Roofing Projects */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-3">
@@ -559,22 +562,35 @@ export default async function DashboardPage() {
                 All Sites &rarr;
               </Link>
             </div>
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {activeProjects.map((p) => (
-                <div key={p.id} className="py-2.5 text-xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <strong className="text-slate-900 dark:text-slate-100">{p.code} — {p.name}</strong>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold">
-                      {p.status}
-                    </span>
+
+            {activeProjects.length === 0 ? (
+              <div className="py-6 text-center space-y-2">
+                <p className="text-xs text-slate-400">No active roofing projects yet.</p>
+                <Link
+                  href="/projects"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-bold border border-blue-200 dark:border-blue-900"
+                >
+                  <Plus size={13} /> + Create Project Site
+                </Link>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {activeProjects.map((p) => (
+                  <div key={p.id} className="py-2.5 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <strong className="text-slate-900 dark:text-slate-100">{p.code} — {p.name}</strong>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold">
+                        {p.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-500 text-[11px]">
+                      <span>{p.siteLocation}, {p.city}</span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{formatINR(p.contractValue)}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-slate-500 text-[11px]">
-                    <span>{p.siteLocation}, {p.city}</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{formatINR(p.contractValue)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* SRM Machine & Tool Custody Strip */}

@@ -20,6 +20,7 @@ import {
   ExternalLink,
   ShieldCheck,
   Calendar,
+  Archive,
 } from "lucide-react";
 import { formatINR, numberToWordsINR } from "@/lib/decimal";
 
@@ -214,6 +215,25 @@ export default function InvoiceDetailPage({
     }
   };
 
+  const handleArchiveInvoice = async () => {
+    if (!confirm(`Move invoice ${invoice?.invoiceNumber} to Archive? You can restore it anytime from the Invoices Archive tab.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/invoices/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        router.push("/invoices");
+      } else {
+        alert(data.error || "Failed to archive invoice");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to archive invoice");
+    }
+  };
+
   const handleVoidInvoice = async () => {
     if (!confirm(`Are you sure you want to VOID invoice ${invoice?.invoiceNumber}? This action marks the balance due as zero and voids the tax bill.`)) {
       return;
@@ -334,6 +354,14 @@ export default function InvoiceDetailPage({
           >
             <Copy size={15} /> Clone
           </Link>
+
+          <button
+            onClick={handleArchiveInvoice}
+            className="px-3 py-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-lg text-xs font-bold border border-amber-200 dark:border-amber-900 flex items-center gap-1.5 transition cursor-pointer"
+            title="Move Invoice to Archive"
+          >
+            <Archive size={15} /> Archive
+          </button>
 
           {invoice.status !== "VOID" && (
             <button

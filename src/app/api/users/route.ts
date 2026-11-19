@@ -136,3 +136,30 @@ export async function PUT(request: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await getCurrentUserSession();
+    if (!session || (session.role !== "SUPER_ADMIN" && session.role !== "MANAGING_DIRECTOR")) {
+      return NextResponse.json(
+        { success: false, error: "Only Super Admin or Managing Director can delete users." },
+        { status: 403 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ success: false, error: "User ID is required." }, { status: 400 });
+    }
+
+    if (session.userId === id) {
+      return NextResponse.json({ success: false, error: "You cannot delete your own active account." }, { status: 400 });
+    }
+
+    await prisma.user.delete({ where: { id } });
+    return NextResponse.json({ success: true, message: "User deleted successfully" });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

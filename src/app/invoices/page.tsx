@@ -15,6 +15,10 @@ import {
   Building,
   CreditCard,
   ArrowRight,
+  Archive,
+  RotateCcw,
+  Trash2,
+  ExternalLink,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
 
@@ -37,6 +41,7 @@ interface InvoiceItem {
   balanceDue: string;
   status: string;
   isInterState: boolean;
+  isArchived?: boolean;
 }
 
 export default function InvoicesPage() {
@@ -45,6 +50,10 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [displayPlainNumber, setDisplayPlainNumber] = useState(false);
+
+  // Archive Confirm Modal
+  const [archiveInvoice, setArchiveInvoice] = useState<InvoiceItem | null>(null);
+  const [archiving, setArchiving] = useState(false);
 
   // Payment Recording Modal
   const [paymentInvoice, setPaymentInvoice] = useState<InvoiceItem | null>(null);
@@ -56,10 +65,10 @@ export default function InvoicesPage() {
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState("");
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = async (showArchived = statusFilter === "ARCHIVED") => {
     try {
       setLoading(true);
-      const res = await fetch("/api/invoices");
+      const res = await fetch(`/api/invoices?archived=${showArchived ? "true" : "false"}`);
       const data = await res.json();
       if (data.success) {
         setInvoices(data.invoices);
@@ -72,8 +81,47 @@ export default function InvoicesPage() {
   };
 
   useEffect(() => {
-    fetchInvoices();
-  }, []);
+    fetchInvoices(statusFilter === "ARCHIVED");
+  }, [statusFilter]);
+
+  const handleArchiveConfirm = async () => {
+    if (!archiveInvoice) return;
+    try {
+      setArchiving(true);
+      const res = await fetch(`/api/invoices/${archiveInvoice.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setArchiveInvoice(null);
+        fetchInvoices(statusFilter === "ARCHIVED");
+      } else {
+        alert(data.error || "Failed to archive invoice");
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const handleRestore = async (inv: InvoiceItem) => {
+    try {
+      const res = await fetch(`/api/invoices/${inv.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restore" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchInvoices(statusFilter === "ARCHIVED");
+      } else {
+        alert(data.error || "Failed to restore invoice");
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
 
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +148,7 @@ export default function InvoicesPage() {
         setPaymentAmount("");
         setTdsAmount("0");
         setReferenceNumber("");
-        fetchInvoices();
+        fetchInvoices(statusFilter === "ARCHIVED");
       } else {
         setPaymentError(data.error || "Failed to record payment");
       }
@@ -112,7 +160,10 @@ export default function InvoicesPage() {
   };
 
   const filteredInvoices = invoices.filter((inv) => {
-    const matchesStatus = statusFilter === "ALL" || inv.status === statusFilter;
+    const matchesStatus =
+      statusFilter === "ALL" ||
+      statusFilter === "ARCHIVED" ||
+      inv.status === statusFilter;
     const matchesSearch =
       inv.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       inv.customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -143,14 +194,14 @@ export default function InvoicesPage() {
             </span>
             <button
               onClick={() => setDisplayPlainNumber(!displayPlainNumber)}
-              className="text-[10px] text-slate-500 hover:text-blue-600 underline ml-1"
+              className="text-[10px] text-slate-500 hover:text-blue-600 underline ml-1 cursor-pointer"
             >
               ({displayPlainNumber ? "show prefix" : "show plain #"})
             </button>
           </div>
           <Link
             href="/invoices/new"
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow transition active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow transition active:scale-95 cursor-pointer"
           >
             <Plus size={16} /> + Create Invoice
           </Link>
@@ -160,16 +211,19 @@ export default function InvoicesPage() {
       {/* Filter Tabs & Search */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto">
-          {["ALL", "UNPAID", "PARTIAL", "PAID"].map((st) => (
+          {["ALL", "UNPAID", "PARTIAL", "PAID", "ARCHIVED"].map((st) => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
                 statusFilter === st
-                  ? "bg-blue-600 text-white"
+                  ? st === "ARCHIVED"
+                    ? "bg-amber-600 text-white"
+                    : "bg-blue-600 text-white"
                   : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
               }`}
             >
+              {st === "ARCHIVED" && <Archive size={13} />}
               {st}
             </button>
           ))}
@@ -212,14 +266,22 @@ export default function InvoicesPage() {
               ) : filteredInvoices.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-8 text-center text-slate-400">
-                    No invoices found. Click <strong>+ Create Invoice</strong> to issue invoice <strong>#{nextSeq}</strong>.
+                    {statusFilter === "ARCHIVED"
+                      ? "No archived invoices found."
+                      : `No invoices found. Click + Create Invoice to issue invoice #${nextSeq}.`}
                   </td>
                 </tr>
               ) : (
                 filteredInvoices.map((inv) => (
                   <tr key={inv.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
                     <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100">
-                      <div>{displayPlainNumber ? `#${inv.sequenceNumber}` : inv.invoiceNumber}</div>
+                      <Link
+                        href={`/invoices/${inv.id}`}
+                        className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 group"
+                      >
+                        <span>{displayPlainNumber ? `#${inv.sequenceNumber}` : inv.invoiceNumber}</span>
+                        <ExternalLink size={11} className="opacity-0 group-hover:opacity-100 transition" />
+                      </Link>
                       <span className="text-[10px] text-slate-400 uppercase font-sans font-normal">{inv.invoiceType}</span>
                     </td>
                     <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
@@ -254,38 +316,59 @@ export default function InvoicesPage() {
                     <td className="py-3 px-4 text-center">
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                          inv.status === "PAID"
+                          inv.isArchived
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                            : inv.status === "PAID"
                             ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
                             : inv.status === "PARTIAL"
                             ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400"
                             : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400"
                         }`}
                       >
-                        {inv.status}
+                        {inv.isArchived ? "ARCHIVED" : inv.status}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
-                        {inv.status !== "PAID" && (
+                        {!inv.isArchived ? (
+                          <>
+                            {inv.status !== "PAID" && (
+                              <button
+                                onClick={() => {
+                                  setPaymentInvoice(inv);
+                                  setPaymentAmount(inv.balanceDue);
+                                }}
+                                className="px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold border border-emerald-200 transition cursor-pointer"
+                                title="Record Customer Payment"
+                              >
+                                + Pay
+                              </button>
+                            )}
+                            <Link
+                              href={`/invoices/${inv.id}/print`}
+                              target="_blank"
+                              className="p-1 rounded text-slate-500 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                              title="Print A4 GST Tax Invoice"
+                            >
+                              <Printer size={15} />
+                            </Link>
+                            <button
+                              onClick={() => setArchiveInvoice(inv)}
+                              className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                              title="Archive / Delete Invoice"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </>
+                        ) : (
                           <button
-                            onClick={() => {
-                              setPaymentInvoice(inv);
-                              setPaymentAmount(inv.balanceDue);
-                            }}
-                            className="px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold border border-emerald-200 transition"
-                            title="Record Customer Payment"
+                            onClick={() => handleRestore(inv)}
+                            className="px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-bold border border-blue-200 transition cursor-pointer flex items-center gap-1"
+                            title="Restore Invoice from Archive"
                           >
-                            + Pay
+                            <RotateCcw size={12} /> Restore
                           </button>
                         )}
-                        <Link
-                          href={`/invoices/${inv.id}/print`}
-                          target="_blank"
-                          className="p-1 rounded text-slate-500 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                          title="Print A4 GST Tax Invoice"
-                        >
-                          <Printer size={15} />
-                        </Link>
                       </div>
                     </td>
                   </tr>
@@ -295,6 +378,45 @@ export default function InvoicesPage() {
           </table>
         </div>
       </div>
+
+      {/* Archive Confirmation Modal */}
+      {archiveInvoice && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
+            <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center mx-auto">
+              <Archive size={24} />
+            </div>
+            <div className="text-center">
+              <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
+                Move Invoice to Archive?
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Invoice <strong className="text-slate-900 dark:text-slate-100">{archiveInvoice.invoiceNumber}</strong> (Customer: {archiveInvoice.customer.name}) will be archived.
+              </p>
+              <div className="mt-3 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300 text-[11px] text-left">
+                ℹ️ <strong>Zero Data Loss:</strong> This invoice will NOT be permanently deleted. It will be safely moved to the <strong>Archive</strong> tab, where you can view or restore it at any time.
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setArchiveInvoice(null)}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={archiving}
+                onClick={handleArchiveConfirm}
+                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow cursor-pointer disabled:opacity-50"
+              >
+                {archiving ? "Archiving..." : "Yes, Archive Invoice"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Record Payment Receipt Modal */}
       {paymentInvoice && (
@@ -318,84 +440,80 @@ export default function InvoicesPage() {
             <form onSubmit={handleRecordPayment} className="space-y-3.5 mt-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">Amount Received (₹) *</label>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Payment Date</label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                     required
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono font-bold"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">TDS u/s 194C (₹)</label>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Mode</label>
+                  <select
+                    value={paymentMode}
+                    onChange={(e) => setPaymentMode(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                  >
+                    <option value="NEFT">NEFT / RTGS</option>
+                    <option value="IMPS">IMPS</option>
+                    <option value="UPI">UPI / GPay</option>
+                    <option value="CHEQUE">Cheque</option>
+                    <option value="CASH">Cash</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Amount Received (₹)*</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-mono font-bold text-sm"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">TDS Deducted (₹)</label>
                   <input
                     type="number"
                     step="0.01"
                     value={tdsAmount}
                     onChange={(e) => setTdsAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono font-bold text-blue-600"
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-mono"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">Payment Mode</label>
-                  <select
-                    value={paymentMode}
-                    onChange={(e) => setPaymentMode(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-semibold"
-                  >
-                    <option value="NEFT">NEFT / RTGS</option>
-                    <option value="UPI">UPI / QR Code</option>
-                    <option value="CHEQUE">Cheque</option>
-                    <option value="CASH">Cash in Hand</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">Payment Date</label>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Reference / UTR #</label>
                   <input
-                    type="date"
-                    value={paymentDate}
-                    onChange={(e) => setPaymentDate(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    type="text"
+                    value={referenceNumber}
+                    onChange={(e) => setReferenceNumber(e.target.value)}
+                    placeholder="e.g. UTR / Chq No"
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300">UTR / Cheque / Transaction Ref No</label>
-                <input
-                  type="text"
-                  placeholder="e.g. UTR1234567890 / Chq 004512"
-                  value={referenceNumber}
-                  onChange={(e) => setReferenceNumber(e.target.value)}
-                  className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
-                />
-              </div>
-
-              <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-300">
-                ⚡ <strong>Double-Entry Posting:</strong> Automatically debits Bank/Cash and TDS
-                Receivable (1070), and credits Accounts Receivable (1030).
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setPaymentInvoice(null)}
-                  className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer font-bold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingPayment}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition disabled:opacity-50"
+                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer disabled:opacity-50"
                 >
-                  {submittingPayment ? "Posting..." : "Confirm & Record Receipt"}
+                  {submittingPayment ? "Recording..." : "Record Payment"}
                 </button>
               </div>
             </form>

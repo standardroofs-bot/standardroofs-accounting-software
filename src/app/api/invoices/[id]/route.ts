@@ -43,7 +43,32 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { status, notes, terms, dueDate } = body;
+    const { status, notes, terms, dueDate, action } = body;
+
+    // Handle Archive / Restore Actions
+    if (action === "restore") {
+      const restored = await prisma.invoice.update({
+        where: { id },
+        data: {
+          isArchived: false,
+          archivedAt: null,
+        },
+        include: { customer: true, items: true },
+      });
+      return NextResponse.json({ success: true, message: "Invoice restored from Archive", invoice: restored });
+    }
+
+    if (action === "archive") {
+      const archived = await prisma.invoice.update({
+        where: { id },
+        data: {
+          isArchived: true,
+          archivedAt: new Date(),
+        },
+        include: { customer: true, items: true },
+      });
+      return NextResponse.json({ success: true, message: "Invoice moved to Archive", invoice: archived });
+    }
 
     const data: any = {};
     if (status) data.status = status;
@@ -71,24 +96,26 @@ export async function DELETE(
     const { id } = await params;
     const invoice = await prisma.invoice.findUnique({
       where: { id },
-      include: { payments: true },
     });
 
     if (!invoice) {
       return NextResponse.json({ success: false, error: "Invoice not found" }, { status: 404 });
     }
 
-    if (invoice.payments && invoice.payments.length > 0) {
-      return NextResponse.json(
-        { success: false, error: "Cannot delete invoice with recorded payments. Please void it or delete payments first." },
-        { status: 400 }
-      );
-    }
+    // Soft-delete to Archive (never permanently deleted - preserves all audit records)
+    const updated = await prisma.invoice.update({
+      where: { id },
+      data: {
+        isArchived: true,
+        archivedAt: new Date(),
+      },
+    });
 
-    await prisma.invoiceItem.deleteMany({ where: { invoiceId: id } });
-    await prisma.invoice.delete({ where: { id } });
-
-    return NextResponse.json({ success: true, message: "Invoice deleted successfully" });
+    return NextResponse.json({
+      success: true,
+      message: "Invoice moved to Archive successfully",
+      invoice: updated,
+    });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

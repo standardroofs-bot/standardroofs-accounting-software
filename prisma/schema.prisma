@@ -453,6 +453,8 @@ model Customer {
   creditDays         Int           @default(30)
   openingBalance     Decimal       @default(0.00) @db.Decimal(15, 2)
   outstandingBalance Decimal       @default(0.00) @db.Decimal(15, 2)
+  isArchived         Boolean       @default(false)
+  archivedAt         DateTime?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -533,6 +535,8 @@ model Invoice {
   receiptUrl              String?
   journalEntryId          String?          @unique
   importBatchId           String?
+  isArchived              Boolean          @default(false)
+  archivedAt              DateTime?
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 

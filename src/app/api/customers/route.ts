@@ -3,12 +3,26 @@ import { prisma } from "@/lib/prisma";
 import { toDecimal } from "@/lib/decimal";
 import { validateGSTIN, getStateCodeFromGSTIN, INDIAN_STATES } from "@/lib/gst";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const archived = searchParams.get("archived");
+
+    const where: any = {};
+    if (archived === "true") {
+      where.isArchived = true;
+    } else if (archived === "all") {
+      // all
+    } else {
+      where.isArchived = false;
+    }
+
     const customers = await prisma.customer.findMany({
+      where,
       include: {
         projects: { select: { id: true, code: true, name: true, status: true } },
         invoices: {
+          where: { isArchived: false },
           select: {
             id: true,
             invoiceNumber: true,

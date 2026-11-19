@@ -10,10 +10,19 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get("customerId");
     const status = searchParams.get("status");
+    const archived = searchParams.get("archived");
 
     const where: any = {};
     if (customerId) where.customerId = customerId;
-    if (status) where.status = status;
+    if (status && status !== "ALL") where.status = status;
+
+    if (archived === "true") {
+      where.isArchived = true;
+    } else if (archived === "all") {
+      // include both
+    } else {
+      where.isArchived = false;
+    }
 
     const invoices = await prisma.invoice.findMany({
       where,

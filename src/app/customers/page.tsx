@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Users,
   Plus,
@@ -15,9 +16,18 @@ import {
   Clock,
   ArrowRight,
   ShieldCheck,
+  Edit2,
+  Trash2,
+  RotateCcw,
+  Archive,
+  Receipt,
+  FileSpreadsheet,
+  CheckCircle2,
+  ExternalLink,
+  ChevronDown,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
-import { validateGSTIN } from "@/lib/gst";
+import { validateGSTIN, getStateCodeFromGSTIN, INDIAN_STATES_LIST } from "@/lib/gst";
 
 interface CustomerItem {
   id: string;
@@ -34,8 +44,9 @@ interface CustomerItem {
   creditDays: number;
   openingBalance: string;
   outstandingBalance: string;
-  projects: Array<{ id: string; code: string; name: string }>;
-  ageing: {
+  isArchived?: boolean;
+  projects?: Array<{ id: string; code: string; name: string }>;
+  ageing?: {
     bucket0_15: string;
     bucket16_30: string;
     bucket31_60: string;
@@ -48,106 +59,206 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [tabFilter, setTabFilter] = useState<"ALL" | "DUE" | "ZERO" | "ARCHIVED">("ALL");
 
-  // Form State
-  const [name, setName] = useState("");
-  const [companyName, setCompanyName] = useState("");
-  const [gstNumber, setGstNumber] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [state, setState] = useState("Tamil Nadu");
-  const [stateCode, setStateCode] = useState("33");
-  const [billingAddress, setBillingAddress] = useState("");
-  const [shippingAddress, setShippingAddress] = useState("");
-  const [creditDays, setCreditDays] = useState("30");
-  const [openingBalance, setOpeningBalance] = useState("0");
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  // Modal States
+  const [showModal, setShowModal] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<CustomerItem | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<CustomerItem | null>(null);
+  const [archiving, setArchiving] = useState(false);
 
-  // Ledger Statement Modal
-  const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
-  const [ledgerStatement, setLedgerStatement] = useState<any[]>([]);
+  // Form Fields
+  const [formName, setFormName] = useState("");
+  const [formCompanyName, setFormCompanyName] = useState("");
+  const [formGstin, setFormGstin] = useState("");
+  const [formPan, setFormPan] = useState("");
+  const [formPhone, setFormPhone] = useState("");
+  const [formEmail, setFormEmail] = useState("");
+  const [formState, setFormState] = useState("Tamil Nadu");
+  const [formStateCode, setFormStateCode] = useState("33");
+  const [formBilling, setFormBilling] = useState("");
+  const [formShipping, setFormShipping] = useState("");
+  const [sameAsBilling, setSameAsBilling] = useState(true);
+  const [formCreditDays, setFormCreditDays] = useState("30");
+  const [formOpeningBal, setFormOpeningBal] = useState("0");
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  // Statement Modal
+  const [statementCustomer, setStatementCustomer] = useState<CustomerItem | null>(null);
+  const [ledgerEvents, setLedgerEvents] = useState<any[]>([]);
   const [loadingLedger, setLoadingLedger] = useState(false);
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (showArchived = tabFilter === "ARCHIVED") => {
     try {
       setLoading(true);
-      const res = await fetch("/api/customers");
+      const res = await fetch(`/api/customers?archived=${showArchived ? "true" : "false"}`);
       const data = await res.json();
       if (data.success) {
         setCustomers(data.customers);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load customers:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCustomers();
-  }, []);
+    fetchCustomers(tabFilter === "ARCHIVED");
+  }, [tabFilter]);
 
-  const handleCreateCustomer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (gstNumber && !validateGSTIN(gstNumber)) {
-      setErrorMsg("Invalid GSTIN! Must be a valid 15-character Indian GST format (e.g. 33AABCS1234F1Z5)");
-      return;
-    }
+  const openAddModal = () => {
+    setEditingCustomer(null);
+    setFormName("");
+    setFormCompanyName("");
+    setFormGstin("");
+    setFormPan("");
+    setFormPhone("");
+    setFormEmail("");
+    setFormState("Tamil Nadu");
+    setFormStateCode("33");
+    setFormBilling("");
+    setFormShipping("");
+    setSameAsBilling(true);
+    setFormCreditDays("30");
+    setFormOpeningBal("0");
+    setFormError("");
+    setShowModal(true);
+  };
 
-    setSubmitting(true);
-    setErrorMsg("");
+  const openEditModal = (c: CustomerItem) => {
+    setEditingCustomer(c);
+    setFormName(c.name);
+    setFormCompanyName(c.companyName || "");
+    setFormGstin(c.gstNumber || "");
+    setFormPan(c.panNumber || "");
+    setFormPhone(c.phone || "");
+    setFormEmail(c.email || "");
+    setFormState(c.state || "Tamil Nadu");
+    setFormStateCode(c.stateCode || "33");
+    setFormBilling(c.billingAddress || "");
+    setFormShipping(c.shippingAddress || c.billingAddress || "");
+    setSameAsBilling(c.shippingAddress === c.billingAddress || !c.shippingAddress);
+    setFormCreditDays(String(c.creditDays || 30));
+    setFormOpeningBal(String(c.openingBalance || 0));
+    setFormError("");
+    setShowModal(true);
+  };
 
-    try {
-      const res = await fetch("/api/customers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          companyName,
-          gstNumber,
-          phone,
-          email,
-          state,
-          stateCode,
-          billingAddress,
-          shippingAddress: shippingAddress || billingAddress,
-          creditDays: parseInt(creditDays) || 30,
-          openingBalance,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        setShowAddModal(false);
-        setName("");
-        setCompanyName("");
-        setGstNumber("");
-        setPhone("");
-        setEmail("");
-        setBillingAddress("");
-        setShippingAddress("");
-        setOpeningBalance("0");
-        fetchCustomers();
-      } else {
-        setErrorMsg(data.error || "Failed to create customer");
+  const handleGstinChange = (val: string) => {
+    const upper = val.toUpperCase();
+    setFormGstin(upper);
+    if (upper.length >= 2) {
+      const code = upper.slice(0, 2);
+      const found = INDIAN_STATES_LIST.find((s) => s.code === code);
+      if (found) {
+        setFormStateCode(code);
+        setFormState(found.name);
       }
-    } catch (err: any) {
-      setErrorMsg(err.message);
-    } finally {
-      setSubmitting(false);
+    }
+    if (upper.length >= 12 && !formPan) {
+      setFormPan(upper.slice(2, 12));
     }
   };
 
-  const openLedgerStatement = async (cust: CustomerItem) => {
-    setSelectedCustomer(cust);
-    setLoadingLedger(true);
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formName.trim() || !formBilling.trim()) {
+      setFormError("Customer Name and Billing Address are mandatory.");
+      return;
+    }
+    if (formGstin && !validateGSTIN(formGstin)) {
+      setFormError("Invalid GSTIN! Please enter a valid 15-character GST format (e.g. 33AEWFS5187G1ZD).");
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/customers/${cust.id}`);
+      setFormSubmitting(true);
+      setFormError("");
+
+      const payload = {
+        name: formName.trim(),
+        companyName: formCompanyName.trim() || null,
+        gstNumber: formGstin.trim() || null,
+        panNumber: formPan.trim() || null,
+        phone: formPhone.trim() || null,
+        email: formEmail.trim() || null,
+        state: formState,
+        stateCode: formStateCode,
+        billingAddress: formBilling.trim(),
+        shippingAddress: sameAsBilling ? formBilling.trim() : formShipping.trim(),
+        creditDays: Number(formCreditDays) || 30,
+        openingBalance: Number(formOpeningBal) || 0,
+      };
+
+      const url = editingCustomer ? `/api/customers/${editingCustomer.id}` : "/api/customers";
+      const method = editingCustomer ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       const data = await res.json();
       if (data.success) {
-        setLedgerStatement(data.ledgerStatement);
+        setShowModal(false);
+        fetchCustomers(tabFilter === "ARCHIVED");
+      } else {
+        setFormError(data.error || "Failed to save customer");
+      }
+    } catch (err: any) {
+      setFormError(err.message || "An error occurred");
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
+
+  const handleArchiveConfirm = async () => {
+    if (!archiveTarget) return;
+    try {
+      setArchiving(true);
+      const res = await fetch(`/api/customers/${archiveTarget.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setArchiveTarget(null);
+        fetchCustomers(tabFilter === "ARCHIVED");
+      } else {
+        alert(data.error || "Failed to archive customer");
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const handleRestore = async (c: CustomerItem) => {
+    try {
+      const res = await fetch(`/api/customers/${c.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restore" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchCustomers(tabFilter === "ARCHIVED");
+      } else {
+        alert(data.error || "Failed to restore customer");
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const viewStatement = async (c: CustomerItem) => {
+    setStatementCustomer(c);
+    setLoadingLedger(true);
+    try {
+      const res = await fetch(`/api/customers/${c.id}`);
+      const data = await res.json();
+      if (data.success) {
+        setLedgerEvents(data.ledgerStatement || []);
       }
     } catch (err) {
       console.error(err);
@@ -156,23 +267,32 @@ export default function CustomersPage() {
     }
   };
 
-  const filteredCustomers = customers.filter(
-    (c) =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.companyName && c.companyName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (c.gstNumber && c.gstNumber.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Metrics calculations
+  const totalOutstanding = customers.reduce((s, c) => s + Number(c.outstandingBalance || 0), 0);
+  const bucket0_15Total = customers.reduce((s, c) => s + Number(c.ageing?.bucket0_15 || 0), 0);
+  const bucket16_30Total = customers.reduce((s, c) => s + Number(c.ageing?.bucket16_30 || 0), 0);
+  const bucket31_60Total = customers.reduce((s, c) => s + Number(c.ageing?.bucket31_60 || 0), 0);
+  const bucket60_plusTotal = customers.reduce((s, c) => s + Number(c.ageing?.bucket60_plus || 0), 0);
 
-  // Overall AR Ageing Metrics
-  const totalAR = customers.reduce((sum, c) => sum + parseFloat(c.ageing?.totalDue || "0"), 0);
-  const total0_15 = customers.reduce((sum, c) => sum + parseFloat(c.ageing?.bucket0_15 || "0"), 0);
-  const total16_30 = customers.reduce((sum, c) => sum + parseFloat(c.ageing?.bucket16_30 || "0"), 0);
-  const total31_60 = customers.reduce((sum, c) => sum + parseFloat(c.ageing?.bucket31_60 || "0"), 0);
-  const total60_plus = customers.reduce((sum, c) => sum + parseFloat(c.ageing?.bucket60_plus || "0"), 0);
+  const filteredCustomers = customers.filter((c) => {
+    const bal = Number(c.outstandingBalance || 0);
+    if (tabFilter === "DUE" && bal <= 0) return false;
+    if (tabFilter === "ZERO" && bal > 0) return false;
+
+    const query = searchQuery.toLowerCase();
+    const match =
+      c.name.toLowerCase().includes(query) ||
+      (c.companyName && c.companyName.toLowerCase().includes(query)) ||
+      (c.gstNumber && c.gstNumber.toLowerCase().includes(query)) ||
+      (c.phone && c.phone.toLowerCase().includes(query)) ||
+      (c.email && c.email.toLowerCase().includes(query)) ||
+      (c.billingAddress && c.billingAddress.toLowerCase().includes(query));
+    return match;
+  });
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -183,55 +303,84 @@ export default function CustomersPage() {
           </p>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow transition active:scale-95"
+          onClick={openAddModal}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow transition active:scale-95 cursor-pointer"
         >
           <Plus size={16} /> + New Customer
         </button>
       </div>
 
-      {/* AR Ageing Summary Cards */}
+      {/* AR Ageing Summary Strip */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Outstanding</span>
-          <p className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">{formatINR(totalAR)}</p>
-          <span className="text-[10px] text-blue-600 font-semibold mt-0.5 block">Total Unpaid Invoices</span>
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm col-span-2 md:col-span-1">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Outstanding</span>
+          <div className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">
+            {formatINR(totalOutstanding)}
+          </div>
+          <span className="text-[10px] text-slate-400 mt-0.5 block">Total Unpaid Invoices</span>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">0 – 15 Days</span>
-          <p className="text-lg font-black text-emerald-600 mt-1">{formatINR(total0_15)}</p>
+
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">0 – 15 Days</span>
+          <div className="text-lg font-black text-emerald-600 mt-1">{formatINR(bucket0_15Total)}</div>
           <span className="text-[10px] text-slate-400 mt-0.5 block">Current / On Time</span>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">16 – 30 Days</span>
-          <p className="text-lg font-black text-blue-600 mt-1">{formatINR(total16_30)}</p>
+
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">16 – 30 Days</span>
+          <div className="text-lg font-black text-blue-600 mt-1">{formatINR(bucket16_30Total)}</div>
           <span className="text-[10px] text-slate-400 mt-0.5 block">Normal Credit Period</span>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">31 – 60 Days</span>
-          <p className="text-lg font-black text-amber-600 mt-1">{formatINR(total31_60)}</p>
+
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">31 – 60 Days</span>
+          <div className="text-lg font-black text-amber-600 mt-1">{formatINR(bucket31_60Total)}</div>
           <span className="text-[10px] text-slate-400 mt-0.5 block">Follow-Up Required</span>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600">60+ Days</span>
-          <p className="text-lg font-black text-rose-600 mt-1">{formatINR(total60_plus)}</p>
-          <span className="text-[10px] text-rose-500 font-semibold mt-0.5 block">Overdue Critical</span>
+
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block">60+ Days</span>
+          <div className="text-lg font-black text-rose-600 mt-1">{formatINR(bucket60_plusTotal)}</div>
+          <span className="text-[10px] text-slate-400 mt-0.5 block">Overdue Critical</span>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="flex items-center justify-between gap-4 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-        <div className="relative flex-1 max-w-md">
+      {/* Filter Tabs & Search */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto">
+          {[
+            { id: "ALL", label: "All Customers" },
+            { id: "DUE", label: "With Balance Due" },
+            { id: "ZERO", label: "Zero Balance" },
+            { id: "ARCHIVED", label: "Archived" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setTabFilter(tab.id as any)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                tabFilter === tab.id
+                  ? tab.id === "ARCHIVED"
+                    ? "bg-amber-600 text-white"
+                    : "bg-blue-600 text-white"
+                  : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              {tab.id === "ARCHIVED" && <Archive size={13} />}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full sm:w-72">
           <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
           <input
             type="text"
-            placeholder="Search customer name, company, GSTIN or phone..."
+            placeholder="Search customer, GSTIN, phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
-        <span className="text-xs text-slate-400">Total {filteredCustomers.length} Customers</span>
       </div>
 
       {/* Customers Table */}
@@ -245,7 +394,7 @@ export default function CustomersPage() {
                 <th className="py-3 px-4">Contact Info</th>
                 <th className="py-3 px-4">Credit Terms</th>
                 <th className="py-3 px-4 text-right">AR Outstanding (₹)</th>
-                <th className="py-3 px-4 text-center">Ledger Statement</th>
+                <th className="py-3 px-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
@@ -256,211 +405,306 @@ export default function CustomersPage() {
               ) : filteredCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-400">
-                    No customers found. Click <strong>+ New Customer</strong> to add your first client.
+                    {tabFilter === "ARCHIVED" ? "No archived customers found." : "No customers found matching criteria."}
                   </td>
                 </tr>
               ) : (
-                filteredCustomers.map((cust) => (
-                  <tr key={cust.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
-                    <td className="py-3 px-4">
-                      <div className="font-bold text-slate-900 dark:text-slate-100">{cust.name}</div>
-                      {cust.companyName && (
-                        <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                          <Building size={12} /> {cust.companyName}
+                filteredCustomers.map((c) => {
+                  const bal = Number(c.outstandingBalance || 0);
+                  return (
+                    <tr key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-slate-900 dark:text-slate-100">{c.name}</div>
+                        {c.companyName && (
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 flex items-center gap-1">
+                            <Building size={11} className="text-slate-400" /> {c.companyName}
+                          </div>
+                        )}
+                        <p className="text-[10px] text-slate-400 truncate max-w-xs mt-0.5">
+                          {c.billingAddress}
+                        </p>
+                      </td>
+                      <td className="py-3 px-4">
+                        {c.gstNumber ? (
+                          <div>
+                            <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                              {c.gstNumber}
+                            </span>
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              {c.state} (Code: {c.stateCode})
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">Unregistered Consumer</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 space-y-0.5 text-slate-500">
+                        {c.phone && (
+                          <div className="flex items-center gap-1 text-[11px]">
+                            <Phone size={11} className="text-slate-400" /> {c.phone}
+                          </div>
+                        )}
+                        {c.email && (
+                          <div className="flex items-center gap-1 text-[11px]">
+                            <Mail size={11} className="text-slate-400" /> {c.email}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                          {c.creditDays} Days Credit
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold">
+                        <span className={bal > 0 ? "text-rose-600 dark:text-rose-400 text-sm" : "text-emerald-600"}>
+                          {formatINR(bal)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {!c.isArchived ? (
+                            <>
+                              <button
+                                onClick={() => viewStatement(c)}
+                                className="px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold border border-blue-200 transition cursor-pointer"
+                                title="View Double-Entry Ledger Statement"
+                              >
+                                View Statement
+                              </button>
+                              <Link
+                                href={`/invoices/new?customerId=${c.id}`}
+                                className="px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold border border-emerald-200 transition"
+                                title="Create Tax Invoice for this Customer"
+                              >
+                                + Invoice
+                              </Link>
+                              <button
+                                onClick={() => openEditModal(c)}
+                                className="p-1.5 rounded text-slate-500 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                                title="Edit Customer"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                onClick={() => setArchiveTarget(c)}
+                                className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                                title="Archive Customer"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => handleRestore(c)}
+                              className="px-2.5 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold border border-blue-200 transition cursor-pointer flex items-center gap-1"
+                            >
+                              <RotateCcw size={12} /> Restore
+                            </button>
+                          )}
                         </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      {cust.gstNumber ? (
-                        <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{cust.gstNumber}</span>
-                      ) : (
-                        <span className="text-slate-400 italic">Unregistered</span>
-                      )}
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        {cust.state} (State Code: {cust.stateCode})
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
-                      {cust.phone && <div className="text-[11px] flex items-center gap-1"><Phone size={11} /> {cust.phone}</div>}
-                      {cust.email && <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5"><Mail size={11} /> {cust.email}</div>}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                        {cust.creditDays} Days Credit
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
-                      {formatINR(cust.ageing?.totalDue || cust.outstandingBalance)}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => openLedgerStatement(cust)}
-                        className="px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 text-[11px] font-bold hover:bg-blue-100 transition inline-flex items-center gap-1"
-                      >
-                        <FileText size={12} /> View Statement
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Add Customer Modal */}
-      {showAddModal && (
+      {/* Add / Edit Customer Modal */}
+      {showModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Users className="text-blue-600" /> Create Customer Profile
+              <Building className="text-blue-600" />
+              {editingCustomer ? `Edit Customer: ${editingCustomer.name}` : "New Customer (Zoho Books Format)"}
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Add new roofing client with Indian GSTIN & billing details
-            </p>
 
-            {errorMsg && (
+            {formError && (
               <div className="mt-3 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
                 <AlertCircle size={16} />
-                <span>{errorMsg}</span>
+                <span>{formError}</span>
               </div>
             )}
 
-            <form onSubmit={handleCreateCustomer} className="space-y-3.5 mt-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleFormSubmit} className="space-y-4 mt-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">Customer / Contact Name *</label>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Customer Display Name *
+                  </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. S. Murugesan"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="e.g. Sabari or K.P.E Ravindran"
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">Company / Firm Name</label>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Company / Trade Name
+                  </label>
                   <input
                     type="text"
-                    placeholder="e.g. Kongu Agro Farms Pvt Ltd"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    value={formCompanyName}
+                    onChange={(e) => setFormCompanyName(e.target.value)}
+                    placeholder="e.g. Sabari & Co"
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">GSTIN (15 Digits)</label>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    GSTIN (15-digit GST Number)
+                  </label>
                   <input
                     type="text"
-                    placeholder="33AAAAA0000A1Z5"
                     maxLength={15}
-                    value={gstNumber}
-                    onChange={(e) => {
-                      const val = e.target.value.toUpperCase();
-                      setGstNumber(val);
-                      if (val.length >= 2) {
-                        setStateCode(val.substring(0, 2));
-                      }
-                    }}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono font-bold"
+                    value={formGstin}
+                    onChange={(e) => handleGstinChange(e.target.value)}
+                    placeholder="e.g. 33AEWFS5187G1ZD"
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-mono uppercase"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">State & GST Code *</label>
-                  <div className="flex gap-2 mt-1">
-                    <input
-                      type="text"
-                      value={state}
-                      onChange={(e) => setState(e.target.value)}
-                      placeholder="Tamil Nadu"
-                      className="w-3/4 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    />
-                    <input
-                      type="text"
-                      value={stateCode}
-                      onChange={(e) => setStateCode(e.target.value)}
-                      placeholder="33"
-                      className="w-1/4 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono font-bold text-center"
-                    />
-                  </div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    PAN Number
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={10}
+                    value={formPan}
+                    onChange={(e) => setFormPan(e.target.value.toUpperCase())}
+                    placeholder="e.g. AEWFS5187G"
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-mono uppercase"
+                  />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">Mobile Phone</label>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Phone Number</label>
                   <input
-                    type="text"
-                    placeholder="+91 98427 12345"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    type="tel"
+                    value={formPhone}
+                    onChange={(e) => setFormPhone(e.target.value)}
+                    placeholder="e.g. +91 98427 00000"
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">Email Address</label>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Email Address</label>
                   <input
                     type="email"
-                    placeholder="accounts@client.in"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    value={formEmail}
+                    onChange={(e) => setFormEmail(e.target.value)}
+                    placeholder="e.g. client@standardroofs.in"
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Place of Supply (State)
+                  </label>
+                  <select
+                    value={formStateCode}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      setFormStateCode(code);
+                      const f = INDIAN_STATES_LIST.find((s) => s.code === code);
+                      if (f) setFormState(f.name);
+                    }}
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                  >
+                    {INDIAN_STATES_LIST.map((s) => (
+                      <option key={s.code} value={s.code}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Credit Terms (Days)
+                  </label>
+                  <select
+                    value={formCreditDays}
+                    onChange={(e) => setFormCreditDays(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                  >
+                    <option value="0">Due on Receipt (0 Days)</option>
+                    <option value="15">Net 15 Days</option>
+                    <option value="30">Net 30 Days</option>
+                    <option value="45">Net 45 Days</option>
+                    <option value="60">Net 60 Days</option>
+                  </select>
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300">Billing Address *</label>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Billing Address *
+                </label>
                 <textarea
-                  required
                   rows={2}
-                  placeholder="Street, City, PIN Code, Tamil Nadu"
-                  value={billingAddress}
-                  onChange={(e) => setBillingAddress(e.target.value)}
-                  className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                  required
+                  value={formBilling}
+                  onChange={(e) => setFormBilling(e.target.value)}
+                  placeholder="Street, Area, City, Pincode"
+                  className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">Credit Period (Days)</label>
-                  <input
-                    type="number"
-                    value={creditDays}
-                    onChange={(e) => setCreditDays(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">Opening Balance (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={openingBalance}
-                    onChange={(e) => setOpeningBalance(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
-                  />
-                </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="sameAsBilling"
+                  checked={sameAsBilling}
+                  onChange={(e) => setSameAsBilling(e.target.checked)}
+                  className="rounded text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="sameAsBilling" className="text-slate-700 dark:text-slate-300 font-medium">
+                  Shipping Address is same as Billing Address
+                </label>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              {!sameAsBilling && (
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Shipping / Project Site Address
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formShipping}
+                    onChange={(e) => setFormShipping(e.target.value)}
+                    placeholder="Project Site, Street, City, Pincode"
+                    className="w-full px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition disabled:opacity-50"
+                  disabled={formSubmitting}
+                  className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer disabled:opacity-50"
                 >
-                  {submitting ? "Saving..." : "Save Customer"}
+                  {formSubmitting ? "Saving..." : editingCustomer ? "Update Customer" : "Save Customer"}
                 </button>
               </div>
             </form>
@@ -468,84 +712,106 @@ export default function CustomersPage() {
         </div>
       )}
 
-      {/* Customer Ledger Statement Modal */}
-      {selectedCustomer && (
+      {/* Archive Confirm Modal */}
+      {archiveTarget && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
+            <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center mx-auto">
+              <Archive size={24} />
+            </div>
+            <div className="text-center">
+              <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
+                Move Customer to Archive?
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Customer <strong className="text-slate-900 dark:text-slate-100">{archiveTarget.name}</strong> will be moved to the archive.
+              </p>
+              <div className="mt-3 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300 text-[11px] text-left">
+                ℹ️ <strong>Zero Data Loss:</strong> Customer profile and past invoices remain 100% intact. You can view or restore this customer anytime from the <strong>Archived</strong> tab.
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setArchiveTarget(null)}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={archiving}
+                onClick={handleArchiveConfirm}
+                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow cursor-pointer disabled:opacity-50"
+              >
+                {archiving ? "Archiving..." : "Yes, Archive Customer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Statement Modal */}
+      {statementCustomer && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 max-h-[90vh] overflow-y-auto space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
-                <h2 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <FileText className="text-blue-600" /> Customer Ledger Statement
-                </h2>
+                <h3 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <FileSpreadsheet className="text-blue-600" /> Customer Account Statement
+                </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {selectedCustomer.name} {selectedCustomer.companyName ? `(${selectedCustomer.companyName})` : ""}
+                  Client: <strong>{statementCustomer.name}</strong> • GSTIN: {statementCustomer.gstNumber || "Unregistered"}
                 </p>
               </div>
               <button
-                onClick={() => setSelectedCustomer(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+                onClick={() => setStatementCustomer(null)}
+                className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="my-4 max-h-80 overflow-y-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 font-bold">
-                  <tr>
-                    <th className="py-2 px-3">Date</th>
-                    <th className="py-2 px-3">Voucher / Narration</th>
-                    <th className="py-2 px-3 text-right">Debit (₹)</th>
-                    <th className="py-2 px-3 text-right">Credit (₹)</th>
-                    <th className="py-2 px-3 text-right">Balance (₹)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                  {loadingLedger ? (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400 font-sans">Loading statement...</td>
+            {loadingLedger ? (
+              <div className="py-12 text-center text-slate-400 text-xs">Loading ledger events...</div>
+            ) : ledgerEvents.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs">No transactions recorded for this customer yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold uppercase">
+                      <th className="py-2.5 px-3">Date</th>
+                      <th className="py-2.5 px-3">Voucher #</th>
+                      <th className="py-2.5 px-3">Transaction Narration</th>
+                      <th className="py-2.5 px-3 text-right">Debit (Dr) ₹</th>
+                      <th className="py-2.5 px-3 text-right">Credit (Cr) ₹</th>
+                      <th className="py-2.5 px-3 text-right">Running Balance ₹</th>
                     </tr>
-                  ) : ledgerStatement.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400 font-sans">
-                        No transactions recorded for this customer yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    ledgerStatement.map((ev, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {ledgerEvents.map((ev, i) => (
+                      <tr key={i} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
                         <td className="py-2 px-3 text-slate-500 whitespace-nowrap">
-                          {new Date(ev.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                          {new Date(ev.date).toLocaleDateString("en-IN")}
                         </td>
-                        <td className="py-2 px-3 font-sans">
-                          <div className="font-bold text-slate-800 dark:text-slate-200">{ev.voucherNumber}</div>
-                          <div className="text-[10px] text-slate-400">{ev.narration}</div>
+                        <td className="py-2 px-3 font-mono font-bold text-blue-600">{ev.voucherNumber}</td>
+                        <td className="py-2 px-3">{ev.narration}</td>
+                        <td className="py-2 px-3 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
+                          {Number(ev.debit) > 0 ? formatINR(ev.debit) : "-"}
                         </td>
-                        <td className="py-2 px-3 text-right text-emerald-600 font-bold">
-                          {parseFloat(ev.debit) > 0 ? formatINR(ev.debit) : "—"}
+                        <td className="py-2 px-3 text-right font-mono font-bold text-emerald-600">
+                          {Number(ev.credit) > 0 ? formatINR(ev.credit) : "-"}
                         </td>
-                        <td className="py-2 px-3 text-right text-blue-600 font-bold">
-                          {parseFloat(ev.credit) > 0 ? formatINR(ev.credit) : "—"}
-                        </td>
-                        <td className="py-2 px-3 text-right font-bold text-slate-900 dark:text-slate-100">
+                        <td className="py-2 px-3 text-right font-mono font-black text-slate-900 dark:text-slate-100">
                           {formatINR(ev.balance)}
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={() => setSelectedCustomer(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold"
-              >
-                Close
-              </button>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -18,6 +18,7 @@ import {
   Building,
   AlertTriangle,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 
 interface UserItem {
@@ -229,6 +230,27 @@ export default function UsersPage() {
     }
   };
 
+  const handleDeleteUser = async (user: UserItem) => {
+    if (user.role === "SUPER_ADMIN") {
+      alert("Cannot delete the primary Super Administrator account!");
+      return;
+    }
+    if (!confirm(`Are you sure you want to delete ${user.name} (${user.email})?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/users?id=${user.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        fetchUsers();
+      } else {
+        alert(data.error || "Failed to delete user");
+      }
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
+
   const handleToggleUserActive = async (user: UserItem) => {
     if (!confirm(`Are you sure you want to ${user.active ? "deactivate" : "activate"} ${user.name}?`)) {
       return;
@@ -343,13 +365,24 @@ export default function UsersPage() {
                       </button>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => openPermissionModal(u)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-[11px] transition shadow-xs"
-                      >
-                        <Shield size={13} className="text-blue-500" />
-                        <span>Edit Permissions</span>
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => openPermissionModal(u)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-[11px] transition shadow-xs cursor-pointer"
+                        >
+                          <Shield size={12} className="text-blue-500" />
+                          <span>Permissions</span>
+                        </button>
+                        {u.role !== "SUPER_ADMIN" && (
+                          <button
+                            onClick={() => handleDeleteUser(u)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                            title="Delete User Account"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

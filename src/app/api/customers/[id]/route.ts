@@ -17,6 +17,7 @@ export async function GET(
           },
         },
         invoices: {
+          where: { isArchived: false },
           include: {
             items: true,
             payments: true,
@@ -142,6 +143,71 @@ export async function PUT(
     });
 
     return NextResponse.json({ success: true, customer });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const { action } = body;
+
+    if (action === "restore") {
+      const restored = await prisma.customer.update({
+        where: { id },
+        data: { isArchived: false, archivedAt: null },
+      });
+      return NextResponse.json({ success: true, message: "Customer restored from Archive", customer: restored });
+    }
+
+    if (action === "archive") {
+      const archived = await prisma.customer.update({
+        where: { id },
+        data: { isArchived: true, archivedAt: new Date() },
+      });
+      return NextResponse.json({ success: true, message: "Customer moved to Archive", customer: archived });
+    }
+
+    return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const customer = await prisma.customer.findUnique({
+      where: { id },
+      include: { invoices: { where: { isArchived: false } } },
+    });
+
+    if (!customer) {
+      return NextResponse.json({ success: false, error: "Customer not found" }, { status: 404 });
+    }
+
+    // Soft-delete to Archive (never permanently deletes active records)
+    const updated = await prisma.customer.update({
+      where: { id },
+      data: {
+        isArchived: true,
+        archivedAt: new Date(),
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Customer moved to Archive successfully",
+      customer: updated,
+    });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
