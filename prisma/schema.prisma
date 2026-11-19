@@ -399,6 +399,12 @@ model BankTransaction {
   reconciledAt     DateTime?
   bankStatementRef String?
   journalEntryId   String?
+  category         String?             @default("UNCATEGORIZED") // UNCATEGORIZED, CUSTOMER_PAYMENT, VENDOR_PAYMENT, SITE_EXPENSE, LABOUR_CONTRACTOR, OFFICE_OVERHEAD, OWNER_CAPITAL, LOAN_EMI
+  status           String              @default("UNCATEGORIZED")
+  customerName     String?
+  vendorName       String?
+  projectName      String?
+  notes            String?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
@@ -433,6 +439,10 @@ model Customer {
   stateCode          String        @default("33") // 33 for TN
   billingAddress     String
   shippingAddress    String?
+  siteAddress        String?
+  googleMapsLink     String?
+  length             Decimal?      @default(0.00) @db.Decimal(10, 2)
+  breadth            Decimal?      @default(0.00) @db.Decimal(10, 2)
   email              String?
   phone              String?
   creditDays         Int           @default(30)
@@ -1134,18 +1144,27 @@ model StaffPayroll {
 model CompanySettings {
   id               String   @id @default("sr_company_config")
   companyName      String   @default("Standard Roofs")
+  orgId            String   @default("60069196862")
+  portalName       String   @default("standardroofs1")
+  contactPerson    String   @default("Prabhakaran T")
   tagline          String?  @default("Roofing & PEB Structure Specialists")
-  gstin            String   @default("33AABCS1234F1Z5")
-  pan              String?  @default("AABCS1234F")
+  gstin            String   @default("33AEWFS5187G1ZD")
+  pan              String?  @default("AEWFS5187G")
   state            String   @default("Tamil Nadu")
   stateCode        String   @default("33")
-  address          String   @default("12/4, Perundurai Road, Near Collectorate, Erode - 638011, Tamil Nadu")
-  phone            String   @default("+91 98427 12345")
-  email            String   @default("accounts@standardroofs.com")
-  bankName         String   @default("HDFC Bank")
-  bankBranch       String   @default("Erode Main Branch")
-  bankAccountNo    String   @default("50200012345678")
-  bankIfsc         String   @default("HDFC0001234")
+  address          String   @default("144/A, Vellakkal Medu, Villarasampatti, Nasiyanur (Post), Erode, Tamil Nadu, India – 638107")
+  phone            String   @default("+91 8608475767")
+  email            String   @default("info@standardroofs.in")
+  website          String   @default("https://www.standardroofs.in/")
+  bankName         String   @default("ICICI Bank")
+  bankAccountName  String?  @default("Standard Roofs (ICICI, xxxx3161)")
+  bankBranch       String   @default("Kagam, Erode")
+  bankAccountNo    String   @default("155205003161")
+  bankIfsc         String   @default("ICIC0001552")
+  currency         String   @default("INR")
+  fiscalYear       String   @default("April-March")
+  taxBasis         String   @default("Accrual")
+  dateFormat       String   @default("dd/MM/yyyy")
   invoiceFormat    String   @default("PREFIX") // PREFIX (SR/26-27/0033) or PLAIN (33)
   invoiceNextNo    Int      @default(33)
   createdAt        DateTime @default(now())
@@ -1258,21 +1277,69 @@ model FixedAsset {
 model Estimate {
   id                     String         @id @default(cuid())
   estimateNumber         String         @unique // EST/26-27/0001
+  serialNo               String?        // SR-00001, SR-00002...
+  version                Int            @default(1) // 1 -> V1, 2 -> V2
+  subject                String?        // SR-00001 - ClientName - RoofType - V1
   date                   DateTime       @default(now())
   expiryDate             DateTime?
+  validUntil             DateTime?
   customerId             String
   projectId              String?
   status                 String         @default("SENT") // DRAFT, SENT, APPROVED, CONVERTED, REJECTED
-  roofType               String         @default("PEB") // Clay Tile, PEB, Tensile, UPVC, Solar
+  quoteStage             String         @default("Draft") // Draft, Sent, Approved, Converted, Declined
+  roofType               String         @default("Ceramic Tile") // Roofing System Master
+  subType                String?        // 3 Way, A Type, Half A, Half L, etc.
   totalSqFt              Decimal        @default(0.00) @db.Decimal(15, 2)
   subTotal               Decimal        @default(0.00) @db.Decimal(15, 2)
   cgstTotal              Decimal        @default(0.00) @db.Decimal(15, 2)
   sgstTotal              Decimal        @default(0.00) @db.Decimal(15, 2)
   igstTotal              Decimal        @default(0.00) @db.Decimal(15, 2)
   totalAmount            Decimal        @default(0.00) @db.Decimal(15, 2)
+  rateSqft               Decimal?       @default(0.00) @db.Decimal(10, 2)
   terms                  String?
   notes                  String?
   convertedInvoiceId     String?        @unique
+  pdfUrl                 String?
+
+  // Client Auto-Fetch Fields
+  clientMobile           String?
+  siteAddress            String?
+  googleMapsLink         String?
+  length                 Decimal?       @default(0.00) @db.Decimal(10, 2)
+  breadth                Decimal?       @default(0.00) @db.Decimal(10, 2)
+
+  // Staff Contacts
+  supervisorName         String?
+  supervisorMobile       String?
+  managerName            String?
+  managerMobile          String?
+  accountantName         String?
+  accountantMobile       String?
+
+  // Roofing Specs (8 fields)
+  topLayer               String?
+  bottomLayer            String?
+  ridgeType              String?
+  clipType               String?
+  thicknessType          String?
+  weldingRod             String?
+  waterproofingSheet     String?
+  productColor           String?
+  colorText              String?
+
+  // Product Images & 2D Drawings
+  productImage1          String?
+  productImage2          String?
+  earthImage             String?
+  roof2DImage            String?
+  manual2DRoofImage      String?
+
+  // Structural Steel Specs (4 fields)
+  pillarSpec             String?
+  platformSpec           String?
+  rafterSpec             String?
+  purlinSpec             String?
+
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
 
@@ -1417,5 +1484,56 @@ model RoofingPriceItem {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+// -------------------------------------------------------------
+// SYSTEM SETTINGS (PERSISTENT QUOTATION & INVOICE NUMBERING)
+// -------------------------------------------------------------
+
+model SystemSettings {
+  id                    String   @id @default("sr_system_settings")
+  lastQuoteSerialNumber Int      @default(0) // Persistent counter for SR-00001, SR-00002...
+  lastInvoiceNumber     Int      @default(32) // Next invoice is #33
+  updatedAt             DateTime @updatedAt
+}
+
+// -------------------------------------------------------------
+// ROOFING SYSTEM MASTER SPECIFICATIONS (FROM TECHNICAL DOC & EXCEL)
+// -------------------------------------------------------------
+
+model RoofingSystemMaster {
+  id                 String   @id @default(cuid())
+  systemName         String   @unique // e.g. "Ceramic_3Way", "Monier_A Type"
+  material           String   // Ceramic, Monier, Puff Sheet, UPVC, Stone Coated, GI Spanish Sheet, PEB, Clay
+  roofType           String   // 3 Way, A Type, Half A, Half L, L Type, Manju Type, Pyramid, Single Tapper
+  topLayer           String?
+  bottomLayer        String?
+  ridgeHipSystem     String?
+  thickness          String?
+  screw              String?
+  clipsFasteners     String?
+  defaultColor       String?
+  weldingRod         String?
+  waterproofSheet    String?
+  pillarSpec         String?
+  platformSpec       String?
+  rafterSpec         String?
+  purlinSpec         String?
+  defaultRate        Decimal  @default(280.00) @db.Decimal(10, 2)
+  diagramUrl         String?  // 2D diagram
+  sampleImageUrl     String?  // 3D/Real roof image
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model ProductColorMaster {
+  id           String   @id @default(cuid())
+  colorName    String   @unique // e.g. "Coffee Brown", "Antique Red", "Blue Grey", "Steel Grey", "Terracotta"
+  material     String   @default("Ceramic")
+  image1Url    String?
+  image2Url    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 
 

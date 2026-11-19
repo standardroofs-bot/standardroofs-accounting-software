@@ -3,15 +3,20 @@ import { Decimal, toDecimal } from "./decimal";
 export const COMPANY_GST_STATE_CODE = "33"; // Tamil Nadu
 export const COMPANY_STATE = "Tamil Nadu";
 export const COMPANY_NAME = "Standard Roofs";
-export const COMPANY_GSTIN = "33AABCS1234F1Z5";
-export const COMPANY_PAN = "AABCS1234F";
-export const COMPANY_ADDRESS = "124/B, Perundurai Road, Erode - 638011, Tamil Nadu, India";
-export const COMPANY_PHONE = "+91 98427 00001 / +91 424 2223344";
-export const COMPANY_EMAIL = "accounts@standardroofs.in";
-export const COMPANY_BANK_NAME = "HDFC Bank";
-export const COMPANY_BANK_BRANCH = "Erode Main Branch";
-export const COMPANY_BANK_AC_NO = "50200012345678";
-export const COMPANY_BANK_IFSC = "HDFC0001234";
+export const COMPANY_ORG_ID = "60069196862";
+export const COMPANY_PORTAL = "standardroofs1";
+export const COMPANY_CONTACT_PERSON = "Prabhakaran T";
+export const COMPANY_GSTIN = "33AEWFS5187G1ZD";
+export const COMPANY_PAN = "AEWFS5187G";
+export const COMPANY_ADDRESS = "144/A, Vellakkal Medu, Villarasampatti, Nasiyanur (Post), Erode, Tamil Nadu, India – 638107";
+export const COMPANY_PHONE = "+91 8608475767";
+export const COMPANY_EMAIL = "info@standardroofs.in";
+export const COMPANY_WEBSITE = "https://www.standardroofs.in/";
+export const COMPANY_BANK_NAME = "ICICI Bank";
+export const COMPANY_BANK_ACCOUNT_NAME = "Standard Roofs (ICICI, xxxx3161)";
+export const COMPANY_BANK_BRANCH = "Kagam, Erode";
+export const COMPANY_BANK_AC_NO = "155205003161";
+export const COMPANY_BANK_IFSC = "ICIC0001552";
 
 export interface GSTCalculationResult {
   isInterState: boolean;

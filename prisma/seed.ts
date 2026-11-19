@@ -262,41 +262,58 @@ async function main() {
   }
   console.log("✓ Chart of Accounts initialized (all 34 balances strictly ₹ 0.00)");
 
-  // 5. BANK ACCOUNTS (Opening Balances = ₹ 0.00)
-  const hdfcAccount = await prisma.account.findUniqueOrThrow({ where: { code: "1020" } });
-  await prisma.bankAccount.upsert({
-    where: { accountNumber: "50200012345678" },
-    update: { openingBalance: 0.00, currentBalance: 0.00 },
+  // 5. BANK ACCOUNTS (Standard Roofs ICICI A/C 155205003161 Opening Balance = ₹ 24,03,272.00)
+  const iciciLedgerAcc = await prisma.account.upsert({
+    where: { code: "1020" },
+    update: {
+      name: "ICICI Bank Current Account (155205003161)",
+      openingBalance: 2403272.00,
+      currentBalance: 2403272.00,
+    },
     create: {
-      accountName: "Standard Roofs Operating A/c",
-      bankName: "HDFC Bank",
-      branchName: "Erode Main Branch",
-      accountNumber: "50200012345678",
-      ifscCode: "HDFC0001234",
-      openingBalance: 0.00,
-      currentBalance: 0.00,
-      accountId: hdfcAccount.id,
-      active: true,
+      code: "1020",
+      name: "ICICI Bank Current Account (155205003161)",
+      type: AccountType.ASSET,
+      subType: AccountSubType.BANK,
+      isSystem: true,
+      openingBalance: 2403272.00,
+      currentBalance: 2403272.00,
     },
   });
 
-  const iciciAccount = await prisma.account.findUniqueOrThrow({ where: { code: "1025" } });
-  await prisma.bankAccount.upsert({
-    where: { accountNumber: "001205009876" },
-    update: { openingBalance: 0.00, currentBalance: 0.00 },
+  await prisma.account.upsert({
+    where: { code: "3010" },
+    update: {
+      name: "Owner Capital Account (Prabhakaran T)",
+      openingBalance: 2403272.00,
+      currentBalance: 2403272.00,
+    },
     create: {
-      accountName: "Standard Roofs CC / OD Facility",
+      code: "3010",
+      name: "Owner Capital Account (Prabhakaran T)",
+      type: AccountType.EQUITY,
+      subType: AccountSubType.EQUITY,
+      isSystem: true,
+      openingBalance: 2403272.00,
+      currentBalance: 2403272.00,
+    },
+  });
+
+  await prisma.bankAccount.deleteMany();
+  await prisma.bankAccount.create({
+    data: {
+      accountName: "Standard Roofs (ICICI, xxxx3161)",
       bankName: "ICICI Bank",
-      branchName: "Brough Road, Erode",
-      accountNumber: "001205009876",
-      ifscCode: "ICIC0000012",
-      openingBalance: 0.00,
-      currentBalance: 0.00,
-      accountId: iciciAccount.id,
+      branchName: "Kagam, Erode",
+      accountNumber: "155205003161",
+      ifscCode: "ICIC0001552",
+      openingBalance: 2403272.00,
+      currentBalance: 2403272.00,
+      accountId: iciciLedgerAcc.id,
       active: true,
     },
   });
-  console.log("✓ HDFC Current & ICICI CC/OD bank accounts initialized (balances strictly ₹ 0.00)");
+  console.log("✓ ICICI Bank Current Account (155205003161) initialized with ₹ 24,03,272.00");
 
   // 6. REAL MACHINES & TOOLS (Imported directly from 2026_SRMachines_Tracking_System.xlsx)
   const realMachinesData = [
@@ -410,30 +427,77 @@ async function main() {
   }
   console.log(`✓ ${siteIssuesData.length} Site Consumable & Material Issue records initialized from tracking sheet`);
 
-  // 8. DEFAULT COMPANY SETTINGS
+  // 8. DEFAULT COMPANY SETTINGS & SYSTEM SETTINGS
+  await prisma.systemSettings.upsert({
+    where: { id: "sr_system_settings" },
+    update: {
+      lastQuoteSerialNumber: 0,
+      lastInvoiceNumber: 32,
+    },
+    create: {
+      id: "sr_system_settings",
+      lastQuoteSerialNumber: 0,
+      lastInvoiceNumber: 32,
+    },
+  });
+
   await prisma.companySettings.upsert({
     where: { id: "sr_company_config" },
-    update: { invoiceNextNo: 33 },
+    update: {
+      companyName: "Standard Roofs",
+      orgId: "60069196862",
+      portalName: "standardroofs1",
+      contactPerson: "Prabhakaran T",
+      tagline: "Roofing & PEB Structure Specialists",
+      gstin: "33AEWFS5187G1ZD",
+      pan: "AEWFS5187G",
+      state: "Tamil Nadu",
+      stateCode: "33",
+      address: "144/A, Vellakkal Medu, Villarasampatti, Nasiyanur (Post), Erode, Tamil Nadu, India – 638107",
+      phone: "+91 8608475767",
+      email: "info@standardroofs.in",
+      website: "https://www.standardroofs.in/",
+      bankName: "ICICI Bank",
+      bankAccountName: "Standard Roofs (ICICI, xxxx3161)",
+      bankBranch: "Kagam, Erode",
+      bankAccountNo: "155205003161",
+      bankIfsc: "ICIC0001552",
+      currency: "INR",
+      fiscalYear: "April-March",
+      taxBasis: "Accrual",
+      dateFormat: "dd/MM/yyyy",
+      invoiceFormat: "PREFIX",
+      invoiceNextNo: 33,
+    },
     create: {
       id: "sr_company_config",
       companyName: "Standard Roofs",
+      orgId: "60069196862",
+      portalName: "standardroofs1",
+      contactPerson: "Prabhakaran T",
       tagline: "Roofing & PEB Structure Specialists",
-      gstin: "33AABCS1234F1Z5",
-      pan: "AABCS1234F",
+      gstin: "33AEWFS5187G1ZD",
+      pan: "AEWFS5187G",
       state: "Tamil Nadu",
       stateCode: "33",
-      address: "12/4, Perundurai Road, Near Collectorate, Erode - 638011, Tamil Nadu",
-      phone: "+91 98427 12345",
-      email: "accounts@standardroofs.com",
-      bankName: "HDFC Bank",
-      bankBranch: "Erode Main Branch",
-      bankAccountNo: "50200012345678",
-      bankIfsc: "HDFC0001234",
+      address: "144/A, Vellakkal Medu, Villarasampatti, Nasiyanur (Post), Erode, Tamil Nadu, India – 638107",
+      phone: "+91 8608475767",
+      email: "info@standardroofs.in",
+      website: "https://www.standardroofs.in/",
+      bankName: "ICICI Bank",
+      bankAccountName: "Standard Roofs (ICICI, xxxx3161)",
+      bankBranch: "Kagam, Erode",
+      bankAccountNo: "155205003161",
+      bankIfsc: "ICIC0001552",
+      currency: "INR",
+      fiscalYear: "April-March",
+      taxBasis: "Accrual",
+      dateFormat: "dd/MM/yyyy",
       invoiceFormat: "PREFIX",
       invoiceNextNo: 33,
     },
   });
-  console.log("✓ Standard Roofs Company Profile & GST Settings initialized");
+  console.log("✓ Standard Roofs Company Profile & ICICI Bank Settings initialized");
 
   console.log("===============================================================");
   console.log("✅ RESET COMPLETE: 0 DUMMY DATA. REAL SRM EXCEL IMPORTED. BOOKS AT ₹ 0.00");

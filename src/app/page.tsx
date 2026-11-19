@@ -68,6 +68,23 @@ export default async function DashboardPage() {
     },
   });
 
+  const pendingUncatCount = await prisma.bankTransaction.count({
+    where: { status: "UNCATEGORIZED" },
+  });
+
+  const lowStockCount = await prisma.materialItem.count({
+    where: { currentStock: { lte: 5 } },
+  });
+
+  const systemSettings = await prisma.systemSettings.findFirst();
+  const nextSerialDisplay = `SR-${String((systemSettings?.lastQuoteSerialNumber || 0) + 1).padStart(5, "0")}`;
+
+  const activeProjects = await prisma.project.findMany({
+    take: 4,
+    orderBy: { createdAt: "desc" },
+    include: { customer: true },
+  });
+
   // Calculate Metrics
   const cashBal = toDecimal(cashAccount?.currentBalance || "0");
   const bankTotal = bankAccounts.reduce(
@@ -175,64 +192,85 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* 4-Step Guided Setup Bar for Clean Slate */}
-      {isCleanSlate && (
-        <div className="bg-linear-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-2xl p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-blue-600" />
-              <h3 className="font-bold text-slate-900 text-sm">Guided Setup Bar (Ready for First Entry)</h3>
+      {/* Executive Daily Action & Quick Access Bar */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-amber-500 shrink-0" />
+          <div>
+            <h3 className="font-black text-xs uppercase tracking-wider text-slate-800 dark:text-slate-200">
+              Executive Daily Actions (Prabhakaran T • MD Command)
+            </h3>
+            <p className="text-[11px] text-slate-500">
+              Direct shortcuts to create Zoho quotations, tax invoice sequence #33, and categorize ICICI bank transactions.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/estimates"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition active:scale-95"
+          >
+            <PlusCircle size={15} />
+            <span>+ Create Quote {nextSerialDisplay}</span>
+          </Link>
+
+          <Link
+            href="/invoices/new"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 rounded-xl text-xs font-bold shadow transition active:scale-95"
+          >
+            <Receipt size={15} />
+            <span>+ Tax Invoice #{invoiceSeq?.nextNumber || 33}</span>
+          </Link>
+
+          <Link
+            href="/banking"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold shadow transition active:scale-95"
+          >
+            <Landmark size={15} />
+            <span>+ Categorize ICICI ({pendingUncatCount})</span>
+          </Link>
+
+          <Link
+            href="/expenses"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition active:scale-95"
+          >
+            <ArrowUpRight size={15} />
+            <span>+ Record Expense</span>
+          </Link>
+
+          <Link
+            href="/inventory"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition active:scale-95"
+          >
+            <Layers size={15} />
+            <span>+ Issue Material</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Operational Action Alerts (93 ICICI Transactions & Low Stock) */}
+      {pendingUncatCount > 0 && (
+        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center font-black shrink-0">
+              {pendingUncatCount}
             </div>
-            <span className="text-xs font-semibold text-blue-700 bg-white px-2.5 py-1 rounded-full border border-blue-200 shadow-2xs">
-              Next Invoice: #{invoiceSeq?.nextNumber || 33}
-            </span>
+            <div>
+              <div className="font-bold text-slate-900 dark:text-slate-100">
+                {pendingUncatCount} Pending ICICI Bank Statement Transactions
+              </div>
+              <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                Account 155205003161 has {pendingUncatCount} statement entries ready for 1-click categorization into Customer Advance, Vendor Bills, and Site Costs.
+              </div>
+            </div>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <Link
-              href="/banking"
-              className="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-blue-500 hover:shadow-md transition group"
-            >
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[11px]">1</span>
-                <span>Add Bank & Cash</span>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1">Configure opening balances or HDFC/SBI bank accounts.</p>
-            </Link>
-
-            <Link
-              href="/price-catalog"
-              className="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-blue-500 hover:shadow-md transition group"
-            >
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[11px]">2</span>
-                <span>Check Price Catalog</span>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1">Pre-saved roofing rates for Clay Tile, PEB, UPVC & Tensile.</p>
-            </Link>
-
-            <Link
-              href="/customers"
-              className="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-blue-500 hover:shadow-md transition group"
-            >
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[11px]">3</span>
-                <span>Add Customers & Projects</span>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1">Register client GSTIN (Code 33) and site address.</p>
-            </Link>
-
-            <Link
-              href="/invoices/new"
-              className="bg-white p-3.5 rounded-xl border border-blue-300 bg-blue-50/50 hover:border-blue-600 hover:shadow-md transition group"
-            >
-              <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
-                <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px]">4</span>
-                <span>Create Invoice #33</span>
-              </div>
-              <p className="text-[11px] text-blue-700 mt-1">Issue next tax invoice continuing from invoice #32.</p>
-            </Link>
-          </div>
+          <Link
+            href="/banking"
+            className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow transition shrink-0 whitespace-nowrap"
+          >
+            Categorize Feed Now &rarr;
+          </Link>
         </div>
       )}
 
@@ -323,15 +361,15 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Total Liquidity</span>
+            <span className="text-xs font-bold uppercase tracking-wider">ICICI Bank & Liquidity</span>
             <Landmark size={18} className="text-blue-600" />
           </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-2">
+          <p className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-2 font-mono">
             {formatINR(totalLiquidity)}
           </p>
-          <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-            <span>Cash: {formatINR(cashBal)}</span>
-            <span>Bank: {formatINR(bankTotal)}</span>
+          <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 font-mono">
+            <span>ICICI (xxxx3161): {formatINR(bankTotal)}</span>
+            <span>Petty Cash: {formatINR(cashBal)}</span>
           </div>
         </div>
 

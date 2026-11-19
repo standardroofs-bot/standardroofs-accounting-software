@@ -17,6 +17,7 @@ import {
   Sparkles,
   ShieldCheck,
   Check,
+  Search,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
 
@@ -83,6 +84,92 @@ export default function BankingPage() {
   const [reconciling, setReconciling] = useState(false);
   const [reconcileMsg, setReconcileMsg] = useState("");
 
+  // Uncategorized Statement Transactions Queue State
+  const [activeTab, setActiveTab] = useState<"accounts" | "uncategorized">("uncategorized");
+  const [uncategorizedTxs, setUncategorizedTxs] = useState<any[]>([]);
+  const [pendingCount, setPendingCount] = useState(93);
+  const [uncatLoading, setUncatLoading] = useState(false);
+  const [categorizingId, setCategorizingId] = useState<string | null>(null);
+  const [txSearch, setTxSearch] = useState("");
+  const [txTypeFilter, setTxTypeFilter] = useState("ALL");
+  const [categorySelections, setCategorySelections] = useState<Record<string, string>>({});
+
+  const fetchUncategorizedTxs = async () => {
+    try {
+      setUncatLoading(true);
+      const res = await fetch("/api/banking/categorize?status=UNCATEGORIZED");
+      const data = await res.json();
+      if (data.success) {
+        setUncategorizedTxs(data.transactions);
+        setPendingCount(data.pendingCount);
+        // Pre-populate smart default suggestions based on payee/purpose
+        const defaults: Record<string, string> = {};
+        for (const t of data.transactions) {
+          const text = `${t.payeeOrPayer} ${t.purpose}`.toLowerCase();
+          if (text.includes("advance") || text.includes("site advance") || text.includes("kumar") || text.includes("sujithra") || text.includes("sinclair")) {
+            defaults[t.id] = "CUSTOMER_PAYMENT";
+          } else if (text.includes("steel") || text.includes("jsw") || text.includes("tapco") || text.includes("tiles") || text.includes("lot")) {
+            defaults[t.id] = "VENDOR_PAYMENT";
+          } else if (text.includes("diesel") || text.includes("petro") || text.includes("fuel") || text.includes("consumable") || text.includes("bata")) {
+            defaults[t.id] = "SITE_EXPENSE";
+          } else if (text.includes("muster") || text.includes("labour") || text.includes("saran") || text.includes("thennarasu")) {
+            defaults[t.id] = "LABOUR_CONTRACTOR";
+          } else if (text.includes("rent") || text.includes("electricity") || text.includes("board") || text.includes("tneb")) {
+            defaults[t.id] = "OFFICE_OVERHEAD";
+          } else if (text.includes("capital") || text.includes("drawing")) {
+            defaults[t.id] = "OWNER_CAPITAL";
+          } else {
+            defaults[t.id] = t.type === "DEPOSIT" ? "CUSTOMER_PAYMENT" : "SITE_EXPENSE";
+          }
+        }
+        setCategorySelections(defaults);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setUncatLoading(false);
+    }
+  };
+
+  const handleCategorizeSingle = async (tx: any) => {
+    const category = categorySelections[tx.id] || (tx.type === "DEPOSIT" ? "CUSTOMER_PAYMENT" : "SITE_EXPENSE");
+    setCategorizingId(tx.id);
+    try {
+      const res = await fetch("/api/banking/categorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transactionId: tx.id,
+          category,
+          counterpartyName: tx.payeeOrPayer,
+          notes: tx.purpose,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUncategorizedTxs((prev) => prev.filter((item) => item.id !== tx.id));
+        setPendingCount((prev) => Math.max(0, prev - 1));
+        fetchBankData();
+      } else {
+        alert(data.error || "Failed to categorize transaction");
+      }
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    } finally {
+      setCategorizingId(null);
+    }
+  };
+
+  const handleAutoCategorizeTop10 = async () => {
+    const top10 = uncategorizedTxs.slice(0, 10);
+    if (top10.length === 0) return;
+    if (!confirm(`1-Click Categorize top ${top10.length} ICICI statement transactions using AI suggestions?`)) return;
+
+    for (const tx of top10) {
+      await handleCategorizeSingle(tx);
+    }
+  };
+
   const fetchBankData = async () => {
     try {
       setLoading(true);
@@ -139,6 +226,7 @@ export default function BankingPage() {
   useEffect(() => {
     fetchBankData();
     fetchCoA();
+    fetchUncategorizedTxs();
   }, []);
 
   useEffect(() => {
@@ -370,8 +458,223 @@ export default function BankingPage() {
         </div>
       </div>
 
-      {/* Bank Account Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Module Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button
+          onClick={() => setActiveTab("uncategorized")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeTab === "uncategorized"
+              ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+              : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+          }`}
+        >
+          <Sparkles size={14} className={activeTab === "uncategorized" ? "text-amber-300" : "text-amber-500"} />
+          <span>Uncategorized Statement Transactions</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-white/20 text-white">
+            {pendingCount} Pending
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("accounts")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeTab === "accounts"
+              ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+              : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+          }`}
+        >
+          <Landmark size={14} />
+          <span>ICICI Bank Facilities & Ledgers</span>
+        </button>
+      </div>
+
+      {/* TAB 1: UNCATEGORIZED STATEMENT QUEUE (93 PENDING) */}
+      {activeTab === "uncategorized" && (
+        <div className="space-y-4 animate-in fade-in">
+          {/* Action & Filter Bar */}
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:w-72">
+                <Search size={15} className="absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search ICICI ref, payee, description..."
+                  value={txSearch}
+                  onChange={(e) => setTxSearch(e.target.value)}
+                  className="pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs w-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-200"
+                />
+              </div>
+
+              <select
+                value={txTypeFilter}
+                onChange={(e) => setTxTypeFilter(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200"
+              >
+                <option value="ALL">All Flows</option>
+                <option value="DEPOSIT">Money In (Deposits)</option>
+                <option value="WITHDRAWAL">Money Out (Payouts)</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+              <button
+                onClick={handleAutoCategorizeTop10}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-sm transition active:scale-95 cursor-pointer"
+              >
+                <Sparkles size={14} />
+                <span>Auto-Categorize Top 10</span>
+              </button>
+
+              <button
+                onClick={() => setShowReconcileModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 text-xs font-bold shadow-sm transition cursor-pointer"
+              >
+                <Upload size={14} />
+                <span>Upload Statement CSV</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Uncategorized Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                  Pending ICICI Statement Feed
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Each categorization automatically posts a balanced double-entry voucher to the respective Ledger & Project cost.
+                </p>
+              </div>
+              <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
+                {uncategorizedTxs.length} items to reconcile
+              </span>
+            </div>
+
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/90 z-10 border-b border-slate-200 dark:border-slate-800">
+                  <tr className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">ICICI Reference</th>
+                    <th className="py-3 px-4">Description / Payee</th>
+                    <th className="py-3 px-4 text-right">Flow & Amount</th>
+                    <th className="py-3 px-4">Assign Category (Auto-Suggested)</th>
+                    <th className="py-3 px-4 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
+                  {uncatLoading ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-400">
+                        Loading pending transactions...
+                      </td>
+                    </tr>
+                  ) : uncategorizedTxs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400">
+                        <CheckCircle2 size={32} className="mx-auto text-emerald-500 mb-2" />
+                        <div className="font-bold text-sm text-slate-800 dark:text-slate-200">
+                          All ICICI Transactions Fully Categorized!
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          All 93 statement transactions are reconciled with balanced double-entry vouchers.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    uncategorizedTxs
+                      .filter((tx) => {
+                        const q = txSearch.toLowerCase();
+                        const matchesQ =
+                          tx.payeeOrPayer.toLowerCase().includes(q) ||
+                          tx.purpose.toLowerCase().includes(q) ||
+                          (tx.referenceNumber || "").toLowerCase().includes(q);
+                        const matchesType = txTypeFilter === "ALL" || tx.type === txTypeFilter;
+                        return matchesQ && matchesType;
+                      })
+                      .map((tx) => {
+                        const currentCat = categorySelections[tx.id] || (tx.type === "DEPOSIT" ? "CUSTOMER_PAYMENT" : "SITE_EXPENSE");
+                        const isProcessing = categorizingId === tx.id;
+                        return (
+                          <tr key={tx.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
+                            <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
+                              {new Date(tx.date).toLocaleDateString("en-IN", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </td>
+                            <td className="py-3 px-4 font-mono text-[11px] text-slate-500">
+                              {tx.referenceNumber || "ICICI-STATEMENT"}
+                            </td>
+                            <td className="py-3 px-4 max-w-xs">
+                              <div className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                                {tx.payeeOrPayer}
+                              </div>
+                              <div className="text-[11px] text-slate-400 truncate">
+                                {tx.purpose}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                              <div
+                                className={`font-mono font-bold ${
+                                  tx.type === "DEPOSIT"
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : "text-rose-600 dark:text-rose-400"
+                                }`}
+                              >
+                                {tx.type === "DEPOSIT" ? "+" : "-"} ₹ {parseFloat(tx.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              </div>
+                              <span className="text-[9px] uppercase font-bold text-slate-400">
+                                {tx.type === "DEPOSIT" ? "Money In" : "Money Out"}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <select
+                                value={currentCat}
+                                onChange={(e) =>
+                                  setCategorySelections({
+                                    ...categorySelections,
+                                    [tx.id]: e.target.value,
+                                  })
+                                }
+                                className="px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
+                              >
+                                <option value="CUSTOMER_PAYMENT">Customer Advance / Payment (Dr Bank, Cr Debtors)</option>
+                                <option value="VENDOR_PAYMENT">Vendor / Raw Material Bill (Dr Creditors, Cr Bank)</option>
+                                <option value="SITE_EXPENSE">Site Direct Expense / Fuel (Dr Site Exp, Cr Bank)</option>
+                                <option value="LABOUR_CONTRACTOR">Labour Muster / Contractor (Dr Labour Exp, Cr Bank)</option>
+                                <option value="OFFICE_OVERHEAD">Office Overhead / Rent / Power (Dr Overhead, Cr Bank)</option>
+                                <option value="OWNER_CAPITAL">Owner Capital Infusion (Dr Bank, Cr Capital)</option>
+                                <option value="LOAN_EMI">Vehicle / Machinery Loan EMI (Dr Loan, Cr Bank)</option>
+                              </select>
+                            </td>
+                            <td className="py-3 px-4 text-center whitespace-nowrap">
+                              <button
+                                onClick={() => handleCategorizeSingle(tx)}
+                                disabled={isProcessing}
+                                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                              >
+                                {isProcessing ? "Posting..." : "1-Click Categorize"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: BANK FACILITIES & CLEARED TRANSACTIONS */}
+      {activeTab === "accounts" && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Bank Account Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {loading ? (
           <div className="col-span-2 text-center py-8 text-xs text-slate-400">
             Loading bank accounts...
@@ -560,6 +863,8 @@ export default function BankingPage() {
           </table>
         </div>
       </div>
+        </div>
+      )}
 
       {/* Contra Voucher Modal */}
       {showContraModal && (

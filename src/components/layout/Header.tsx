@@ -45,6 +45,9 @@ export function Header({ onQuickCreate }: HeaderProps) {
         if (data.success) setCurrentUser(data.user);
       })
       .catch((err) => console.error(err));
+
+    const isDarkMode = document.documentElement.classList.contains("dark");
+    setIsDark(isDarkMode);
   }, []);
 
   const handleLogout = async () => {
@@ -84,11 +87,14 @@ export function Header({ onQuickCreate }: HeaderProps) {
   ]);
 
   const toggleDarkMode = () => {
-    setIsDark(!isDark);
-    if (!isDark) {
+    const nextDark = !isDark;
+    setIsDark(nextDark);
+    if (nextDark) {
       document.documentElement.classList.add("dark");
+      localStorage.setItem("sr_theme", "dark");
     } else {
       document.documentElement.classList.remove("dark");
+      localStorage.setItem("sr_theme", "light");
     }
   };
 
@@ -96,17 +102,21 @@ export function Header({ onQuickCreate }: HeaderProps) {
     <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 sticky top-0 z-30 transition-colors">
       {/* Left: Organization context & Search */}
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Building className="text-blue-600 dark:text-blue-400" size={20} />
+        <Link
+          href="/"
+          className="flex items-center gap-2 hover:opacity-85 transition group cursor-pointer"
+          title="Return to Dashboard Home"
+        >
+          <Building className="text-blue-600 dark:text-blue-400 group-hover:scale-105 transition" size={20} />
           <div className="flex flex-col">
-            <span className="font-bold text-sm text-slate-800 dark:text-slate-100">
+            <span className="font-bold text-sm text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
               Standard Roofs
             </span>
             <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
               Books & Roofing ERP
             </span>
           </div>
-        </div>
+        </Link>
 
         {/* Financial Year Selector */}
         <div className="flex items-center gap-1.5 ml-4 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200">

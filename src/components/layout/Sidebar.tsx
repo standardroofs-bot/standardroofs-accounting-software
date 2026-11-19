@@ -189,13 +189,17 @@ export function Sidebar() {
     >
       {/* Brand Header */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800 bg-slate-950/40 shrink-0">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center font-black text-white shrink-0 shadow-md">
+        <Link
+          href="/"
+          className="flex items-center gap-3 overflow-hidden hover:opacity-90 transition group cursor-pointer"
+          title="Return to Dashboard Home"
+        >
+          <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center font-black text-white shrink-0 shadow-md group-hover:bg-blue-500 transition">
             SR
           </div>
           {!collapsed && (
             <div className="flex flex-col truncate">
-              <span className="font-bold text-sm tracking-tight text-white leading-none">
+              <span className="font-bold text-sm tracking-tight text-white leading-none group-hover:text-blue-300 transition">
                 SR-Books
               </span>
               <span className="text-[11px] text-slate-400 truncate mt-1">
@@ -203,7 +207,7 @@ export function Sidebar() {
               </span>
             </div>
           )}
-        </div>
+        </Link>
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition"
