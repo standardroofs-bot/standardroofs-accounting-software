@@ -200,8 +200,12 @@ export function Sidebar() {
           className="flex items-center gap-3 overflow-hidden hover:opacity-90 transition group cursor-pointer"
           title="Return to Dashboard Home"
         >
-          <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center font-black text-white shrink-0 shadow-md group-hover:bg-blue-500 transition">
-            SR
+          <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center p-1 shrink-0 shadow-md overflow-hidden border border-slate-700 group-hover:border-blue-400 transition">
+            <img
+              src="/images/standard-roofs-logo.png"
+              alt="Standard Roofs Logo"
+              className="w-full h-full object-contain"
+            />
           </div>
           {!collapsed && (
             <div className="flex flex-col truncate">

@@ -42,6 +42,53 @@ export function validateGSTIN(gstin: string): boolean {
   return regex.test(clean);
 }
 
+export const INDIAN_STATES_LIST = [
+  { code: "33", name: "Tamil Nadu" },
+  { code: "32", name: "Kerala" },
+  { code: "29", name: "Karnataka" },
+  { code: "37", name: "Andhra Pradesh" },
+  { code: "36", name: "Telangana" },
+  { code: "27", name: "Maharashtra" },
+  { code: "07", name: "Delhi" },
+  { code: "24", name: "Gujarat" },
+  { code: "09", name: "Uttar Pradesh" },
+  { code: "01", name: "Jammu and Kashmir" },
+  { code: "02", name: "Himachal Pradesh" },
+  { code: "03", name: "Punjab" },
+  { code: "04", name: "Chandigarh" },
+  { code: "05", name: "Uttarakhand" },
+  { code: "06", name: "Haryana" },
+  { code: "08", name: "Rajasthan" },
+  { code: "10", name: "Bihar" },
+  { code: "11", name: "Sikkim" },
+  { code: "12", name: "Arunachal Pradesh" },
+  { code: "13", name: "Nagaland" },
+  { code: "14", name: "Manipur" },
+  { code: "15", name: "Mizoram" },
+  { code: "16", name: "Tripura" },
+  { code: "17", name: "Meghalaya" },
+  { code: "18", name: "Assam" },
+  { code: "19", name: "West Bengal" },
+  { code: "20", name: "Jharkhand" },
+  { code: "21", name: "Odisha" },
+  { code: "22", name: "Chhattisgarh" },
+  { code: "23", name: "Madhya Pradesh" },
+  { code: "26", name: "Dadra & Nagar Haveli and Daman & Diu" },
+  { code: "30", name: "Goa" },
+  { code: "31", name: "Lakshadweep" },
+  { code: "34", name: "Puducherry" },
+  { code: "35", name: "Andaman & Nicobar Islands" },
+  { code: "38", name: "Ladakh" },
+];
+
+export const INVOICE_PAYMENT_TERMS = [
+  { label: "Due on Receipt", days: 0 },
+  { label: "Net 15", days: 15 },
+  { label: "Net 30", days: 30 },
+  { label: "Net 45", days: 45 },
+  { label: "Net 60", days: 60 },
+];
+
 /**
  * Extract State Code from 15-digit GSTIN
  */

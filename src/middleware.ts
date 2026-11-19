@@ -74,6 +74,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/public") ||
     pathname.startsWith("/uploads") ||
+    pathname.startsWith("/images") ||
     PUBLIC_PATHS.includes(pathname)
   ) {
     return NextResponse.next();
@@ -133,7 +134,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - images, uploads (static assets)
      */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico|images|uploads).*)",
   ],
 };

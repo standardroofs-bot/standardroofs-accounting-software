@@ -62,9 +62,13 @@ export default function LoginPage() {
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
 
         {/* Top Brand Identity */}
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-black text-xl text-white shadow-lg shadow-blue-500/20">
-            SR
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="h-14 bg-white p-2 rounded-xl shadow-lg border border-slate-700 flex items-center justify-center">
+            <img
+              src="/images/standard-roofs-logo.png"
+              alt="Standard Roofs Logo"
+              className="h-10 w-auto object-contain"
+            />
           </div>
           <div>
             <span className="text-xl font-black tracking-tight text-white block">
@@ -130,15 +134,22 @@ export default function LoginPage() {
 
         {/* Footer Meta */}
         <div className="relative z-10 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-400 gap-2">
-          <span>Standard Roofs • Erode - 638011, Tamil Nadu</span>
-          <span>FY 2026-27 Active • GSTIN: 33AABCS1234F1Z5</span>
+          <span>Standard Roofs • Erode - 638107, Tamil Nadu</span>
+          <span>FY 2026-27 Active • GSTIN: 33AEWFS5187G1ZD</span>
         </div>
       </div>
 
       {/* Right Panel: Clean Sign-In Form */}
       <div className="lg:w-5/12 flex flex-col justify-center items-center p-6 lg:p-12 bg-slate-900/40">
         <div className="w-full max-w-md space-y-6">
-          <div className="space-y-2">
+          <div className="space-y-3">
+            <div className="h-12 w-fit bg-white px-3 py-1.5 rounded-lg shadow border border-slate-700 flex items-center justify-center lg:hidden">
+              <img
+                src="/images/standard-roofs-logo.png"
+                alt="Standard Roofs Logo"
+                className="h-9 w-auto object-contain"
+              />
+            </div>
             <h2 className="text-2xl font-bold tracking-tight text-white">Sign in to your account</h2>
             <p className="text-xs text-slate-400">
               Enter your official Standard Roofs credentials to access the ERP & accounting portal.

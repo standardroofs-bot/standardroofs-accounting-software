@@ -23,7 +23,9 @@ interface PriceItem {
   hsnSacCode: string;
   unit: string;
   defaultRate: string;
+  purchaseRate?: string | null;
   gstRate: string;
+  productType?: string;
   description?: string | null;
 }
 
@@ -31,7 +33,7 @@ export default function PriceCatalogPage() {
   const [items, setItems] = useState<PriceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [selectedRoofType, setSelectedRoofType] = useState("ALL");
+  const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [showAddModal, setShowAddModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -101,12 +103,20 @@ export default function PriceCatalogPage() {
   };
 
   const filteredItems = items.filter((it) => {
+    const q = search.toLowerCase().trim();
     const matchesSearch =
-      it.name.toLowerCase().includes(search.toLowerCase()) ||
-      it.itemCode.toLowerCase().includes(search.toLowerCase()) ||
-      it.roofType.toLowerCase().includes(search.toLowerCase());
-    const matchesRoof = selectedRoofType === "ALL" || it.roofType === selectedRoofType;
-    return matchesSearch && matchesRoof;
+      !q ||
+      it.name.toLowerCase().includes(q) ||
+      it.itemCode.toLowerCase().includes(q) ||
+      (it.hsnSacCode && it.hsnSacCode.toLowerCase().includes(q)) ||
+      (it.category && it.category.toLowerCase().includes(q)) ||
+      (it.description && it.description.toLowerCase().includes(q));
+
+    const matchesCategory =
+      selectedCategory === "ALL" ||
+      it.category?.toUpperCase() === selectedCategory.toUpperCase();
+
+    return matchesSearch && matchesCategory;
   });
 
   return (
@@ -150,18 +160,26 @@ export default function PriceCatalogPage() {
           />
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
-          {["ALL", "PEB", "Clay Tile", "UPVC", "Tensile", "Solar"].map((rt) => (
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+          {[
+            { id: "ALL", label: `All Items (${items.length})` },
+            { id: "STEEL", label: "Steel & Pipes" },
+            { id: "TILES", label: "Roof Tiles" },
+            { id: "SHEETS", label: "Sheets & Panels" },
+            { id: "FASTENERS", label: "Fasteners & Screws" },
+            { id: "COATINGS", label: "Paints & Primers" },
+            { id: "SERVICE", label: "Labour & Services" },
+          ].map((cat) => (
             <button
-              key={rt}
-              onClick={() => setSelectedRoofType(rt)}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                selectedRoofType === rt
-                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                selectedCategory === cat.id
+                  ? "bg-blue-600 text-white shadow-sm"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
               }`}
             >
-              {rt}
+              {cat.label}
             </button>
           ))}
         </div>

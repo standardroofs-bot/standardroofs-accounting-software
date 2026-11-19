@@ -518,6 +518,7 @@ model Invoice {
   cgstTotal               Decimal          @default(0.00) @db.Decimal(15, 2)
   sgstTotal               Decimal          @default(0.00) @db.Decimal(15, 2)
   igstTotal               Decimal          @default(0.00) @db.Decimal(15, 2)
+  adjustment              Decimal          @default(0.00) @db.Decimal(15, 2)
   totalAmount             Decimal          @default(0.00) @db.Decimal(15, 2)
   amountPaid              Decimal          @default(0.00) @db.Decimal(15, 2)
   tdsDeducted             Decimal          @default(0.00) @db.Decimal(15, 2)
@@ -525,6 +526,7 @@ model Invoice {
   status                  String           @default("UNPAID") // DRAFT, SENT, UNPAID, PARTIAL, PAID, OVERDUE, CANCELLED
   notes                   String?
   terms                   String?
+  shippingAddress         String?
   receiptUrl              String?
   journalEntryId          String?          @unique
   importBatchId           String?
@@ -547,6 +549,7 @@ model InvoiceItem {
   id            String   @id @default(cuid())
   invoiceId     String
   description   String
+  subDescription String?
   hsnSacCode    String   // SAC 9954, HSN 7210, etc.
   quantity      Decimal  @default(1.00) @db.Decimal(15, 2)
   unit          String   @default("SQFT") // SQFT, RFT, MT, NOS, LOT
@@ -1066,6 +1069,8 @@ model MaterialItem {
   rate            Decimal?                @default(0.00) @db.Decimal(15, 2)
   yardLocation    String                  @default("Erode Main Yard")
   imageUrl        String?
+  hsnSacCode      String?
+  productType     String?                 @default("goods")
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 
@@ -1171,6 +1176,7 @@ model CompanySettings {
   phone            String   @default("+91 8608475767")
   email            String   @default("info@standardroofs.in")
   website          String   @default("https://www.standardroofs.in/")
+  logoUrl          String?  @default("/images/standard-roofs-logo.png")
   bankName         String   @default("ICICI Bank")
   bankAccountName  String?  @default("Standard Roofs (ICICI, xxxx3161)")
   bankBranch       String   @default("Kagam, Erode")
@@ -1495,7 +1501,9 @@ model RoofingPriceItem {
   hsnSacCode  String   @default("9954")
   unit        String   @default("Sq.Ft") // Sq.Ft, MT, Nos, Kg, Box
   defaultRate Decimal  @db.Decimal(15, 2)
+  purchaseRate Decimal? @default(0.00) @db.Decimal(15, 2)
   gstRate     Decimal  @default(18.00) @db.Decimal(5, 2)
+  productType String   @default("goods") // goods, service
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

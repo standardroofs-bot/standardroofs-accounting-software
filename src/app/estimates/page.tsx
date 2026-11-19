@@ -1096,9 +1096,13 @@ export default function EstimatesPage() {
               {/* 1. Header & Letterhead */}
               <div className="border-b-2 border-blue-600 pb-4 flex justify-between items-start">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-lg">
-                      SR
+                  <div className="flex items-center gap-3">
+                    <div className="h-14 bg-white px-2.5 py-1 rounded-lg border border-slate-200 flex items-center justify-center shrink-0 shadow-xs">
+                      <img
+                        src="/images/standard-roofs-logo.png"
+                        alt="Standard Roofs Logo"
+                        className="h-12 w-auto object-contain"
+                      />
                     </div>
                     <div>
                       <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-none">

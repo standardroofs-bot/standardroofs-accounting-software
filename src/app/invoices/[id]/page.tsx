@@ -40,12 +40,14 @@ interface InvoiceDetail {
   cgstTotal: number | string;
   sgstTotal: number | string;
   igstTotal: number | string;
+  adjustment?: number | string;
   totalAmount: number | string;
   paidAmount: number | string;
   balanceDue: number | string;
   status: string;
   notes: string | null;
   terms: string | null;
+  shippingAddress?: string | null;
   customer: {
     id: string;
     name: string;
@@ -71,6 +73,7 @@ interface InvoiceDetail {
   items: Array<{
     id: string;
     description: string;
+    subDescription?: string | null;
     hsnSacCode: string;
     quantity: number | string;
     unit: string;
@@ -496,7 +499,14 @@ export default function InvoiceDetailPage({
               {invoice.items?.map((it, idx) => (
                 <tr key={it.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
                   <td className="py-2.5 px-3 text-center font-mono text-slate-400">{idx + 1}</td>
-                  <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">{it.description}</td>
+                  <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">
+                    <div>{it.description}</div>
+                    {it.subDescription && (
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 font-normal mt-0.5">
+                        {it.subDescription}
+                      </div>
+                    )}
+                  </td>
                   <td className="py-2.5 px-3 text-center font-mono text-slate-600 dark:text-slate-400">{it.hsnSacCode}</td>
                   <td className="py-2.5 px-3 text-right font-mono font-medium">{Number(it.quantity).toFixed(2)}</td>
                   <td className="py-2.5 px-3 text-center font-mono text-slate-500">{it.unit}</td>
@@ -540,6 +550,16 @@ export default function InvoiceDetailPage({
                   <span className="font-bold">{formatINR(invoice.sgstTotal)}</span>
                 </div>
               </>
+            )}
+            {Number(invoice.adjustment || 0) !== 0 && (
+              <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>Adjustment (+/-):</span>
+                <span className="font-bold">
+                  {Number(invoice.adjustment) < 0
+                    ? `(-) ${formatINR(Math.abs(Number(invoice.adjustment)))}`
+                    : `(+) ${formatINR(Number(invoice.adjustment))}`}
+                </span>
+              </div>
             )}
             <div className="flex justify-between pt-2 border-t border-slate-300 dark:border-slate-700 text-sm font-black text-slate-900 dark:text-slate-100">
               <span>Grand Total:</span>

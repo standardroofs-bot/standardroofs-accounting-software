@@ -348,9 +348,14 @@ export default function PurchaseOrdersPage() {
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <ShoppingCart className="text-blue-600" /> Create New Purchase Order
-              </h3>
+              <div className="flex items-center gap-3">
+                <div className="h-10 bg-white px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0">
+                  <img src="/images/standard-roofs-logo.png" alt="Standard Roofs Logo" className="h-7 w-auto object-contain" />
+                </div>
+                <h3 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <ShoppingCart className="text-blue-600" /> Create New Purchase Order
+                </h3>
+              </div>
               <button
                 onClick={() => setShowModal(false)}
                 className="text-slate-400 hover:text-slate-600 text-lg cursor-pointer"

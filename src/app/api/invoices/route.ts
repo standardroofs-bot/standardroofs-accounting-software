@@ -43,7 +43,11 @@ export async function POST(request: Request) {
       dueDate,
       notes,
       terms,
-      items, // Array of { description, hsnSacCode, quantity, unit, unitPrice, discount, gstRate }
+      shippingAddress,
+      placeOfSupply,
+      placeOfSupplyStateCode,
+      adjustment = 0,
+      items, // Array of { description, subDescription, hsnSacCode, quantity, unit, unitPrice, discount, gstRate }
     } = body;
 
     if (!customerId || !items || !Array.isArray(items) || items.length === 0) {
@@ -70,13 +74,32 @@ export async function POST(request: Request) {
     const sgstAccount = await prisma.account.findUniqueOrThrow({ where: { code: "2031" } }); // SGST Output
     const igstAccount = await prisma.account.findUniqueOrThrow({ where: { code: "2032" } }); // IGST Output
 
+    // Dedicated Round-Off / Adjustment Account
+    let roundOffAccount = await prisma.account.findFirst({
+      where: { OR: [{ code: "6090" }, { name: { contains: "Round Off", mode: "insensitive" } }] },
+    });
+    if (!roundOffAccount) {
+      roundOffAccount = await prisma.account.create({
+        data: {
+          code: "6090",
+          name: "Round Off / Adjustment Account",
+          type: "EXPENSE",
+          subType: "INDIRECT_EXPENSE",
+          isSystem: true,
+        },
+      });
+    }
+
+    // Place of supply resolution
+    const effectiveStateCode = placeOfSupplyStateCode || customer.stateCode || COMPANY_GST_STATE_CODE;
+    const effectiveState = placeOfSupply || customer.state || "Tamil Nadu";
+    const isInterState = effectiveStateCode !== COMPANY_GST_STATE_CODE;
+
     // Calculate line items with GST
-    const isInterState = customer.stateCode !== COMPANY_GST_STATE_CODE;
     let subTotal = new Decimal(0);
     let cgstTotal = new Decimal(0);
     let sgstTotal = new Decimal(0);
     let igstTotal = new Decimal(0);
-    let grandTotal = new Decimal(0);
 
     const processedItems = items.map((it: any) => {
       const qty = toDecimal(it.quantity || 1);
@@ -86,19 +109,19 @@ export async function POST(request: Request) {
 
       const baseAmount = qty.times(price);
       const taxable = baseAmount.minus(disc).greaterThan(0) ? baseAmount.minus(disc) : new Decimal(0);
-      const gstRes = calculateGST(taxable, customer.stateCode, rate);
+      const gstRes = calculateGST(taxable, effectiveStateCode, rate);
 
       subTotal = subTotal.plus(taxable);
       cgstTotal = cgstTotal.plus(gstRes.cgstAmount);
       sgstTotal = sgstTotal.plus(gstRes.sgstAmount);
       igstTotal = igstTotal.plus(gstRes.igstAmount);
-      grandTotal = grandTotal.plus(gstRes.totalAmount);
 
       return {
-        description: it.description,
-        hsnSacCode: it.hsnSacCode || "9954",
+        description: it.description || "Roofing Material / Works",
+        subDescription: it.subDescription ? String(it.subDescription).trim() : null,
+        hsnSacCode: it.hsnSacCode || "7306",
         quantity: qty.toFixed(2),
-        unit: it.unit || "SQFT",
+        unit: it.unit || "nos",
         unitPrice: price.toFixed(2),
         discount: disc.toFixed(2),
         taxableAmount: taxable.toFixed(2),
@@ -112,6 +135,10 @@ export async function POST(request: Request) {
         totalAmount: gstRes.totalAmount.toFixed(2),
       };
     });
+
+    const adjDecimal = toDecimal(adjustment || 0);
+    const unadjustedGrandTotal = subTotal.plus(cgstTotal).plus(sgstTotal).plus(igstTotal);
+    const grandTotal = unadjustedGrandTotal.plus(adjDecimal);
 
     // Obtain sequential invoice number starting at #33
     const voucherInfo = await getNextVoucherNumber(fy.id, "INVOICE");
@@ -127,7 +154,7 @@ export async function POST(request: Request) {
 
     if (isActualFinancialDoc) {
       const journalLines: any[] = [
-        // Debit: Customer Receivable
+        // Debit: Customer Receivable (Actual rounded grand total)
         {
           accountId: arAccount.id,
           debit: grandTotal,
@@ -147,7 +174,7 @@ export async function POST(request: Request) {
         },
       ];
 
-      // Credit: Taxes
+      // Taxes
       if (isInterState) {
         if (igstTotal.greaterThan(0)) {
           journalLines.push({
@@ -182,6 +209,31 @@ export async function POST(request: Request) {
         }
       }
 
+      // Round-off adjustment balancing
+      if (!adjDecimal.isZero() && roundOffAccount) {
+        if (adjDecimal.lessThan(0)) {
+          // Negative adjustment (discount/round down): Debit round off expense
+          journalLines.push({
+            accountId: roundOffAccount.id,
+            debit: adjDecimal.abs(),
+            credit: 0,
+            narration: `Round-off adjustment on ${invoiceNumber}`,
+            customerId: customer.id,
+            projectId: projectId || undefined,
+          });
+        } else {
+          // Positive adjustment: Credit round off income
+          journalLines.push({
+            accountId: roundOffAccount.id,
+            debit: 0,
+            credit: adjDecimal,
+            narration: `Round-off adjustment on ${invoiceNumber}`,
+            customerId: customer.id,
+            projectId: projectId || undefined,
+          });
+        }
+      }
+
       const postedJournal = await postDoubleEntryTransaction({
         voucherType: VoucherType.INVOICE,
         financialYearId: fy.id,
@@ -195,6 +247,9 @@ export async function POST(request: Request) {
       journalEntryId = postedJournal.id;
     }
 
+    // Effective shipping address
+    const resolvedShipping = shippingAddress || customer.shippingAddress || customer.billingAddress;
+
     // Create Invoice record
     const invoice = await prisma.invoice.create({
       data: {
@@ -202,22 +257,24 @@ export async function POST(request: Request) {
         sequenceNumber,
         invoiceType,
         date: date ? new Date(date) : new Date(),
-        dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + (customer.creditDays || 30) * 86400000),
+        dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + (customer.creditDays || 0) * 86400000),
         customerId,
         projectId: projectId || null,
         financialYearId: fy.id,
-        placeOfSupply: customer.state,
-        placeOfSupplyStateCode: customer.stateCode,
+        placeOfSupply: effectiveState,
+        placeOfSupplyStateCode: effectiveStateCode,
         isInterState,
         subTotal: subTotal.toFixed(2),
         cgstTotal: cgstTotal.toFixed(2),
         sgstTotal: sgstTotal.toFixed(2),
         igstTotal: igstTotal.toFixed(2),
+        adjustment: adjDecimal.toFixed(2),
         totalAmount: grandTotal.toFixed(2),
         balanceDue: grandTotal.toFixed(2),
         status: "UNPAID",
         notes: notes || null,
-        terms: terms || "Payment due within specified credit terms. Subject to Erode Jurisdiction.",
+        terms: terms || "Due on Receipt",
+        shippingAddress: resolvedShipping,
         journalEntryId,
         items: {
           create: processedItems,

@@ -27,6 +27,37 @@ async function main() {
   });
   const settings = await prisma.systemSettings.findFirst();
 
+  // Ensure VoucherSequence for INVOICE is strictly set to nextNumber: 33
+  const fy = await prisma.financialYear.findFirst({ where: { isCurrent: true } });
+  if (fy) {
+    await prisma.voucherSequence.upsert({
+      where: {
+        financialYearId_voucherType: {
+          financialYearId: fy.id,
+          voucherType: 'INVOICE',
+        },
+      },
+      update: {
+        prefix: 'SR/26-27/',
+        nextNumber: 33,
+        paddingLength: 4,
+      },
+      create: {
+        financialYearId: fy.id,
+        voucherType: 'INVOICE',
+        prefix: 'SR/26-27/',
+        nextNumber: 33,
+        paddingLength: 4,
+      },
+    });
+  }
+
+  const vSeq = fy
+    ? await prisma.voucherSequence.findUnique({
+        where: { financialYearId_voucherType: { financialYearId: fy.id, voucherType: 'INVOICE' } },
+      })
+    : null;
+
   console.log(
     JSON.stringify(
       {
@@ -45,10 +76,12 @@ async function main() {
           openingBalance: b.openingBalance.toString(),
         })),
         systemSettings: settings,
+        voucherSequenceForInvoice: vSeq,
         nextInvoiceCalculation: {
           systemSettingsLastInvoiceNumber: settings?.lastInvoiceNumber,
           nextInvoiceNumberFromSystemSettings: (settings?.lastInvoiceNumber || 0) + 1,
           companySettingsInvoiceNextNo: company?.invoiceNextNo,
+          voucherSequenceNextNumber: vSeq?.nextNumber,
         },
       },
       null,
