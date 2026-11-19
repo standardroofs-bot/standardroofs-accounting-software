@@ -97,9 +97,9 @@ export default async function InvoicePrintPage({
       {/* Print Controls (Hidden on Print) */}
       <PrintButton backUrl={`/invoices/${invoice.id}`} title="Print / Save as PDF (A4)" />
 
-      {/* A4 Document Outer Border Box (Exact Zoho Books Specifications) */}
+      {/* A4 Document Outer Border Box (100% Zoho Books Closed Frame) */}
       <div
-        className="max-w-[210mm] min-h-[297mm] mx-auto bg-white border border-[#777777] shadow-lg print:border print:border-[#777777] print:shadow-none print:m-0 print:w-full print:max-w-none relative overflow-hidden"
+        className="max-w-[210mm] mx-auto bg-white border border-[#8c8c8c] shadow-lg print:border print:border-[#8c8c8c] print:shadow-none print:m-0 print:w-full print:max-w-none relative overflow-hidden"
         style={{
           fontFamily: 'Arial, "Helvetica Neue", Helvetica, sans-serif',
           color: "#111827",
@@ -117,16 +117,16 @@ export default async function InvoicePrintPage({
           </div>
         )}
 
-        {/* 1. Header Block */}
-        <div className="px-7 py-6 flex justify-between items-center">
+        {/* 1. Header Block: Bold Logo & Bottom-Right Aligned TAX INVOICE */}
+        <div className="px-7 py-6 flex justify-between items-stretch">
           {/* Logo & Standard Roofs Organization Profile */}
           <div className="flex items-start gap-4">
             <img
               src="/images/standard-roofs-logo.png"
               alt="Standard Roofs Logo"
-              className="h-16 w-auto object-contain shrink-0"
+              className="w-[250px] h-auto object-contain shrink-0"
             />
-            <div className="text-[11px] leading-[1.35] text-[#222222] space-y-0.5">
+            <div className="text-[11px] leading-[1.35] text-[#222222] space-y-0.5 pt-0.5">
               <h1 className="font-bold text-[13px] text-[#111111]">Standard Roofs</h1>
               <p>144/A, Vellakkal Medu,</p>
               <p>Villarasampatti, Nasiyanur(Post),</p>
@@ -137,17 +137,17 @@ export default async function InvoicePrintPage({
             </div>
           </div>
 
-          {/* Right: TAX INVOICE Title */}
-          <div className="text-right pr-2">
-            <h2 className="text-[26px] font-normal tracking-[0.05em] text-[#222222] uppercase">
+          {/* Right: TAX INVOICE Title aligned to bottom-right */}
+          <div className="flex flex-col justify-end items-end pb-1 pr-2">
+            <h2 className="text-[26px] font-normal tracking-[0.05em] text-[#222222] uppercase leading-none">
               TAX INVOICE
             </h2>
           </div>
         </div>
 
         {/* 2. Metadata Split Row */}
-        <div className="grid grid-cols-12 border-t border-b border-[#777777] text-[11px]">
-          <div className="col-span-6 p-3 border-r border-[#777777] space-y-1">
+        <div className="grid grid-cols-12 border-t border-b border-[#8c8c8c] text-[11px]">
+          <div className="col-span-6 p-3 border-r border-[#8c8c8c] space-y-1">
             <div className="flex items-center">
               <span className="w-24 text-[#444444]">Invoice No.</span>
               <span className="w-4 text-[#444444] text-center">:</span>
@@ -185,11 +185,21 @@ export default async function InvoicePrintPage({
           </div>
         </div>
 
-        {/* 3. Bill To / Ship To Split Row */}
-        <div className="grid grid-cols-12 border-b border-[#777777] text-[11px]">
-          {/* Bill To */}
-          <div className="col-span-6 p-3 border-r border-[#777777] space-y-1">
-            <span className="font-bold text-[#333333] block text-[11px]">Bill To</span>
+        {/* 3. Bill To / Ship To Section with Shaded Header Bar */}
+        {/* Shaded Header Bar (bg-[#f3f4f6]) */}
+        <div className="grid grid-cols-12 border-b border-[#8c8c8c] bg-[#f3f4f6] text-[11px] font-bold text-[#333333]">
+          <div className="col-span-6 px-3 py-1.5 border-r border-[#8c8c8c]">
+            Bill To
+          </div>
+          <div className="col-span-6 px-3 py-1.5">
+            Ship To
+          </div>
+        </div>
+
+        {/* Address Content Rows */}
+        <div className="grid grid-cols-12 border-b border-[#8c8c8c] text-[11px]">
+          {/* Bill To Content */}
+          <div className="col-span-6 p-3 border-r border-[#8c8c8c] space-y-1">
             <p className="font-semibold text-[#0066cc] text-[12px]">{customerName}</p>
             <div className="text-[#222222] text-[11px] leading-[1.4]">
               {billingLines.map((line, i) => (
@@ -203,9 +213,8 @@ export default async function InvoicePrintPage({
             )}
           </div>
 
-          {/* Ship To */}
+          {/* Ship To Content */}
           <div className="col-span-6 p-3 space-y-1">
-            <span className="font-bold text-[#333333] block text-[11px]">Ship To</span>
             <div className="text-[#222222] text-[11px] leading-[1.4]">
               {shippingLines.map((line, i) => (
                 <div key={i}>{line}</div>
@@ -214,15 +223,15 @@ export default async function InvoicePrintPage({
           </div>
         </div>
 
-        {/* 4. Items Table (Exact Zoho Books Style) */}
-        <table className="w-full text-left border-collapse border-b border-[#777777] text-[11px]">
+        {/* 4. Items Table with Shaded thead */}
+        <table className="w-full text-left border-collapse border-b border-[#8c8c8c] text-[11px]">
           <thead>
-            <tr className="border-b border-[#777777] text-[11px] font-bold text-[#222222] bg-white">
-              <th className="py-2 px-2.5 w-12 text-center border-r border-[#777777]">S.no</th>
-              <th className="py-2 px-3 border-r border-[#777777]">Item & Description</th>
-              <th className="py-2 px-2.5 w-24 text-center border-r border-[#777777]">HSN/SAC</th>
-              <th className="py-2 px-2.5 w-20 text-right border-r border-[#777777]">Qty</th>
-              <th className="py-2 px-2.5 w-24 text-right border-r border-[#777777]">Rate</th>
+            <tr className="border-b border-[#8c8c8c] text-[11px] font-bold text-[#222222] bg-[#f3f4f6]">
+              <th className="py-2 px-2.5 w-12 text-center border-r border-[#8c8c8c]">S.no</th>
+              <th className="py-2 px-3 border-r border-[#8c8c8c]">Item & Description</th>
+              <th className="py-2 px-2.5 w-24 text-center border-r border-[#8c8c8c]">HSN/SAC</th>
+              <th className="py-2 px-2.5 w-20 text-right border-r border-[#8c8c8c]">Qty</th>
+              <th className="py-2 px-2.5 w-24 text-right border-r border-[#8c8c8c]">Rate</th>
               <th className="py-2 px-3 w-28 text-right">Amount</th>
             </tr>
           </thead>
@@ -234,10 +243,10 @@ export default async function InvoicePrintPage({
               );
               return (
                 <tr key={item.id} className="align-top">
-                  <td className="py-2.5 px-2.5 text-center text-[#444444] border-r border-[#777777]">
+                  <td className="py-2.5 px-2.5 text-center text-[#444444] border-r border-[#8c8c8c]">
                     {idx + 1}
                   </td>
-                  <td className="py-2.5 px-3 border-r border-[#777777]">
+                  <td className="py-2.5 px-3 border-r border-[#8c8c8c]">
                     <div className="font-semibold text-[#111111] leading-snug">{item.description}</div>
                     {item.subDescription && (
                       <div className="text-[10px] text-[#666666] mt-0.5 font-normal">
@@ -245,14 +254,14 @@ export default async function InvoicePrintPage({
                       </div>
                     )}
                   </td>
-                  <td className="py-2.5 px-2.5 text-center text-[#222222] border-r border-[#777777]">
+                  <td className="py-2.5 px-2.5 text-center text-[#222222] border-r border-[#8c8c8c]">
                     {item.hsnSacCode}
                   </td>
-                  <td className="py-2.5 px-2.5 text-right border-r border-[#777777]">
+                  <td className="py-2.5 px-2.5 text-right border-r border-[#8c8c8c]">
                     <div className="text-[#111111]">{Number(item.quantity).toFixed(2)}</div>
                     <div className="text-[10px] text-[#666666] lowercase">{item.unit}</div>
                   </td>
-                  <td className="py-2.5 px-2.5 text-right text-[#111111] border-r border-[#777777]">
+                  <td className="py-2.5 px-2.5 text-right text-[#111111] border-r border-[#8c8c8c]">
                     {Number(item.unitPrice).toLocaleString("en-IN", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
@@ -270,10 +279,10 @@ export default async function InvoicePrintPage({
           </tbody>
         </table>
 
-        {/* 5. Footer Split Grid: Words/Bank/Terms vs Totals & Signature */}
+        {/* 5. Footer Split Grid: Words/Bank/Terms vs Totals & Signature with Closed Bottom Frame */}
         <div className="grid grid-cols-12 text-[11px]">
           {/* Left Column (col-span-7) */}
-          <div className="col-span-7 p-4 border-r border-[#777777] space-y-4">
+          <div className="col-span-7 p-4 border-r border-[#8c8c8c] space-y-4">
             {/* Total In Words */}
             <div className="space-y-0.5">
               <span className="font-semibold text-[#444444] text-[11px] block">Total In Words</span>
@@ -288,7 +297,7 @@ export default async function InvoicePrintPage({
               <div className="space-y-0.5 text-[#222222]">
                 <p>Bank Name : {COMPANY_BANK_NAME}</p>
                 <p>A/C No : {COMPANY_BANK_AC_NO}</p>
-                <p>Branch :{COMPANY_BANK_BRANCH}</p>
+                <p>Branch :Erode, Tamil Nadu</p>
                 <p>IFSC Code : {COMPANY_BANK_IFSC}</p>
               </div>
             </div>
@@ -306,7 +315,7 @@ export default async function InvoicePrintPage({
           {/* Right Column (col-span-5) */}
           <div className="col-span-5 flex flex-col justify-between">
             {/* Totals Table */}
-            <div className="p-3 space-y-1.5 text-[11px] border-b border-[#777777]">
+            <div className="p-3 space-y-1.5 text-[11px] border-b border-[#8c8c8c]">
               <div className="flex justify-between py-0.5 text-[#444444]">
                 <span>Sub Total</span>
                 <span className="text-[#111111]">
@@ -374,8 +383,8 @@ export default async function InvoicePrintPage({
               </div>
             </div>
 
-            {/* Signature Box */}
-            <div className="p-4 text-center text-[11px] flex flex-col justify-between min-h-[140px]">
+            {/* Signature Box: Sivakumar D (Manager) centered at top, Authorized Signature at bottom */}
+            <div className="p-4 text-center text-[11px] flex flex-col justify-between flex-1 min-h-[140px]">
               <span className="font-semibold text-[#111111] block">Sivakumar D (Manager)</span>
               <div className="h-14"></div>
               <span className="font-medium text-[#666666] block text-[10px]">Authorized Signature</span>

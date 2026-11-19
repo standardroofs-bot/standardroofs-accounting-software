@@ -1,20 +1,24 @@
 import { prisma } from "../src/lib/prisma";
 
 async function main() {
-  const inv34 = await prisma.invoice.findFirst({
-    where: { sequenceNumber: 34 },
-    include: { items: true, customer: true },
+  const invoices = await prisma.invoice.findMany({
+    orderBy: { sequenceNumber: "desc" },
+    include: { customer: true },
   });
-  console.log("Invoice 34:", {
-    id: inv34?.id,
-    customer: inv34?.customer?.name,
-    subTotal: inv34?.subTotal,
-    cgst: inv34?.cgstTotal,
-    sgst: inv34?.sgstTotal,
-    adj: inv34?.adjustment,
-    total: inv34?.totalAmount,
-    status: inv34?.status,
-  });
+  console.log(`Found ${invoices.length} invoices:`);
+  for (const inv of invoices) {
+    console.log({
+      id: inv.id,
+      invoiceNumber: inv.invoiceNumber,
+      seq: inv.sequenceNumber,
+      customer: inv.customer?.name,
+      journalEntryId: inv.journalEntryId,
+    });
+  }
+
+  const sys = await prisma.systemSettings.findFirst();
+  const vs = await prisma.voucherSequence.findFirst({ where: { voucherType: "INVOICE" } });
+  console.log({ sysLast: sys?.lastInvoiceNumber, vsNext: vs?.nextNumber });
 }
 
 main()
