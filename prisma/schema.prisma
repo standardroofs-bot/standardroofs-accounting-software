@@ -177,7 +177,9 @@ model FinancialYear {
   cashBookEntries  CashBookEntry[]
   dailyClosings    DailyCashClosing[]
   invoices         Invoice[]
+  salesOrders      SalesOrder[]
   purchaseBills    PurchaseBill[]
+  purchaseOrders   PurchaseOrder[]
 }
 
 model VoucherSequence {
@@ -266,6 +268,7 @@ model JournalEntry {
   creditDebitNotes   CreditDebitNote[]
   customerAdvances   CustomerAdvance[]
   supplierAdvances   SupplierAdvance[]
+  billPayment        BillPayment?
   importBatchId      String?
   importBatch        ImportBatch?    @relation(fields: [importBatchId], references: [id])
 }
@@ -381,6 +384,7 @@ model BankAccount {
   capitalTrans     CapitalTransaction[]
   loans            BusinessLoan[]
   emiPayments      LoanEmiPayment[]
+  billPayments     BillPayment[]
 }
 
 model BankTransaction {
@@ -453,6 +457,7 @@ model Customer {
 
   projects           Project[]
   invoices           Invoice[]
+  salesOrders        SalesOrder[]
   estimates          Estimate[]
   journalLines       JournalLine[]
   creditDebitNotes   CreditDebitNote[]
@@ -482,7 +487,9 @@ model Project {
   customer             Customer              @relation(fields: [customerId], references: [id])
   invoices             Invoice[]
   estimates            Estimate[]
+  salesOrders          SalesOrder[]
   purchaseBills        PurchaseBill[]
+  purchaseOrders       PurchaseOrder[]
   expenses             ExpenseClaim[]
   cashBookEntries      CashBookEntry[]
   journalLines         JournalLine[]
@@ -528,6 +535,8 @@ model Invoice {
   financialYear           FinancialYear    @relation(fields: [financialYearId], references: [id])
   journalEntry            JournalEntry?    @relation(fields: [journalEntryId], references: [id])
   importBatch             ImportBatch?     @relation(fields: [importBatchId], references: [id])
+  salesOrderId            String?
+  salesOrder              SalesOrder?      @relation(fields: [salesOrderId], references: [id])
   items                   InvoiceItem[]
   payments                InvoicePayment[]
   creditDebitNotes        CreditDebitNote[]
@@ -599,6 +608,8 @@ model Supplier {
 
   journalLines       JournalLine[]
   purchaseBills      PurchaseBill[]
+  purchaseOrders     PurchaseOrder[]
+  billPayments       BillPayment[]
   expenses           ExpenseClaim[]
   materialMovements  MaterialStockMovement[]
   fixedAssets        FixedAsset[]
@@ -632,7 +643,10 @@ model PurchaseBill {
   project             Project?       @relation(fields: [projectId], references: [id])
   financialYear       FinancialYear  @relation(fields: [financialYearId], references: [id])
   journalEntry        JournalEntry?  @relation(fields: [journalEntryId], references: [id])
+  purchaseOrderId     String?
+  purchaseOrder       PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
   items               PurchaseItem[]
+  payments            BillPayment[]
   fixedAssets         FixedAsset[]
   creditDebitNotes    CreditDebitNote[]
 }
@@ -1345,6 +1359,7 @@ model Estimate {
 
   customer               Customer       @relation(fields: [customerId], references: [id])
   project                Project?       @relation(fields: [projectId], references: [id])
+  salesOrder             SalesOrder?
   items                  EstimateItem[]
 }
 
@@ -1493,6 +1508,8 @@ model SystemSettings {
   id                    String   @id @default("sr_system_settings")
   lastQuoteSerialNumber Int      @default(0) // Persistent counter for SR-00001, SR-00002...
   lastInvoiceNumber     Int      @default(32) // Next invoice is #33
+  lastPoSerialNumber    Int      @default(0) // Persistent counter for PO-26-27-0001...
+  lastSoSerialNumber    Int      @default(0) // Persistent counter for SO-26-27-0001...
   updatedAt             DateTime @updatedAt
 }
 
@@ -1534,6 +1551,133 @@ model ProductColorMaster {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+// -------------------------------------------------------------
+// ZOHO BOOKS EXTENSIONS: PURCHASE ORDERS & BILL PAYMENTS
+// -------------------------------------------------------------
+
+model PurchaseOrder {
+  id              String              @id @default(cuid())
+  poNumber        String              @unique // PO-26-27-0001
+  sequenceNumber  Int
+  date            DateTime
+  expectedDate    DateTime?
+  supplierId      String
+  projectId       String?
+  financialYearId String
+  subTotal        Decimal             @default(0.00) @db.Decimal(15, 2)
+  cgstTotal       Decimal             @default(0.00) @db.Decimal(15, 2)
+  sgstTotal       Decimal             @default(0.00) @db.Decimal(15, 2)
+  igstTotal       Decimal             @default(0.00) @db.Decimal(15, 2)
+  totalAmount     Decimal             @default(0.00) @db.Decimal(15, 2)
+  status          String              @default("DRAFT") // DRAFT, ISSUED, BILLED, CANCELLED
+  terms           String?
+  notes           String?
+  convertedBillId String?             @unique
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  supplier        Supplier            @relation(fields: [supplierId], references: [id])
+  project         Project?            @relation(fields: [projectId], references: [id])
+  financialYear   FinancialYear       @relation(fields: [financialYearId], references: [id])
+  items           PurchaseOrderItem[]
+  purchaseBills   PurchaseBill[]
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  description     String
+  hsnSacCode      String        @default("7210")
+  quantity        Decimal       @default(1.00) @db.Decimal(15, 2)
+  unit            String        @default("SQFT")
+  unitPrice       Decimal       @db.Decimal(15, 2)
+  taxableAmount   Decimal       @db.Decimal(15, 2)
+  gstRate         Decimal       @default(18.00) @db.Decimal(5, 2)
+  cgstAmount      Decimal       @default(0.00) @db.Decimal(15, 2)
+  sgstAmount      Decimal       @default(0.00) @db.Decimal(15, 2)
+  igstAmount      Decimal       @default(0.00) @db.Decimal(15, 2)
+  totalAmount     Decimal       @db.Decimal(15, 2)
+
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+}
+
+model BillPayment {
+  id              String        @id @default(cuid())
+  paymentNumber   String        @unique // VPM-26-27-0001
+  paymentDate     DateTime
+  purchaseBillId  String
+  supplierId      String
+  bankAccountId   String?
+  amount          Decimal       @db.Decimal(15, 2)
+  tdsSection      String?       // 194C, 194Q
+  tdsRate         Decimal?      @default(0.00) @db.Decimal(5, 2)
+  tdsAmount       Decimal       @default(0.00) @db.Decimal(15, 2)
+  paymentMode     String        @default("NEFT") // NEFT, RTGS, IMPS, UPI, CHEQUE, CASH
+  referenceNumber String?
+  notes           String?
+  journalEntryId  String?       @unique
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  purchaseBill    PurchaseBill  @relation(fields: [purchaseBillId], references: [id])
+  supplier        Supplier      @relation(fields: [supplierId], references: [id])
+  bankAccount     BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  journalEntry    JournalEntry? @relation(fields: [journalEntryId], references: [id])
+}
+
+// -------------------------------------------------------------
+// ZOHO BOOKS EXTENSIONS: SALES ORDERS
+// -------------------------------------------------------------
+
+model SalesOrder {
+  id                 String           @id @default(cuid())
+  soNumber           String           @unique // SO-26-27-0001
+  sequenceNumber     Int
+  date               DateTime
+  deliveryDate       DateTime?
+  customerId         String
+  projectId          String?
+  estimateId         String?          @unique
+  financialYearId    String
+  subTotal           Decimal          @default(0.00) @db.Decimal(15, 2)
+  cgstTotal          Decimal          @default(0.00) @db.Decimal(15, 2)
+  sgstTotal          Decimal          @default(0.00) @db.Decimal(15, 2)
+  igstTotal          Decimal          @default(0.00) @db.Decimal(15, 2)
+  totalAmount        Decimal          @default(0.00) @db.Decimal(15, 2)
+  status             String           @default("CONFIRMED") // DRAFT, CONFIRMED, INVOICED, CANCELLED
+  terms              String?
+  notes              String?
+  convertedInvoiceId String?          @unique
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  customer           Customer         @relation(fields: [customerId], references: [id])
+  project            Project?         @relation(fields: [projectId], references: [id])
+  estimate           Estimate?        @relation(fields: [estimateId], references: [id])
+  financialYear      FinancialYear    @relation(fields: [financialYearId], references: [id])
+  items              SalesOrderItem[]
+  invoices           Invoice[]
+}
+
+model SalesOrderItem {
+  id            String     @id @default(cuid())
+  salesOrderId  String
+  description   String
+  hsnSacCode    String     @default("9954")
+  quantity      Decimal    @default(1.00) @db.Decimal(15, 2)
+  unit          String     @default("SQFT")
+  unitPrice     Decimal    @db.Decimal(15, 2)
+  taxableAmount Decimal    @db.Decimal(15, 2)
+  gstRate       Decimal    @default(18.00) @db.Decimal(5, 2)
+  cgstAmount    Decimal    @default(0.00) @db.Decimal(15, 2)
+  sgstAmount    Decimal    @default(0.00) @db.Decimal(15, 2)
+  igstAmount    Decimal    @default(0.00) @db.Decimal(15, 2)
+  totalAmount   Decimal    @db.Decimal(15, 2)
+
+  salesOrder    SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+}
+
 
 
 

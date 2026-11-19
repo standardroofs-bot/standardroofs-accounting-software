@@ -13,7 +13,7 @@ import {
   COMPANY_BANK_AC_NO,
   COMPANY_BANK_IFSC,
 } from "@/lib/gst";
-import { Printer } from "lucide-react";
+import PrintButton from "@/components/common/PrintButton";
 
 export const dynamic = "force-dynamic";
 
@@ -34,30 +34,17 @@ export default async function InvoicePrintPage({
 
   if (!invoice) notFound();
 
-  return (
-    <div className="bg-slate-100 min-h-screen py-8 text-slate-900 print:bg-white print:py-0 print:m-0">
-      {/* Print Controls (Hidden on Print) */}
-      <div className="max-w-[210mm] mx-auto mb-4 flex items-center justify-between print:hidden px-4">
-        <a
-          href="/invoices"
-          className="text-xs text-blue-600 hover:underline font-bold"
-        >
-          ← Back to Invoices
-        </a>
-        <button
-          onClick={() => {}}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow flex items-center gap-2 print:hidden cursor-pointer"
-          id="print-btn"
-        >
-          <Printer size={16} /> Print / Save as PDF (A4)
-        </button>
-      </div>
+  const customerName = invoice.customer?.name || "Customer";
+  const customerCompany = invoice.customer?.companyName;
+  const billingAddr = invoice.customer?.billingAddress || invoice.customer?.shippingAddress || "Erode, Tamil Nadu";
+  const customerGstin = invoice.customer?.gstNumber;
+  const customerState = invoice.customer?.state || "Tamil Nadu";
+  const customerStateCode = invoice.customer?.stateCode || "33";
 
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `document.getElementById('print-btn')?.addEventListener('click', () => window.print());`,
-        }}
-      />
+  return (
+    <div className="bg-slate-100 min-h-screen py-8 text-slate-900 print:bg-white print:py-0 print:m-0 font-sans">
+      {/* Print Controls (Hidden on Print) */}
+      <PrintButton backUrl={`/invoices/${invoice.id}`} title="Print / Save as PDF (A4)" />
 
       {/* A4 Document Container */}
       <div className="max-w-[210mm] min-h-[297mm] mx-auto bg-white p-8 border border-slate-300 shadow-xl print:border-none print:shadow-none print:p-6 text-xs font-sans">
@@ -121,7 +108,7 @@ export default async function InvoicePrintPage({
               <div>
                 <span className="text-slate-500 font-sans">Place of Supply: </span>
                 <strong>
-                  {invoice.placeOfSupply} (Code: {invoice.placeOfSupplyStateCode})
+                  {invoice.placeOfSupply || "Tamil Nadu"} (Code: {invoice.placeOfSupplyStateCode || "33"})
                 </strong>
               </div>
             </div>
@@ -134,23 +121,23 @@ export default async function InvoicePrintPage({
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
               Billed To:
             </span>
-            <p className="font-bold text-slate-900 mt-1 text-sm">{invoice.customer.name}</p>
-            {invoice.customer.companyName && (
-              <p className="text-slate-700 font-semibold">{invoice.customer.companyName}</p>
+            <p className="font-bold text-slate-900 mt-1 text-sm">{customerName}</p>
+            {customerCompany && (
+              <p className="text-slate-700 font-semibold">{customerCompany}</p>
             )}
             <p className="text-slate-600 mt-1 whitespace-pre-line text-[11px]">
-              {invoice.customer.billingAddress}
+              {billingAddr}
             </p>
             <div className="mt-2 text-[10px] font-mono text-slate-700">
-              {invoice.customer.gstNumber ? (
+              {customerGstin ? (
                 <span>
-                  <strong>GSTIN:</strong> {invoice.customer.gstNumber}
+                  <strong>GSTIN:</strong> {customerGstin}
                 </span>
               ) : (
                 <span className="italic text-slate-400">GST: Unregistered Consumer</span>
               )}
               <span className="ml-3">
-                <strong>State:</strong> {invoice.customer.state} ({invoice.customer.stateCode})
+                <strong>State:</strong> {customerState} ({customerStateCode})
               </span>
             </div>
           </div>
@@ -173,7 +160,7 @@ export default async function InvoicePrintPage({
               </div>
             ) : (
               <p className="text-slate-600 mt-1 whitespace-pre-line text-[11px]">
-                {invoice.customer.shippingAddress || invoice.customer.billingAddress}
+                {invoice.customer?.shippingAddress || invoice.customer?.siteAddress || billingAddr}
               </p>
             )}
           </div>
@@ -288,7 +275,7 @@ export default async function InvoicePrintPage({
           <div>
             <span className="font-bold uppercase text-slate-700 block">Terms & Conditions:</span>
             <p className="text-slate-600 mt-1 whitespace-pre-line leading-relaxed">
-              {invoice.terms}
+              {invoice.terms || "1. Payment due within agreed credit days.\n2. Goods once sold cannot be taken back.\n3. All disputes subject to Erode Jurisdiction."}
             </p>
           </div>
           <div className="text-right flex flex-col justify-between items-end h-28">

@@ -50,8 +50,10 @@ export async function POST(
         bankAccount = await prisma.bankAccount.findUniqueOrThrow({ where: { id: bankAccountId } });
         depositAccountId = bankAccount.accountId;
       } else {
-        // Default to HDFC Main
-        const defaultBank = await prisma.bankAccount.findFirst({ where: { accountNumber: "50200012345678" } });
+        // Default to ICICI Bank Main Account
+        const defaultBank =
+          (await prisma.bankAccount.findFirst({ where: { accountNumber: "155205003161" } })) ||
+          (await prisma.bankAccount.findFirst());
         if (defaultBank) {
           bankAccount = defaultBank;
           depositAccountId = defaultBank.accountId;

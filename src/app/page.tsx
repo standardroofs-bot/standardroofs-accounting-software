@@ -19,6 +19,12 @@ import {
   Sparkles,
   Camera,
   Layers,
+  FileText,
+  CreditCard,
+  Plus,
+  Clock,
+  Briefcase,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { AccountType } from "@prisma/client";
@@ -26,6 +32,8 @@ import { AccountType } from "@prisma/client";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const now = new Date();
+
   const fy = await prisma.financialYear.findFirst({
     where: { isCurrent: true },
     include: {
@@ -49,6 +57,48 @@ export default async function DashboardPage() {
     where: { type: AccountType.EXPENSE },
   });
 
+  // Receivables & Invoices
+  const invoices = await prisma.invoice.findMany({
+    where: { status: { not: "VOID" } },
+    select: { balanceDue: true, dueDate: true, status: true, totalAmount: true },
+  });
+  let totalReceivables = toDecimal(0);
+  let currentReceivables = toDecimal(0);
+  let overdueReceivables = toDecimal(0);
+
+  invoices.forEach((inv) => {
+    const bal = toDecimal(inv.balanceDue);
+    if (bal.greaterThan(0)) {
+      totalReceivables = totalReceivables.plus(bal);
+      if (inv.dueDate && new Date(inv.dueDate) < now) {
+        overdueReceivables = overdueReceivables.plus(bal);
+      } else {
+        currentReceivables = currentReceivables.plus(bal);
+      }
+    }
+  });
+
+  // Payables & Vendor Bills
+  const bills = await prisma.purchaseBill.findMany({
+    select: { balanceDue: true, dueDate: true, status: true, totalAmount: true },
+  });
+  let totalPayables = toDecimal(0);
+  let currentPayables = toDecimal(0);
+  let overduePayables = toDecimal(0);
+
+  bills.forEach((b) => {
+    const bal = toDecimal(b.balanceDue);
+    if (bal.greaterThan(0)) {
+      totalPayables = totalPayables.plus(bal);
+      if (b.dueDate && new Date(b.dueDate) < now) {
+        overduePayables = overduePayables.plus(bal);
+      } else {
+        currentPayables = currentPayables.plus(bal);
+      }
+    }
+  });
+
+  // Machines & Active Fleet
   const machines = await prisma.machineAsset.findMany({
     orderBy: { sNo: "asc" },
     include: {
@@ -57,35 +107,35 @@ export default async function DashboardPage() {
         take: 1,
       },
     },
-    take: 8,
+    take: 6,
   });
 
+  // Recent Vouchers
   const recentVouchers = await prisma.journalEntry.findMany({
     orderBy: { createdAt: "desc" },
-    take: 6,
+    take: 5,
     include: {
       createdBy: { select: { name: true } },
     },
   });
 
+  // Bank Statement Queue
   const pendingUncatCount = await prisma.bankTransaction.count({
     where: { status: "UNCATEGORIZED" },
   });
 
-  const lowStockCount = await prisma.materialItem.count({
-    where: { currentStock: { lte: 5 } },
-  });
-
-  const systemSettings = await prisma.systemSettings.findFirst();
-  const nextSerialDisplay = `SR-${String((systemSettings?.lastQuoteSerialNumber || 0) + 1).padStart(5, "0")}`;
-
+  // Active Projects
   const activeProjects = await prisma.project.findMany({
     take: 4,
     orderBy: { createdAt: "desc" },
     include: { customer: true },
   });
 
-  // Calculate Metrics
+  const systemSettings = await prisma.systemSettings.findFirst();
+  const nextSerialDisplay = `SR-${String((systemSettings?.lastQuoteSerialNumber || 0) + 1).padStart(5, "0")}`;
+  const nextInvoiceNo = (systemSettings?.lastInvoiceNumber || 32) + 1;
+
+  // Liquidity Metrics
   const cashBal = toDecimal(cashAccount?.currentBalance || "0");
   const bankTotal = bankAccounts.reduce(
     (sum, b) => sum.plus(toDecimal(b.currentBalance)),
@@ -114,454 +164,448 @@ export default async function DashboardPage() {
   const grossSiteProfit = totalIncome.minus(directSiteCosts);
   const netSurplus = grossSiteProfit.minus(officeOverheads);
 
-  const invoiceSeq = fy?.voucherSequences.find((s) => s.voucherType === "INVOICE");
-  const nextInvoiceDisplay = invoiceSeq
-    ? `${invoiceSeq.prefix}${String(invoiceSeq.nextNumber).padStart(invoiceSeq.paddingLength, "0")}`
-    : "SR/26-27/0033";
+  // Top Expenses Breakdown
+  const topExpenseAccounts = expenseAccounts
+    .map((a) => ({
+      name: a.name,
+      code: a.code,
+      amount: toDecimal(a.currentBalance),
+    }))
+    .sort((a, b) => b.amount.minus(a.amount).toNumber())
+    .slice(0, 5);
 
-  const isCleanSlate = totalLiquidity.isZero() && totalIncome.isZero() && totalExpense.isZero();
+  // Fiscal months data for Cash Flow
+  const months = [
+    "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Mobile Site Supervisor Quick Action Bar (Visible primarily on small screens) */}
-      <div className="md:hidden bg-slate-900 text-white p-4 rounded-xl border border-slate-800 shadow-md space-y-3">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-          <span>FIELD QUICK ACTIONS</span>
-          <span className="text-[10px] px-2 py-0.5 rounded bg-blue-600 text-white font-mono">SITE MODE</span>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <Link
-            href="/expenses"
-            className="flex flex-col items-center justify-center p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-center gap-1.5 transition"
-          >
-            <Camera className="w-5 h-5 text-emerald-400" />
-            <span className="text-[10px] font-semibold leading-tight">+ Upload Bill Photo</span>
-          </Link>
-          <Link
-            href="/machines"
-            className="flex flex-col items-center justify-center p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-center gap-1.5 transition"
-          >
-            <Wrench className="w-5 h-5 text-amber-400" />
-            <span className="text-[10px] font-semibold leading-tight">My SRM Tools</span>
-          </Link>
-          <Link
-            href="/fleet"
-            className="flex flex-col items-center justify-center p-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-center gap-1.5 transition"
-          >
-            <Truck className="w-5 h-5 text-blue-400" />
-            <span className="text-[10px] font-semibold leading-tight">Vehicle & Diesel</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* Welcome Banner */}
-      <div className="bg-linear-to-r from-slate-900 via-blue-950 to-slate-900 rounded-2xl p-6 text-white border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
-              FY {fy?.name || "2026-27"} Active
-            </span>
-            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              Double-Entry Compliant
-            </span>
-            {isCleanSlate && (
-              <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                Pristine ₹0.00 Books
-              </span>
-            )}
-          </div>
-          <h1 className="text-2xl font-black mt-2 tracking-tight">
-            Standard Roofs Books & ERP
-          </h1>
-          <p className="text-xs text-slate-300 mt-1 max-w-xl">
-            In-house financial management, PEB roofing project accounting, daily cash reconciliation
-            and machine tracking for Erode headquarters.
-          </p>
-        </div>
-
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-3.5 border border-white/10 text-right">
-          <span className="text-[10px] text-slate-300 uppercase tracking-wider block">
-            Next Invoice Sequence
-          </span>
-          <span className="text-lg font-mono font-black text-blue-300">
-            {nextInvoiceDisplay}
-          </span>
-          <span className="text-[10px] text-slate-400 block mt-0.5">
-            (Sequence #{invoiceSeq?.nextNumber || 33} continuing cleanly)
-          </span>
-        </div>
-      </div>
-
-      {/* Executive Daily Action & Quick Access Bar */}
+    <div className="space-y-6 font-sans">
+      {/* Executive Command & Zoho 1-Click Action Bar */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-amber-500 shrink-0" />
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black shadow-md shadow-blue-500/20">
+            SR
+          </div>
           <div>
-            <h3 className="font-black text-xs uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              Executive Daily Actions (Prabhakaran T • MD Command)
-            </h3>
-            <p className="text-[11px] text-slate-500">
-              Direct shortcuts to create Zoho quotations, tax invoice sequence #33, and categorize ICICI bank transactions.
+            <div className="flex items-center gap-2">
+              <h1 className="font-black text-sm uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                Standard Roofs Books • Executive Command
+              </h1>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">
+                FY {fy?.name || "2026-27"} Active
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Managing Director: Prabhakaran T • Erode Headquarters • GSTIN: 33AEWFS5187G1ZD
             </p>
           </div>
         </div>
 
+        {/* Action Shortcuts */}
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/estimates"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition active:scale-95"
           >
-            <PlusCircle size={15} />
+            <Plus size={14} />
             <span>+ Create Quote {nextSerialDisplay}</span>
           </Link>
 
           <Link
             href="/invoices/new"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 rounded-xl text-xs font-bold shadow transition active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 rounded-xl text-xs font-bold shadow-sm transition active:scale-95"
           >
-            <Receipt size={15} />
-            <span>+ Tax Invoice #{invoiceSeq?.nextNumber || 33}</span>
+            <Receipt size={14} />
+            <span>+ Tax Invoice #{nextInvoiceNo}</span>
+          </Link>
+
+          <Link
+            href="/bills"
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition active:scale-95"
+          >
+            <FileText size={14} />
+            <span>+ Record Bill</span>
           </Link>
 
           <Link
             href="/banking"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold shadow transition active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold shadow-sm transition active:scale-95"
           >
-            <Landmark size={15} />
+            <Landmark size={14} />
             <span>+ Categorize ICICI ({pendingUncatCount})</span>
           </Link>
-
-          <Link
-            href="/expenses"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition active:scale-95"
-          >
-            <ArrowUpRight size={15} />
-            <span>+ Record Expense</span>
-          </Link>
-
-          <Link
-            href="/inventory"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition active:scale-95"
-          >
-            <Layers size={15} />
-            <span>+ Issue Material</span>
-          </Link>
         </div>
       </div>
 
-      {/* Operational Action Alerts (93 ICICI Transactions & Low Stock) */}
-      {pendingUncatCount > 0 && (
-        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center font-black shrink-0">
-              {pendingUncatCount}
+      {/* Zoho Books Side-by-Side Summary Cards: Total Receivables vs Total Payables */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Total Receivables Card (Zoho Books Style) */}
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Total Receivables
+              </span>
+              <Link
+                href="/invoices/new"
+                className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+              >
+                + New Invoice #{nextInvoiceNo}
+              </Link>
+            </div>
+
+            <div className="mt-3">
+              <div className="text-3xl font-black text-slate-900 dark:text-slate-100 font-mono tracking-tight">
+                {formatINR(totalReceivables)}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Total Unpaid Customer Invoices
+              </p>
+            </div>
+
+            {/* Current vs Overdue Split Bar */}
+            <div className="mt-5 space-y-2">
+              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden flex">
+                <div
+                  className="bg-emerald-500 h-full transition-all duration-500"
+                  style={{
+                    width: totalReceivables.isZero()
+                      ? "50%"
+                      : `${currentReceivables.dividedBy(totalReceivables).times(100).toNumber()}%`,
+                  }}
+                  title="Current Receivables"
+                />
+                <div
+                  className="bg-amber-500 h-full transition-all duration-500"
+                  style={{
+                    width: totalReceivables.isZero()
+                      ? "50%"
+                      : `${overdueReceivables.dividedBy(totalReceivables).times(100).toNumber()}%`,
+                  }}
+                  title="Overdue Receivables"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-xs font-mono pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="text-slate-600 dark:text-slate-400 font-sans">Current:</span>
+                  <strong className="text-slate-900 dark:text-slate-100">{formatINR(currentReceivables)}</strong>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                  <span className="text-slate-600 dark:text-slate-400 font-sans">Overdue:</span>
+                  <strong className="text-amber-600 dark:text-amber-400">{formatINR(overdueReceivables)}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+            <span>Customer Accounts Receivable (Ledger 1030)</span>
+            <Link href="/invoices" className="text-blue-600 font-bold hover:underline">
+              View Invoices &rarr;
+            </Link>
+          </div>
+        </div>
+
+        {/* Total Payables Card (Zoho Books Style) */}
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Total Payables
+              </span>
+              <Link
+                href="/bills"
+                className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+              >
+                + New Bill
+              </Link>
+            </div>
+
+            <div className="mt-3">
+              <div className="text-3xl font-black text-slate-900 dark:text-slate-100 font-mono tracking-tight">
+                {formatINR(totalPayables)}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Total Unpaid Vendor Bills
+              </p>
+            </div>
+
+            {/* Current vs Overdue Split Bar */}
+            <div className="mt-5 space-y-2">
+              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden flex">
+                <div
+                  className="bg-blue-500 h-full transition-all duration-500"
+                  style={{
+                    width: totalPayables.isZero()
+                      ? "50%"
+                      : `${currentPayables.dividedBy(totalPayables).times(100).toNumber()}%`,
+                  }}
+                  title="Current Payables"
+                />
+                <div
+                  className="bg-rose-500 h-full transition-all duration-500"
+                  style={{
+                    width: totalPayables.isZero()
+                      ? "50%"
+                      : `${overduePayables.dividedBy(totalPayables).times(100).toNumber()}%`,
+                  }}
+                  title="Overdue Payables"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-xs font-mono pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                  <span className="text-slate-600 dark:text-slate-400 font-sans">Current:</span>
+                  <strong className="text-slate-900 dark:text-slate-100">{formatINR(currentPayables)}</strong>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+                  <span className="text-slate-600 dark:text-slate-400 font-sans">Overdue:</span>
+                  <strong className="text-rose-600 dark:text-rose-400">{formatINR(overduePayables)}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+            <span>Creditor Accounts Payable (Ledger 2010)</span>
+            <Link href="/payments-made" className="text-blue-600 font-bold hover:underline">
+              View Payments Made &rarr;
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Cash Flow Statement Card (Apr 2026 – Mar 2027) */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+          <div>
+            <h2 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Landmark className="text-blue-600" size={18} /> Cash Flow (Fiscal Year Apr 2026 – Mar 2027)
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Monthly tracking of incoming collections vs outgoing disbursements and net liquidity position
+            </p>
+          </div>
+
+          <div className="flex items-center gap-6 text-xs font-mono">
+            <div>
+              <span className="text-[10px] text-slate-400 block font-sans">Cash & Bank as on 01/04/2026</span>
+              <strong className="text-sm text-slate-900 dark:text-slate-100">₹ 24,03,272.00</strong>
             </div>
             <div>
-              <div className="font-bold text-slate-900 dark:text-slate-100">
-                {pendingUncatCount} Pending ICICI Bank Statement Transactions
-              </div>
-              <div className="text-[11px] text-slate-600 dark:text-slate-400">
-                Account 155205003161 has {pendingUncatCount} statement entries ready for 1-click categorization into Customer Advance, Vendor Bills, and Site Costs.
-              </div>
+              <span className="text-[10px] text-slate-400 block font-sans">Live Closing Balance</span>
+              <strong className="text-sm text-emerald-600 dark:text-emerald-400">{formatINR(totalLiquidity)}</strong>
             </div>
           </div>
-          <Link
-            href="/banking"
-            className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow transition shrink-0 whitespace-nowrap"
-          >
-            Categorize Feed Now &rarr;
-          </Link>
-        </div>
-      )}
-
-      {/* Plain-English High-Contrast Action Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <Link
-          href="/advances"
-          className="bg-white hover:bg-emerald-50/50 border border-slate-200 hover:border-emerald-400 p-4 rounded-xl shadow-xs transition group flex flex-col justify-between"
-        >
-          <div className="flex items-center justify-between">
-            <span className="p-2 bg-emerald-100 text-emerald-700 rounded-lg group-hover:scale-105 transition-transform">
-              <ArrowDownLeft className="w-5 h-5" />
-            </span>
-            <span className="text-[10px] font-bold text-emerald-700 uppercase">Incoming</span>
-          </div>
-          <div className="mt-3">
-            <h4 className="text-sm font-bold text-slate-900 group-hover:text-emerald-700">Money Received (In)</h4>
-            <p className="text-[11px] text-slate-500 mt-0.5">Customer advances or invoice payments</p>
-          </div>
-        </Link>
-
-        <Link
-          href="/expenses"
-          className="bg-white hover:bg-rose-50/50 border border-slate-200 hover:border-rose-400 p-4 rounded-xl shadow-xs transition group flex flex-col justify-between"
-        >
-          <div className="flex items-center justify-between">
-            <span className="p-2 bg-rose-100 text-rose-700 rounded-lg group-hover:scale-105 transition-transform">
-              <ArrowUpRight className="w-5 h-5" />
-            </span>
-            <span className="text-[10px] font-bold text-rose-700 uppercase">Outgoing</span>
-          </div>
-          <div className="mt-3">
-            <h4 className="text-sm font-bold text-slate-900 group-hover:text-rose-700">Money Paid / Expense</h4>
-            <p className="text-[11px] text-slate-500 mt-0.5">Site materials, tea, crane, food & fuel</p>
-          </div>
-        </Link>
-
-        <Link
-          href="/invoices/new"
-          className="bg-white hover:bg-blue-50/50 border border-slate-200 hover:border-blue-400 p-4 rounded-xl shadow-xs transition group flex flex-col justify-between"
-        >
-          <div className="flex items-center justify-between">
-            <span className="p-2 bg-blue-100 text-blue-700 rounded-lg group-hover:scale-105 transition-transform">
-              <PlusCircle className="w-5 h-5" />
-            </span>
-            <span className="text-[10px] font-bold text-blue-700 uppercase">#{invoiceSeq?.nextNumber || 33}</span>
-          </div>
-          <div className="mt-3">
-            <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-700">Create Tax Invoice</h4>
-            <p className="text-[11px] text-slate-500 mt-0.5">GST Code 33 compliant tax invoice</p>
-          </div>
-        </Link>
-
-        <Link
-          href="/fleet"
-          className="bg-white hover:bg-amber-50/50 border border-slate-200 hover:border-amber-400 p-4 rounded-xl shadow-xs transition group flex flex-col justify-between"
-        >
-          <div className="flex items-center justify-between">
-            <span className="p-2 bg-amber-100 text-amber-700 rounded-lg group-hover:scale-105 transition-transform">
-              <Truck className="w-5 h-5" />
-            </span>
-            <span className="text-[10px] font-bold text-amber-700 uppercase">Logistics</span>
-          </div>
-          <div className="mt-3">
-            <h4 className="text-sm font-bold text-slate-900 group-hover:text-amber-700">Vehicle & Diesel Entry</h4>
-            <p className="text-[11px] text-slate-500 mt-0.5">Log Bolero / Eicher site trip & fuel</p>
-          </div>
-        </Link>
-
-        <Link
-          href="/machines"
-          className="bg-white hover:bg-purple-50/50 border border-slate-200 hover:border-purple-400 p-4 rounded-xl shadow-xs transition group flex flex-col justify-between"
-        >
-          <div className="flex items-center justify-between">
-            <span className="p-2 bg-purple-100 text-purple-700 rounded-lg group-hover:scale-105 transition-transform">
-              <Wrench className="w-5 h-5" />
-            </span>
-            <span className="text-[10px] font-bold text-purple-700 uppercase">Tools</span>
-          </div>
-          <div className="mt-3">
-            <h4 className="text-sm font-bold text-slate-900 group-hover:text-purple-700">Issue Machine to Team</h4>
-            <p className="text-[11px] text-slate-500 mt-0.5">Track SRM01-06 welder & drill custody</p>
-          </div>
-        </Link>
-      </div>
-
-      {/* Primary KPI Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">ICICI Bank & Liquidity</span>
-            <Landmark size={18} className="text-blue-600" />
-          </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-2 font-mono">
-            {formatINR(totalLiquidity)}
-          </p>
-          <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 font-mono">
-            <span>ICICI (xxxx3161): {formatINR(bankTotal)}</span>
-            <span>Petty Cash: {formatINR(cashBal)}</span>
-          </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Project Revenue</span>
-            <TrendingUp size={18} className="text-emerald-600" />
-          </div>
-          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-2">
-            {formatINR(totalIncome)}
-          </p>
-          <span className="text-[11px] text-slate-500 mt-2 block pt-2 border-t border-slate-100 dark:border-slate-800">
-            PEB Roofing & Fabrication Contracts
-          </span>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Site Expenses</span>
-            <TrendingDown size={18} className="text-rose-600" />
-          </div>
-          <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-2">
-            {formatINR(totalExpense)}
-          </p>
-          <span className="text-[11px] text-slate-500 mt-2 block pt-2 border-t border-slate-100 dark:border-slate-800">
-            Steel, Labour, Cranes & Consumables
-          </span>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Net Operating Surplus</span>
-            <Receipt size={18} className="text-teal-600" />
-          </div>
-          <p className="text-2xl font-black text-teal-600 dark:text-teal-400 mt-2">
-            {formatINR(netSurplus)}
-          </p>
-          <span className="text-[11px] text-slate-500 mt-2 block pt-2 border-t border-slate-100 dark:border-slate-800">
-            Gross Margin before Tax
-          </span>
-        </div>
-      </div>
-
-      {/* Executive Site vs. Office Overheads P&L Bar */}
-      <div className="p-4 bg-linear-to-r from-slate-900 to-blue-950 text-white rounded-2xl border border-slate-800 shadow-md space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-800">
-          <div className="flex items-center gap-2">
-            <Sparkles className="text-amber-400" size={16} />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-              Executive Site Performance vs. Office Overheads
-            </h3>
-          </div>
-          <Link
-            href="/reports"
-            className="text-[11px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition"
-          >
-            View Full CA Financial Reports &rarr;
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div className="p-2.5 bg-white/5 rounded-xl border border-white/10">
-            <span className="text-[10px] text-slate-400 uppercase font-bold">Total Project Revenue</span>
-            <div className="font-mono font-bold text-sm text-white mt-0.5">{formatINR(totalIncome)}</div>
-            <span className="text-[10px] text-slate-400 block">Client Contracts & Billed</span>
+        {/* Visual Monthly Flow Chart Strip */}
+        <div className="space-y-2">
+          <div className="grid grid-cols-12 gap-2 text-center text-[10px] font-bold text-slate-400 uppercase">
+            {months.map((m) => (
+              <div key={m}>{m}</div>
+            ))}
           </div>
 
-          <div className="p-2.5 bg-white/5 rounded-xl border border-white/10">
-            <span className="text-[10px] text-slate-400 uppercase font-bold">Direct Site Costs</span>
-            <div className="font-mono font-bold text-sm text-rose-300 mt-0.5">{formatINR(directSiteCosts)}</div>
-            <span className="text-[10px] text-slate-400 block">Materials, Labour & Cranes</span>
+          <div className="grid grid-cols-12 gap-2 h-24 items-end bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+            {months.map((m, idx) => (
+              <div key={m} className="flex flex-col items-center justify-end h-full group relative">
+                {/* Visual pillar */}
+                <div
+                  className={`w-full rounded-t transition-all ${
+                    idx === 0
+                      ? "bg-blue-600 h-16 shadow-sm shadow-blue-500/20"
+                      : "bg-slate-200 dark:bg-slate-700 h-6 hover:bg-blue-400"
+                  }`}
+                />
+                <span className="text-[9px] font-mono mt-1 text-slate-500">
+                  {idx === 0 ? "₹24.03L" : "₹0.00"}
+                </span>
+              </div>
+            ))}
           </div>
 
-          <div className="p-2.5 bg-emerald-950/40 rounded-xl border border-emerald-500/30">
-            <span className="text-[10px] text-emerald-400 uppercase font-bold">Gross Site Profit</span>
-            <div className="font-mono font-bold text-sm text-emerald-300 mt-0.5">{formatINR(grossSiteProfit)}</div>
-            <span className="text-[10px] text-emerald-400 block">Direct Site Surplus</span>
-          </div>
-
-          <div className="p-2.5 bg-amber-950/40 rounded-xl border border-amber-500/30">
-            <span className="text-[10px] text-amber-400 uppercase font-bold">Office Overheads</span>
-            <div className="font-mono font-bold text-sm text-amber-300 mt-0.5">{formatINR(officeOverheads)}</div>
-            <span className="text-[10px] text-amber-400 block">Erode Yard Rent, EB & Admin</span>
+          <div className="flex items-center justify-between text-xs pt-1 text-slate-500">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-600" /> Opening ICICI Liquidity
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Incoming Collections
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Outgoing Disbursements
+              </span>
+            </div>
+            <Link href="/banking" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
+              Reconcile Bank Statement &rarr;
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Two Column Layout: Quick Actions & Machine Assets */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Recent Vouchers & Quick Navigation */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                <FileSpreadsheet className="text-blue-600" size={18} />
-                Recent General Ledger Vouchers
-              </h2>
-              <Link
-                href="/vouchers"
-                className="text-xs text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1"
-              >
-                View All <ArrowRight size={14} />
+      {/* Income & Expense + Top Expenses Breakdown + Site Operations */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column (7 cols): Income vs Expense & Top Expenses */}
+        <div className="lg:col-span-7 space-y-6">
+          {/* Income vs Expenses Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <TrendingUp size={16} className="text-emerald-600" /> Income vs. Direct Site Expenses
+              </h3>
+              <Link href="/reports" className="text-xs text-blue-600 font-bold hover:underline">
+                P&L Statement &rarr;
               </Link>
             </div>
 
-            <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
-              {recentVouchers.length === 0 ? (
-                <div className="py-8 text-center space-y-2">
-                  <p className="text-xs text-slate-400">
-                    No vouchers recorded yet. Starting at clean ₹ 0.00 books.
-                  </p>
-                  <Link
-                    href="/invoices/new"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
-                  >
-                    <PlusCircle className="w-3.5 h-3.5" />
-                    Issue First Invoice (#33)
-                  </Link>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900">
+                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase block">Total Income</span>
+                <div className="text-lg font-black text-emerald-700 dark:text-emerald-300 font-mono mt-1">
+                  {formatINR(totalIncome)}
                 </div>
-              ) : (
-                recentVouchers.map((v) => (
-                  <div
-                    key={v.id}
-                    className="py-3 flex items-center justify-between gap-4 text-xs hover:bg-slate-50/50 dark:hover:bg-slate-800/40 px-2 rounded-lg transition"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
-                          {v.entryNumber}
-                        </span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                          {v.voucherType}
-                        </span>
-                      </div>
-                      <p className="text-slate-600 dark:text-slate-400 text-[11px] mt-0.5">
-                        {v.narration}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-mono font-bold text-slate-900 dark:text-slate-100 block">
-                        {formatINR(v.totalDebit)}
+                <span className="text-[10px] text-emerald-600/80 block mt-0.5">Project Contracts</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900">
+                <span className="text-[10px] font-bold text-rose-700 dark:text-rose-400 uppercase block">Total Expenses</span>
+                <div className="text-lg font-black text-rose-700 dark:text-rose-300 font-mono mt-1">
+                  {formatINR(totalExpense)}
+                </div>
+                <span className="text-[10px] text-rose-600/80 block mt-0.5">Steel & Site Work</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/30 border border-teal-100 dark:border-teal-900">
+                <span className="text-[10px] font-bold text-teal-700 dark:text-teal-400 uppercase block">Net Margin</span>
+                <div className="text-lg font-black text-teal-700 dark:text-teal-300 font-mono mt-1">
+                  {formatINR(netSurplus)}
+                </div>
+                <span className="text-[10px] text-teal-600/80 block mt-0.5">Operating Profit</span>
+              </div>
+            </div>
+
+            {/* Top Expenses Breakdown */}
+            <div className="pt-2 space-y-2.5">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                Top Operating Expenses Breakdown
+              </span>
+              <div className="space-y-2">
+                {topExpenseAccounts.map((a, idx) => (
+                  <div key={a.code} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold flex items-center justify-center text-[10px]">
+                        {idx + 1}
                       </span>
-                      <span className="text-[10px] text-emerald-600 font-semibold">
-                        {v.status}
-                      </span>
+                      <span className="font-medium text-slate-800 dark:text-slate-200">{a.name}</span>
+                      <span className="font-mono text-[10px] text-slate-400">({a.code})</span>
                     </div>
+                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                      {formatINR(a.amount)}
+                    </span>
                   </div>
-                ))
-              )}
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Recent General Ledger Vouchers */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <FileSpreadsheet size={16} className="text-blue-600" /> Recent Double-Entry Vouchers
+              </h3>
+              <Link href="/vouchers" className="text-xs text-blue-600 font-bold hover:underline">
+                View All Vouchers &rarr;
+              </Link>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {recentVouchers.map((v) => (
+                <div key={v.id} className="py-2.5 flex items-center justify-between text-xs">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-blue-600">{v.entryNumber}</span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 font-semibold">
+                        {v.voucherType}
+                      </span>
+                    </div>
+                    <p className="text-slate-500 text-[11px] mt-0.5">{v.narration}</p>
+                  </div>
+                  <div className="text-right font-mono">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 block">{formatINR(v.totalDebit)}</span>
+                    <span className="text-[10px] text-emerald-600 font-semibold">{v.status}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Right Column: SRM01-SRM06 Machine Allocations Overview */}
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                <Wrench className="text-amber-600" size={18} />
-                Machine & Tool Fleet (SRM)
-              </h2>
-              <Link href="/machines" className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 dark:bg-amber-950 text-amber-600 transition">
-                View All 35 Tools &rarr;
+        {/* Right Column (5 cols): Active Roofing Sites & SRM Team Custody */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* Active Roofing Projects */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <Briefcase size={16} className="text-blue-600" /> Active Roofing Projects
+              </h3>
+              <Link href="/projects" className="text-xs text-blue-600 font-bold hover:underline">
+                All Sites &rarr;
               </Link>
             </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {activeProjects.map((p) => (
+                <div key={p.id} className="py-2.5 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <strong className="text-slate-900 dark:text-slate-100">{p.code} — {p.name}</strong>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold">
+                      {p.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-500 text-[11px]">
+                    <span>{p.siteLocation}, {p.city}</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{formatINR(p.contractValue)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
-            <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
+          {/* SRM Machine & Tool Custody Strip */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <Wrench size={16} className="text-amber-600" /> SRM Tools in Site Custody
+              </h3>
+              <Link href="/machines" className="text-xs text-blue-600 font-bold hover:underline">
+                View 35 Assets &rarr;
+              </Link>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {machines.map((m) => (
-                <div key={m.id} className="py-2.5 flex items-center justify-between text-xs gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
+                <div key={m.id} className="py-2 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
                     {m.imageUrl ? (
-                      <img src={m.imageUrl} alt={m.name} className="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0" />
+                      <img src={m.imageUrl} alt={m.name} className="w-7 h-7 rounded object-cover border border-slate-200 shrink-0" />
                     ) : (
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-400">
-                        <Wrench className="w-3.5 h-3.5" />
+                      <div className="w-7 h-7 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                        <Wrench size={12} className="text-slate-400" />
                       </div>
                     )}
-                    <div className="min-w-0">
-                      <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-                        {m.name}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                        {m.assetCode} • {m.category}
-                      </div>
+                    <div>
+                      <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">{m.name}</div>
+                      <span className="text-[10px] text-slate-400 font-mono">{m.assetCode}</span>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400">
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
                       Working: {m.srFinalCount}
-                    </span>
-                    <span className="text-[10px] text-slate-400 block mt-0.5">
-                      Total: {m.totalCount}
                     </span>
                   </div>
                 </div>

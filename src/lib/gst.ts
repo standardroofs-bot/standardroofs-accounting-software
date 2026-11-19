@@ -45,6 +45,25 @@ export function validateGSTIN(gstin: string): boolean {
 /**
  * Extract State Code from 15-digit GSTIN
  */
+export const STATE_NAMES: Record<string, string> = {
+  "33": "Tamil Nadu",
+  "32": "Kerala",
+  "29": "Karnataka",
+  "37": "Andhra Pradesh",
+  "36": "Telangana",
+  "27": "Maharashtra",
+  "07": "Delhi",
+  "24": "Gujarat",
+  "09": "Uttar Pradesh",
+};
+
+export function getStateFromGSTIN(gstin?: string | null): { code: string; name: string } | null {
+  if (!gstin || gstin.trim().length < 2) return null;
+  const code = gstin.trim().substring(0, 2);
+  const name = STATE_NAMES[code] || "Other State";
+  return { code, name };
+}
+
 export function getStateCodeFromGSTIN(gstin?: string | null): string {
   if (!gstin || gstin.trim().length < 2) return COMPANY_GST_STATE_CODE;
   return gstin.trim().substring(0, 2);

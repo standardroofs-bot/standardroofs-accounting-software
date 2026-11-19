@@ -30,6 +30,8 @@ import {
   Clock,
   Tags,
   RotateCcw,
+  Layers,
+  CreditCard,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -62,6 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { name: "Invoices & GST", href: "/invoices", icon: Receipt, badge: "#33", moduleKey: "invoices" },
       { name: "Quotes & Estimates", href: "/estimates", icon: FileText, badge: "Quotes", moduleKey: "estimates" },
+      { name: "Sales Orders", href: "/sales-orders", icon: Layers, badge: "Orders", moduleKey: "invoices" },
       { name: "Customers & AR", href: "/customers", icon: Users, moduleKey: "customers" },
       { name: "Credit & Debit Notes", href: "/credit-notes", icon: RotateCcw, moduleKey: "credit_debit_notes" },
       { name: "Price Catalog", href: "/price-catalog", icon: Tags, moduleKey: "price_catalog" },
@@ -72,7 +75,10 @@ const NAV_GROUPS: NavGroup[] = [
     id: "purchases",
     title: "Purchases & Expenses",
     items: [
-      { name: "Suppliers & Purchases", href: "/suppliers", icon: ShoppingCart, moduleKey: "suppliers" },
+      { name: "Vendors Master", href: "/vendors", icon: Users, moduleKey: "suppliers" },
+      { name: "Purchase Orders", href: "/purchase-orders", icon: ShoppingCart, badge: "PO", moduleKey: "suppliers" },
+      { name: "Vendor Bills", href: "/bills", icon: FileText, badge: "Bills", moduleKey: "suppliers" },
+      { name: "Payments Made", href: "/payments-made", icon: CreditCard, moduleKey: "suppliers" },
       { name: "Site Expenses", href: "/expenses", icon: ReceiptIndianRupee, moduleKey: "expenses" },
     ],
   },

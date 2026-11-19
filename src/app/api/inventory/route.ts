@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         currentStock: new Decimal(currentStock || 0),
         minAlertStock: new Decimal(minAlertStock || 10),
         unitCost: new Decimal(unitCost || 0),
-        rate: new Decimal(unitCost || 0),
+        rate: new Decimal(body.rate || unitCost || 0),
         yardLocation: yardLocation || "Erode Main Yard",
         imageUrl: imageUrl || null,
       },
@@ -98,7 +98,8 @@ export async function PATCH(req: NextRequest) {
       data: {
         ...(updatedStock !== undefined && { currentStock: updatedStock }),
         ...(minAlertStock !== undefined && { minAlertStock: new Decimal(minAlertStock) }),
-        ...(unitCost !== undefined && { unitCost: new Decimal(unitCost), rate: new Decimal(unitCost) }),
+        ...(unitCost !== undefined && { unitCost: new Decimal(unitCost) }),
+        ...(body.rate !== undefined && { rate: new Decimal(body.rate) }),
       },
     });
 
