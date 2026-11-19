@@ -1,25 +1,20 @@
 import { prisma } from "../src/lib/prisma";
 
 async function main() {
-  const invoices = await prisma.invoice.findMany({
+  const inv34 = await prisma.invoice.findFirst({
+    where: { sequenceNumber: 34 },
     include: { items: true, customer: true },
-    orderBy: { sequenceNumber: "desc" },
   });
-  console.log(`Found ${invoices.length} invoices:`);
-  for (const inv of invoices) {
-    console.log({
-      id: inv.id,
-      invoiceNumber: inv.invoiceNumber,
-      sequenceNumber: inv.sequenceNumber,
-      customer: inv.customer?.name,
-      subTotal: inv.subTotal,
-      cgst: inv.cgstTotal,
-      sgst: inv.sgstTotal,
-      adj: inv.adjustment,
-      total: inv.totalAmount,
-      status: inv.status,
-    });
-  }
+  console.log("Invoice 34:", {
+    id: inv34?.id,
+    customer: inv34?.customer?.name,
+    subTotal: inv34?.subTotal,
+    cgst: inv34?.cgstTotal,
+    sgst: inv34?.sgstTotal,
+    adj: inv34?.adjustment,
+    total: inv34?.totalAmount,
+    status: inv34?.status,
+  });
 }
 
 main()
