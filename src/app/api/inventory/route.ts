@@ -12,7 +12,7 @@ export async function GET() {
           take: 3,
         },
       },
-      orderBy: { itemCode: "asc" },
+      orderBy: { sNo: "asc" },
     });
 
     let totalValuation = toDecimal(0);
@@ -44,7 +44,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { itemCode, name, category, unit, currentStock, minAlertStock, unitCost, yardLocation } = body;
+    const { itemCode, name, category, unit, currentStock, minAlertStock, unitCost, yardLocation, imageUrl } = body;
 
     const count = await prisma.materialItem.count();
     const code = itemCode || `MAT-${String(count + 1).padStart(3, "0")}`;
@@ -52,19 +52,59 @@ export async function POST(req: NextRequest) {
     const material = await prisma.materialItem.create({
       data: {
         itemCode: code.toUpperCase().trim(),
-        name,
+        sNo: count + 1,
+        name: name.trim(),
         category: category || "Roofing Material",
         unit: unit || "Nos",
         currentStock: new Decimal(currentStock || 0),
         minAlertStock: new Decimal(minAlertStock || 10),
         unitCost: new Decimal(unitCost || 0),
+        rate: new Decimal(unitCost || 0),
         yardLocation: yardLocation || "Erode Main Yard",
+        imageUrl: imageUrl || null,
       },
     });
 
     return NextResponse.json({ success: true, material });
   } catch (error: any) {
     console.error("POST /api/inventory error:", error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, delta, currentStock, minAlertStock, unitCost } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Material ID is required." }, { status: 400 });
+    }
+
+    let updatedStock: Decimal | undefined;
+
+    if (delta !== undefined) {
+      const current = await prisma.materialItem.findUnique({ where: { id } });
+      if (!current) {
+        return NextResponse.json({ success: false, error: "Material not found" }, { status: 404 });
+      }
+      updatedStock = Decimal.max(0, current.currentStock.plus(new Decimal(delta)));
+    } else if (currentStock !== undefined) {
+      updatedStock = new Decimal(currentStock);
+    }
+
+    const updated = await prisma.materialItem.update({
+      where: { id },
+      data: {
+        ...(updatedStock !== undefined && { currentStock: updatedStock }),
+        ...(minAlertStock !== undefined && { minAlertStock: new Decimal(minAlertStock) }),
+        ...(unitCost !== undefined && { unitCost: new Decimal(unitCost), rate: new Decimal(unitCost) }),
+      },
+    });
+
+    return NextResponse.json({ success: true, material: updated });
+  } catch (error: any) {
+    console.error("PATCH /api/inventory error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

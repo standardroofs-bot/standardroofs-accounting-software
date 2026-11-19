@@ -851,6 +851,7 @@ model MachineAsset {
   serviceCount    Int                 @default(0)
   scrapCount      Int                 @default(0)
   notes           String?
+  imageUrl        String?
   
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
@@ -1029,17 +1030,51 @@ model VehicleTripLog {
 model MaterialItem {
   id              String                  @id @default(cuid())
   itemCode        String                  @unique // MAT-001, etc.
+  sNo             Int?
   name            String                  // MS Hollow Sections, C/Z Purlins, Kerala Clay Tiles, UPVC Sheets, Galvalume Sheets, Screws, Ridge Caps, Paint/Primer
   category        String                  // Steel, Tiles, Sheets, Fasteners, Coatings
+  subCategory     String?
   unit            String                  // MT, Kg, Sq.Ft, Nos, Boxes, Liters
   currentStock    Decimal                 @default(0.00) @db.Decimal(15, 2)
   minAlertStock   Decimal                 @default(10.00) @db.Decimal(15, 2)
   unitCost        Decimal                 @default(0.00) @db.Decimal(15, 2)
+  rate            Decimal?                @default(0.00) @db.Decimal(15, 2)
   yardLocation    String                  @default("Erode Main Yard")
+  imageUrl        String?
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 
   movements       MaterialStockMovement[]
+}
+
+model TilesInventory {
+  id              String   @id @default(cuid())
+  tileCode        String   @unique
+  tileName        String
+  category        String   @default("Tiles") // "Clay Tiles", "Ceramic Tiles", "Monier Tiles", "Ceiling Tiles"
+  availableStock  Decimal  @default(0.00) @db.Decimal(15, 2)
+  godownStock     Decimal  @default(0.00) @db.Decimal(15, 2)
+  unitCost        Decimal  @default(0.00) @db.Decimal(15, 2)
+  imageUrl        String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PreDispatchChecklist {
+  id             String    @id @default(cuid())
+  checklistType  String    // "WELDER", "LAYER", "GENERAL"
+  sNo            Int?
+  itemName       String
+  standardQty    String    @default("1")
+  verifiedQty    String?
+  status         String    @default("PENDING") // "VERIFIED", "PENDING", "MISSING"
+  imageUrl       String?
+  verifiedBy     String?
+  verifiedAt     DateTime?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model MaterialStockMovement {

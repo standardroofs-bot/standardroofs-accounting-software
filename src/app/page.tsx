@@ -50,6 +50,7 @@ export default async function DashboardPage() {
   });
 
   const machines = await prisma.machineAsset.findMany({
+    orderBy: { sNo: "asc" },
     include: {
       allocations: {
         where: { status: "ACTIVE" },
@@ -492,28 +493,37 @@ export default async function DashboardPage() {
                 <Wrench className="text-amber-600" size={18} />
                 Machine & Tool Fleet (SRM)
               </h2>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950 text-amber-600">
-                16 Tools Tracked
-              </span>
+              <Link href="/machines" className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 dark:bg-amber-950 text-amber-600 transition">
+                View All 35 Tools &rarr;
+              </Link>
             </div>
 
             <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
               {machines.map((m) => (
-                <div key={m.id} className="py-2.5 flex items-center justify-between text-xs">
-                  <div>
-                    <div className="font-semibold text-slate-800 dark:text-slate-200">
-                      {m.name}
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                      {m.assetCode} • {m.category}
+                <div key={m.id} className="py-2.5 flex items-center justify-between text-xs gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {m.imageUrl ? (
+                      <img src={m.imageUrl} alt={m.name} className="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-400">
+                        <Wrench className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                        {m.name}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        {m.assetCode} • {m.category}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400">
-                      {m.allocations[0]?.allocationGroup || "Office"}
+                      Working: {m.srFinalCount}
                     </span>
                     <span className="text-[10px] text-slate-400 block mt-0.5">
-                      {m.currentStatus}
+                      Total: {m.totalCount}
                     </span>
                   </div>
                 </div>

@@ -21,14 +21,17 @@ import {
 } from "lucide-react";
 
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState<"pnl_bs" | "trial" | "projects" | "gst" | "cash_bank">("pnl_bs");
+  const [activeTab, setActiveTab] = useState<"pnl_bs" | "trial" | "projects" | "gst" | "cash_bank" | "monthly_matrix">("pnl_bs");
   const [data, setData] = useState<any>(null);
+  const [matrixData, setMatrixData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState("2026-04-01");
+  const [endDate, setEndDate] = useState("2027-03-31");
+  const [activePreset, setActivePreset] = useState("FY2627");
 
   useEffect(() => {
     fetchReport();
+    fetchMonthlyMatrix();
   }, [startDate, endDate]);
 
   async function fetchReport() {
@@ -47,6 +50,45 @@ export default function ReportsPage() {
       console.error("Error fetching reports:", e);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchMonthlyMatrix() {
+    try {
+      const res = await fetch("/api/reports/monthly-matrix?fy=2026");
+      const json = await res.json();
+      if (json.success) {
+        setMatrixData(json);
+      }
+    } catch (e) {
+      console.error("Error fetching monthly matrix:", e);
+    }
+  }
+
+  function applyPreset(preset: string) {
+    setActivePreset(preset);
+    const now = new Date();
+    if (preset === "FY2627") {
+      setStartDate("2026-04-01");
+      setEndDate("2027-03-31");
+    } else if (preset === "THIS_MONTH") {
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      setStartDate(`${y}-${m}-01`);
+      const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+      setEndDate(`${y}-${m}-${lastDay}`);
+    } else if (preset === "Q1") {
+      setStartDate("2026-04-01");
+      setEndDate("2026-06-30");
+    } else if (preset === "Q2") {
+      setStartDate("2026-07-01");
+      setEndDate("2026-09-30");
+    } else if (preset === "Q3") {
+      setStartDate("2026-10-01");
+      setEndDate("2026-12-31");
+    } else if (preset === "Q4") {
+      setStartDate("2027-01-01");
+      setEndDate("2027-03-31");
     }
   }
 
@@ -114,34 +156,64 @@ export default function ReportsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Preset Period Buttons */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-semibold">
+            {[
+              { id: "FY2627", label: "Full FY 2026-27" },
+              { id: "THIS_MONTH", label: "This Month" },
+              { id: "Q1", label: "Q1 (Apr-Jun)" },
+              { id: "Q2", label: "Q2 (Jul-Sep)" },
+              { id: "Q3", label: "Q3 (Oct-Dec)" },
+              { id: "Q4", label: "Q4 (Jan-Mar)" },
+            ].map((p) => (
+              <button
+                key={p.id}
+                onClick={() => applyPreset(p.id)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer ${
+                  activePreset === p.id
+                    ? "bg-amber-500 text-slate-950 shadow-2xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
           {/* Date Filter */}
           <div className="flex items-center gap-1.5 bg-card p-1 rounded-md border border-border text-xs">
             <Calendar className="h-3.5 w-3.5 text-muted-foreground ml-1" />
             <input
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setActivePreset("CUSTOM");
+              }}
               className="bg-transparent text-foreground p-1 text-xs outline-none"
             />
             <span className="text-muted-foreground">to</span>
             <input
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setActivePreset("CUSTOM");
+              }}
               className="bg-transparent text-foreground p-1 text-xs outline-none"
             />
           </div>
 
           <button
             onClick={handleExportExcel}
-            className="px-3 py-2 text-xs font-semibold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm transition-colors"
+            className="px-3 py-2 text-xs font-semibold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
           >
             <Download className="h-4 w-4" /> Export Excel (.xlsx)
           </button>
 
           <button
             onClick={handlePrint}
-            className="px-3 py-2 text-xs font-semibold rounded-md border border-border bg-card hover:bg-muted text-foreground flex items-center gap-1.5 transition-colors"
+            className="px-3 py-2 text-xs font-semibold rounded-md border border-border bg-card hover:bg-muted text-foreground flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Printer className="h-4 w-4" /> Print / PDF
           </button>
@@ -208,6 +280,18 @@ export default function ReportsPage() {
         >
           <DollarSign className="h-4 w-4" />
           Cash Flow Statement (Direct Reconciled)
+        </button>
+
+        <button
+          onClick={() => setActiveTab("monthly_matrix")}
+          className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-colors ${
+            activeTab === "monthly_matrix"
+              ? "border-amber-500 text-amber-500 bg-amber-500/5"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Calendar className="h-4 w-4" />
+          12-Month P&amp;L Matrix (Apr 2026 &ndash; Mar 2027)
         </button>
       </div>
 
@@ -929,6 +1013,156 @@ export default function ReportsPage() {
                     </span>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: 12-MONTH P&L MATRIX (APR 2026 - MAR 2027) */}
+          {activeTab === "monthly_matrix" && (
+            <div className="space-y-6">
+              <div className="bg-card rounded-2xl border border-border p-6 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
+                  <div>
+                    <h2 className="text-lg font-black text-foreground tracking-tight flex items-center gap-2">
+                      <Calendar className="text-amber-500" size={20} />
+                      12-Month Profit &amp; Loss &amp; Liquidity Carry-Forward Matrix
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      Side-by-side monthly progression from April 2026 to March 2027 matching Excel accounting sheets
+                    </p>
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                    Indian FY 2026-27
+                  </span>
+                </div>
+
+                {!matrixData?.months ? (
+                  <div className="py-12 text-center text-xs text-muted-foreground">Loading monthly matrix...</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left border-collapse min-w-[900px]">
+                      <thead>
+                        <tr className="bg-slate-900 text-white font-bold border-b border-slate-800">
+                          <th className="py-3 px-3 min-w-[200px] sticky left-0 bg-slate-900 z-10">Financial Line Item</th>
+                          {matrixData.months.map((m: any) => (
+                            <th key={m.key} className="py-3 px-2 text-right font-mono min-w-[85px]">
+                              {m.fullName}
+                            </th>
+                          ))}
+                          <th className="py-3 px-3 text-right bg-amber-950/80 text-amber-300 font-bold min-w-[100px]">
+                            Full FY Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {/* 1. Opening Cash & Bank */}
+                        <tr className="hover:bg-muted/40 transition">
+                          <td className="py-2.5 px-3 font-semibold text-foreground sticky left-0 bg-card z-10">
+                            1. Opening Cash &amp; Bank Balance
+                          </td>
+                          {matrixData.months.map((m: any) => (
+                            <td key={m.key} className="py-2.5 px-2 text-right font-mono text-slate-500">
+                              ₹ {m.openingCashBank.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                          ))}
+                          <td className="py-2.5 px-3 text-right font-mono font-bold bg-amber-500/5 text-slate-500">
+                            ₹ {(matrixData.months[0]?.openingCashBank || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+
+                        {/* 2. Revenue */}
+                        <tr className="hover:bg-muted/40 transition">
+                          <td className="py-2.5 px-3 font-bold text-emerald-600 dark:text-emerald-400 sticky left-0 bg-card z-10">
+                            2. Total Revenue / Contracts Money-In
+                          </td>
+                          {matrixData.months.map((m: any) => (
+                            <td key={m.key} className="py-2.5 px-2 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                              ₹ {m.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                          ))}
+                          <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 bg-amber-500/5">
+                            ₹ {matrixData.totals.revenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+
+                        {/* 3. Direct Site Costs */}
+                        <tr className="hover:bg-muted/40 transition">
+                          <td className="py-2.5 px-3 font-semibold text-rose-600 dark:text-rose-400 sticky left-0 bg-card z-10">
+                            3. Direct Site Costs (GL 5xxx)
+                          </td>
+                          {matrixData.months.map((m: any) => (
+                            <td key={m.key} className="py-2.5 px-2 text-right font-mono text-rose-600 dark:text-rose-400">
+                              ₹ {m.directSiteCosts.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                          ))}
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-rose-600 dark:text-rose-400 bg-amber-500/5">
+                            ₹ {matrixData.totals.directSiteCosts.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+
+                        {/* 4. Gross Site Profit */}
+                        <tr className="hover:bg-muted/40 transition bg-slate-50 dark:bg-slate-800/40 font-bold">
+                          <td className="py-2.5 px-3 text-blue-600 dark:text-blue-400 sticky left-0 bg-slate-50 dark:bg-slate-800 z-10">
+                            4. Gross Site Profit (2 - 3)
+                          </td>
+                          {matrixData.months.map((m: any) => (
+                            <td key={m.key} className="py-2.5 px-2 text-right font-mono text-blue-600 dark:text-blue-400">
+                              ₹ {m.grossSiteProfit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                          ))}
+                          <td className="py-2.5 px-3 text-right font-mono font-black text-blue-600 dark:text-blue-400 bg-amber-500/10">
+                            ₹ {matrixData.totals.grossSiteProfit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+
+                        {/* 5. Office Overheads */}
+                        <tr className="hover:bg-muted/40 transition">
+                          <td className="py-2.5 px-3 font-semibold text-purple-600 dark:text-purple-400 sticky left-0 bg-card z-10">
+                            5. Office Overheads &amp; Fixed Costs (GL 6xxx)
+                          </td>
+                          {matrixData.months.map((m: any) => (
+                            <td key={m.key} className="py-2.5 px-2 text-right font-mono text-purple-600 dark:text-purple-400">
+                              ₹ {m.officeOverheads.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                          ))}
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-purple-600 dark:text-purple-400 bg-amber-500/5">
+                            ₹ {matrixData.totals.officeOverheads.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+
+                        {/* 6. Net Profit / (Loss) */}
+                        <tr className="hover:bg-muted/40 transition bg-emerald-50/20 dark:bg-emerald-950/20 font-black">
+                          <td className="py-3 px-3 text-emerald-700 dark:text-emerald-300 sticky left-0 bg-emerald-50/40 dark:bg-emerald-950/40 z-10">
+                            6. Net Profit / (Loss) (4 - 5)
+                          </td>
+                          {matrixData.months.map((m: any) => (
+                            <td key={m.key} className="py-3 px-2 text-right font-mono text-emerald-700 dark:text-emerald-300">
+                              ₹ {m.netProfitLoss.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                          ))}
+                          <td className="py-3 px-3 text-right font-mono font-black text-emerald-700 dark:text-emerald-300 bg-amber-500/15">
+                            ₹ {matrixData.totals.netProfitLoss.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+
+                        {/* 7. Closing Cash & Bank Balance */}
+                        <tr className="hover:bg-muted/40 transition bg-blue-50/20 dark:bg-blue-950/20 font-black">
+                          <td className="py-3 px-3 text-blue-700 dark:text-blue-300 sticky left-0 bg-blue-50/40 dark:bg-blue-950/40 z-10">
+                            7. Closing Cash &amp; Bank (Carried Forward)
+                          </td>
+                          {matrixData.months.map((m: any) => (
+                            <td key={m.key} className="py-3 px-2 text-right font-mono text-blue-700 dark:text-blue-300">
+                              ₹ {m.closingCashBank.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                          ))}
+                          <td className="py-3 px-3 text-right font-mono font-black text-blue-700 dark:text-blue-300 bg-amber-500/15">
+                            ₹ {matrixData.totals.finalCashBank.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -15,13 +15,24 @@ import {
   CheckCircle2,
   Calendar,
   Warehouse,
+  Eye,
+  X,
+  ClipboardCheck,
+  RotateCcw,
+  ZoomIn,
+  Truck,
+  ShieldCheck,
+  Check,
+  Clock,
 } from "lucide-react";
 
 export default function InventoryPage() {
+  const [activeTab, setActiveTab] = useState<"consumables" | "tiles" | "issues" | "checklists">("consumables");
   const [materials, setMaterials] = useState<any[]>([]);
-  const [movements, setMovements] = useState<any[]>([]);
+  const [tiles, setTiles] = useState<any[]>([]);
+  const [siteIssues, setSiteIssues] = useState<any[]>([]);
+  const [checklists, setChecklists] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [totalValuation, setTotalValuation] = useState("0.00");
   const [lowStockCount, setLowStockCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -29,34 +40,44 @@ export default function InventoryPage() {
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [checklistFilter, setChecklistFilter] = useState<"ALL" | "WELDER" | "LAYER" | "GENERAL">("ALL");
+
+  // Lightbox Zoom Modal
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [zoomTitle, setZoomTitle] = useState<string>("");
 
   // Modals
-  const [showMovementModal, setShowMovementModal] = useState(false);
   const [showItemModal, setShowItemModal] = useState(false);
-  const [movementType, setMovementType] = useState<"STOCK_IN" | "SITE_ISSUE">("SITE_ISSUE");
+  const [showIssueModal, setShowIssueModal] = useState(false);
 
-  // Forms
-  const [movementForm, setMovementForm] = useState({
-    materialId: "",
-    quantity: 0,
-    unitCost: 0,
-    projectId: "",
-    supplierId: "",
-    referenceNo: "",
-    notes: "",
-    date: new Date().toISOString().split("T")[0],
-  });
-
+  // Add Item Form
   const [itemForm, setItemForm] = useState({
-    itemCode: "",
     name: "",
-    category: "Steel",
-    unit: "MT",
-    currentStock: 0,
-    minAlertStock: 10,
+    category: "General Hardware",
+    unit: "Nos",
+    currentStock: 10,
+    minAlertStock: 5,
     unitCost: 0,
-    yardLocation: "Erode Yard - Bay 1",
+    yardLocation: "Erode Main Yard",
+    imageUrl: "",
   });
+
+  // Issue to Site Form
+  const [issueForm, setIssueForm] = useState({
+    date: new Date().toISOString().split("T")[0],
+    team: "SRM01",
+    siteName: "SSM School_Site",
+    projectId: "",
+    productName: '5" Cutting Wheel',
+    quantity: 10,
+    isReturnable: false,
+    issuedBy: "Gowri Sankar",
+    approvedBy: "Siva Kumar",
+    condition: "Good",
+    notes: "",
+  });
+
+  const [alertMsg, setAlertMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -65,75 +86,105 @@ export default function InventoryPage() {
   async function fetchData() {
     try {
       setLoading(true);
-      const [invRes, movRes, prjRes, supRes] = await Promise.all([
+      const [invRes, tileRes, issueRes, chkRes, prjRes] = await Promise.all([
         fetch("/api/inventory"),
-        fetch("/api/inventory/movements"),
+        fetch("/api/inventory/tiles"),
+        fetch("/api/inventory/issues"),
+        fetch("/api/inventory/checklists"),
         fetch("/api/projects"),
-        fetch("/api/suppliers"),
       ]);
 
       const invData = await invRes.json();
-      const movData = await movRes.json();
+      const tileData = await tileRes.json();
+      const issueData = await issueRes.json();
+      const chkData = await chkRes.json();
       const prjData = await prjRes.json();
-      const supData = await supRes.json();
 
       if (invData.success) {
         setMaterials(invData.materials || []);
         setTotalValuation(invData.totalValuation || "0.00");
         setLowStockCount(invData.lowStockCount || 0);
       }
-      if (movData.success) {
-        setMovements(movData.movements || []);
+      if (tileData.success) {
+        setTiles(tileData.tiles || []);
+      }
+      if (issueData.success) {
+        setSiteIssues(issueData.issues || []);
+      }
+      if (chkData.success) {
+        setChecklists(chkData.checklists || []);
       }
       if (prjData.success) {
         setProjects(prjData.projects || []);
       }
-      if (supData.success) {
-        setSuppliers(supData.suppliers || []);
-      }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error fetching inventory data:", e);
+      setAlertMsg({ text: "Failed to load inventory: " + e.message, type: "error" });
     } finally {
       setLoading(false);
     }
   }
 
-  function openMovement(type: "STOCK_IN" | "SITE_ISSUE", materialId?: string) {
-    setMovementType(type);
-    const m = materials.find((item) => item.id === materialId) || materials[0];
-    setMovementForm({
-      materialId: m ? m.id : "",
-      quantity: 0,
-      unitCost: m ? Number(m.unitCost) : 0,
-      projectId: "",
-      supplierId: "",
-      referenceNo: "",
-      notes: "",
-      date: new Date().toISOString().split("T")[0],
-    });
-    setShowMovementModal(true);
-  }
-
-  async function handleMovementSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // Adjust material stock (+/-)
+  async function handleAdjustStock(id: string, delta: number) {
     try {
-      const res = await fetch("/api/inventory/movements", {
-        method: "POST",
+      const res = await fetch("/api/inventory", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ movementType, ...movementForm }),
+        body: JSON.stringify({ id, delta }),
       });
       const data = await res.json();
       if (data.success) {
-        setShowMovementModal(false);
-        fetchData();
-      } else {
-        alert("Failed to save stock movement: " + data.error);
+        setMaterials((prev) =>
+          prev.map((m) => (m.id === id ? { ...m, currentStock: data.material.currentStock } : m))
+        );
       }
-    } catch (err: any) {
-      alert("Error: " + err.message);
+    } catch (e: any) {
+      console.error(e);
     }
   }
 
+  // Adjust tile stock (+/-)
+  async function handleAdjustTile(id: string, currentQty: number, delta: number) {
+    try {
+      const newStock = Math.max(0, currentQty + delta);
+      const res = await fetch("/api/inventory/tiles", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, availableStock: newStock, godownStock: newStock }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTiles((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, availableStock: newStock, godownStock: newStock } : t))
+        );
+      }
+    } catch (e: any) {
+      console.error(e);
+    }
+  }
+
+  // Toggle checklist verified status
+  async function handleToggleChecklist(id: string, currentStatus: string) {
+    try {
+      const newStatus = currentStatus === "VERIFIED" ? "PENDING" : "VERIFIED";
+      const res = await fetch("/api/inventory/checklists", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: newStatus, verifiedBy: "Gowri Sankar" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setChecklists((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, status: newStatus, verifiedAt: new Date().toISOString() } : c))
+        );
+      }
+    } catch (e: any) {
+      console.error(e);
+    }
+  }
+
+  // Submit new consumable item
   async function handleItemSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
@@ -144,492 +195,777 @@ export default function InventoryPage() {
       });
       const data = await res.json();
       if (data.success) {
+        setAlertMsg({ text: `Material "${itemForm.name}" created successfully!`, type: "success" });
         setShowItemModal(false);
-        setItemForm({
-          itemCode: "",
-          name: "",
-          category: "Steel",
-          unit: "MT",
-          currentStock: 0,
-          minAlertStock: 10,
-          unitCost: 0,
-          yardLocation: "Erode Yard - Bay 1",
-        });
         fetchData();
       } else {
-        alert("Failed to create item: " + data.error);
+        setAlertMsg({ text: data.error || "Failed to create item", type: "error" });
       }
-    } catch (err: any) {
-      alert("Error: " + err.message);
+    } catch (e: any) {
+      setAlertMsg({ text: e.message, type: "error" });
     }
   }
 
-  // Filtered Materials
+  // Submit Issue to Site
+  async function handleIssueSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/inventory/issues", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(issueForm),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAlertMsg({ text: `Dispatched ${issueForm.quantity} x "${issueForm.productName}" to ${issueForm.siteName}`, type: "success" });
+        setShowIssueModal(false);
+        fetchData();
+      } else {
+        setAlertMsg({ text: data.error || "Failed to dispatch", type: "error" });
+      }
+    } catch (e: any) {
+      setAlertMsg({ text: e.message, type: "error" });
+    }
+  }
+
   const filteredMaterials = materials.filter((m) => {
     const matchesSearch =
       m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.itemCode.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory =
-      categoryFilter === "ALL" ||
-      m.category.toUpperCase() === categoryFilter.toUpperCase() ||
-      (categoryFilter === "LOW_STOCK" && Number(m.currentStock) <= Number(m.minAlertStock));
-    return matchesSearch && matchesCategory;
+      m.itemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.category.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!matchesSearch) return false;
+    if (categoryFilter === "ALL") return true;
+    if (categoryFilter === "LOW_STOCK") return Number(m.currentStock) <= Number(m.minAlertStock);
+    return m.category.toLowerCase().includes(categoryFilter.toLowerCase());
+  });
+
+  const filteredChecklists = checklists.filter((c) => {
+    if (checklistFilter === "ALL") return true;
+    return c.checklistType === checklistFilter;
   });
 
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+    <div className="space-y-6 pb-12">
+      {/* Top Header Card */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Warehouse className="h-7 w-7 text-amber-500" />
-            Material & Yard Stock Inventory
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5" /> 2026 Yard Inventory Synced
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+              {materials.length} Master Items &middot; All Photos Extracted
+            </span>
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1.5 flex items-center gap-2">
+            <Package className="w-6 h-6 text-amber-500" />
+            Roofing Yard Inventory, Consumables &amp; Dispatch System
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Manage roofing raw materials at Erode Yard, site dispatches, stock-ins, and automated double-entry cost transfer
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Matching <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">2_New_Inventory_Management_With_Images.xlsx</code> &middot; Current Stock, Tiles, Site Issue Register &amp; Pre-Dispatch Checklists
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={() => setShowItemModal(true)}
-            className="px-3 py-2 text-xs font-semibold rounded-md border border-border bg-card hover:bg-muted text-foreground flex items-center gap-1.5 transition-colors"
+            className="px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
           >
-            <Plus className="h-4 w-4" /> Add Raw Material
+            <Plus className="w-4 h-4" /> + Add Consumable
           </button>
+
           <button
-            onClick={() => openMovement("STOCK_IN")}
-            className="px-3 py-2 text-xs font-semibold rounded-md border border-border bg-card hover:bg-muted text-foreground flex items-center gap-1.5 transition-colors"
+            onClick={() => setShowIssueModal(true)}
+            className="px-4 py-2 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
           >
-            <ArrowDownLeft className="h-4 w-4 text-emerald-500" /> Stock In (Receive)
-          </button>
-          <button
-            onClick={() => openMovement("SITE_ISSUE")}
-            className="px-4 py-2 text-xs font-semibold rounded-md bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-sm transition-colors"
-          >
-            <ArrowUpRight className="h-4 w-4" /> + Issue to Project Site
+            <ArrowUpRight className="w-4 h-4" /> + Issue to Project Site
           </button>
         </div>
       </div>
 
-      {/* KPI Stats */}
+      {alertMsg && (
+        <div
+          className={`p-4 rounded-xl border flex items-center justify-between ${
+            alertMsg.type === "success"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300"
+              : "bg-red-50 border-red-200 text-red-800 dark:bg-red-950/40 dark:border-red-800 dark:text-red-300"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            <span className="text-xs font-semibold">{alertMsg.text}</span>
+          </div>
+          <button onClick={() => setAlertMsg(null)} className="text-xs font-bold underline cursor-pointer">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* KPI Stats Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <div className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
             <DollarSign className="h-4 w-4 text-emerald-500" /> Yard Stock Valuation
           </div>
-          <div className="text-2xl font-bold mt-1 text-foreground">
+          <div className="text-2xl font-black mt-1 text-slate-900 dark:text-slate-100">
             ₹ {Number(totalValuation).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-xs text-muted-foreground mt-0.5">Asset Account 1030</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Inventory Asset Account 1030</div>
         </div>
 
-        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Package className="h-4 w-4 text-blue-500" /> Tracked Materials
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <div className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+            <Package className="h-4 w-4 text-blue-500" /> Current Stock Consumables
           </div>
-          <div className="text-2xl font-bold mt-1 text-foreground">{materials.length} Items</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Steel, Tiles, Sheets, Fasteners</div>
+          <div className="text-2xl font-black mt-1 text-slate-900 dark:text-slate-100">
+            {materials.length} Items
+          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Wheels, bits, screws, silicone, paint</div>
         </div>
 
-        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <div className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
             <AlertTriangle className="h-4 w-4 text-rose-500" /> Low Stock Alerts
           </div>
-          <div className="text-2xl font-bold mt-1 text-foreground">
+          <div className="text-2xl font-black mt-1">
             {lowStockCount > 0 ? (
               <span className="text-rose-500">{lowStockCount} Items</span>
             ) : (
               <span className="text-emerald-500">All Optimal</span>
             )}
           </div>
-          <div className="text-xs text-muted-foreground mt-0.5">Below reorder threshold</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Below minimum alert threshold</div>
         </div>
 
-        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Layers className="h-4 w-4 text-amber-500" /> Stock Movements
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <div className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+            <ClipboardCheck className="h-4 w-4 text-amber-500" /> Pre-Dispatch Checklists
           </div>
-          <div className="text-2xl font-bold mt-1 text-foreground">{movements.length} Logged</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Dispatches & Inward entries</div>
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-card p-3 rounded-lg border border-border">
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search material or code..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded border border-border bg-background text-foreground"
-          />
-        </div>
-
-        <div className="flex flex-wrap gap-1.5 w-full sm:w-auto">
-          {["ALL", "Steel", "Sheets", "Tiles", "Fasteners", "Coatings", "LOW_STOCK"].map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setCategoryFilter(cat)}
-              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
-                categoryFilter === cat
-                  ? "bg-amber-500 text-slate-950 font-bold"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              }`}
-            >
-              {cat === "LOW_STOCK" ? "⚠️ Low Stock" : cat}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Materials Inventory Table */}
-      <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-foreground">Roofing Materials Yard Stock Register</h3>
-            <p className="text-xs text-muted-foreground">
-              Current on-hand quantities, location within Erode Yard, and valuation
-            </p>
+          <div className="text-2xl font-black mt-1 text-slate-900 dark:text-slate-100">
+            {checklists.length} Checklist Items
           </div>
-          <span className="text-xs text-muted-foreground">{filteredMaterials.length} of {materials.length} items</span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-muted text-muted-foreground font-semibold uppercase tracking-wider">
-              <tr>
-                <th className="py-3 px-4">Item Code & Name</th>
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Yard Location</th>
-                <th className="py-3 px-4 text-right">Unit Rate</th>
-                <th className="py-3 px-4 text-right">Min Alert</th>
-                <th className="py-3 px-4 text-right">Current Stock</th>
-                <th className="py-3 px-4 text-right">Stock Valuation</th>
-                <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredMaterials.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-8 text-center text-muted-foreground">
-                    No materials found matching criteria.
-                  </td>
-                </tr>
-              ) : (
-                filteredMaterials.map((m) => {
-                  const stock = Number(m.currentStock);
-                  const min = Number(m.minAlertStock);
-                  const isLow = stock <= min;
-                  const val = stock * Number(m.unitCost);
-
-                  return (
-                    <tr key={m.id} className="hover:bg-muted/40 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-foreground">{m.name}</div>
-                        <div className="text-[11px] font-mono text-amber-500">{m.itemCode}</div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-muted text-muted-foreground">
-                          {m.category}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-muted-foreground">{m.yardLocation}</td>
-                      <td className="py-3 px-4 text-right font-medium">
-                        ₹ {Number(m.unitCost).toLocaleString("en-IN", { minimumFractionDigits: 2 })} / {m.unit}
-                      </td>
-                      <td className="py-3 px-4 text-right text-muted-foreground">
-                        {min} {m.unit}
-                      </td>
-                      <td className="py-3 px-4 text-right font-bold text-foreground">
-                        {stock.toLocaleString()} {m.unit}
-                      </td>
-                      <td className="py-3 px-4 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                        ₹ {val.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        {isLow ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-rose-500/10 text-rose-600 font-semibold border border-rose-500/20">
-                            <AlertTriangle className="h-3 w-3" /> Low Stock
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-semibold border border-emerald-500/20">
-                            <CheckCircle2 className="h-3 w-3" /> In Stock
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => openMovement("SITE_ISSUE", m.id)}
-                            title="Issue to Site"
-                            className="p-1 rounded hover:bg-amber-500/10 text-amber-500 transition-colors"
-                          >
-                            <ArrowUpRight className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => openMovement("STOCK_IN", m.id)}
-                            title="Receive Stock"
-                            className="p-1 rounded hover:bg-emerald-500/10 text-emerald-500 transition-colors"
-                          >
-                            <ArrowDownLeft className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+          <div className="text-[11px] text-slate-400 mt-0.5">Welder &amp; Layer dispatch verification</div>
         </div>
       </div>
 
-      {/* Stock Movement Register */}
-      <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
-          <h3 className="font-semibold text-foreground">Stock Movement Audit Log</h3>
-          <p className="text-xs text-muted-foreground">
-            Complete trace of Yard Inward Receipts and Site Outward Dispatches with Double-Entry Journal references
-          </p>
-        </div>
+      {/* Main Tabs Navigation */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab("consumables")}
+          className={`px-5 py-3 text-xs font-bold border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
+            activeTab === "consumables"
+              ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20"
+              : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300"
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          Tab 1 — Current Stock ({materials.length} Consumables &amp; Hardware)
+        </button>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-muted text-muted-foreground font-semibold uppercase tracking-wider">
-              <tr>
-                <th className="py-3 px-4">Movement No / Date</th>
-                <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Material</th>
-                <th className="py-3 px-4 text-right">Quantity</th>
-                <th className="py-3 px-4 text-right">Value (₹)</th>
-                <th className="py-3 px-4">Destination Project / Source</th>
-                <th className="py-3 px-4 text-center">Journal Voucher</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {movements.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-muted-foreground">
-                    No stock movements recorded yet. Issue material to a site or record stock receipt above.
-                  </td>
-                </tr>
-              ) : (
-                movements.map((mov) => {
-                  const isIssue = mov.movementType === "SITE_ISSUE";
-                  return (
-                    <tr key={mov.id} className="hover:bg-muted/40 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-foreground">{mov.movementNumber}</div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {new Date(mov.date).toLocaleDateString("en-IN")}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        {isIssue ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 font-semibold border border-amber-500/20">
-                            <ArrowUpRight className="h-3 w-3" /> SITE DISPATCH
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-semibold border border-emerald-500/20">
-                            <ArrowDownLeft className="h-3 w-3" /> STOCK INWARD
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 font-medium text-foreground">{mov.material?.name}</td>
-                      <td className="py-3 px-4 text-right font-bold">
-                        {isIssue ? "-" : "+"}
-                        {Number(mov.quantity).toLocaleString()} {mov.material?.unit}
-                      </td>
-                      <td className="py-3 px-4 text-right font-medium">
-                        ₹ {Number(mov.totalValue).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-3 px-4 text-muted-foreground">
-                        {mov.project ? (
-                          <span className="font-medium text-foreground">
-                            {mov.project.code} - {mov.project.name}
-                          </span>
-                        ) : mov.supplier ? (
-                          <span>Vendor: {mov.supplier.name}</span>
-                        ) : (
-                          "Erode Yard"
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        {mov.journalEntry ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 font-semibold border border-blue-500/20">
-                            <CheckCircle2 className="h-3 w-3" /> {mov.journalEntry.entryNumber}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-[11px]">Direct Log</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        <button
+          onClick={() => setActiveTab("tiles")}
+          className={`px-5 py-3 text-xs font-bold border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
+            activeTab === "tiles"
+              ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20"
+              : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300"
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          Tab 2 — Tiles &amp; Godown Stock ({tiles.length} Varieties)
+        </button>
+
+        <button
+          onClick={() => setActiveTab("issues")}
+          className={`px-5 py-3 text-xs font-bold border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
+            activeTab === "issues"
+              ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20"
+              : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300"
+          }`}
+        >
+          <Truck className="w-4 h-4" />
+          Tab 3 — Site &amp; Team Issue Register ({siteIssues.length} Entries)
+        </button>
+
+        <button
+          onClick={() => setActiveTab("checklists")}
+          className={`px-5 py-3 text-xs font-bold border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
+            activeTab === "checklists"
+              ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20"
+              : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300"
+          }`}
+        >
+          <ClipboardCheck className="w-4 h-4" />
+          Tab 4 — Pre-Dispatch Checklists (Welder &amp; Layer Teams)
+        </button>
       </div>
 
-      {/* Modal: Stock Movement */}
-      {showMovementModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-card border border-border w-full max-w-lg rounded-xl shadow-xl overflow-hidden p-6 space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-border">
-              <h3 className="font-bold text-base text-foreground flex items-center gap-2">
-                {movementType === "SITE_ISSUE" ? (
-                  <>
-                    <ArrowUpRight className="h-5 w-5 text-amber-500" /> Issue Material to Roofing Project Site
-                  </>
-                ) : (
-                  <>
-                    <ArrowDownLeft className="h-5 w-5 text-emerald-500" /> Record Yard Stock Inward
-                  </>
-                )}
+      {/* TAB 1: CURRENT STOCK CONSUMABLES */}
+      {activeTab === "consumables" && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search material or code..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-1.5 w-full sm:w-auto">
+              {["ALL", "Cutting Wheels", "Drill Bits", "Fasteners", "Safety", "Tiles", "LOW_STOCK"].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setCategoryFilter(cat)}
+                  className={`px-3 py-1 text-xs font-bold rounded-full transition-colors cursor-pointer ${
+                    categoryFilter === cat
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                  }`}
+                >
+                  {cat === "LOW_STOCK" ? "⚠️ Low Stock" : cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  Hardware &amp; Consumables Master Register
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Exact item list matching Sheet <code className="font-mono font-bold text-blue-600">Current_Stock</code> in Excel with real photos
+                </p>
+              </div>
+              <span className="text-xs text-slate-500">
+                {filteredMaterials.length} of {materials.length} items
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-700">
+                  <tr>
+                    <th className="py-2.5 px-3 w-12 text-center">S.No</th>
+                    <th className="py-2.5 px-2 w-14 text-center">Photo</th>
+                    <th className="py-2.5 px-4 min-w-[200px]">Material Description</th>
+                    <th className="py-2.5 px-3">Category</th>
+                    <th className="py-2.5 px-3 text-right">Min Qty</th>
+                    <th className="py-2.5 px-3 text-right">Unit Rate (₹)</th>
+                    <th className="py-2.5 px-3 text-center">Available Stock</th>
+                    <th className="py-2.5 px-3 text-right">Total Valuation (₹)</th>
+                    <th className="py-2.5 px-3 text-center">Status</th>
+                    <th className="py-2.5 px-3 text-center">Quick Adjust</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredMaterials.map((m) => {
+                    const stock = Number(m.currentStock);
+                    const min = Number(m.minAlertStock);
+                    const isLow = stock <= min;
+                    const val = stock * Number(m.unitCost || m.rate || 0);
+
+                    return (
+                      <tr key={m.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400 font-bold">{m.sNo}</td>
+
+                        {/* Photo with Click-to-Zoom */}
+                        <td className="py-2 px-2 text-center">
+                          {m.imageUrl ? (
+                            <div
+                              onClick={() => {
+                                setZoomImage(m.imageUrl);
+                                setZoomTitle(`${m.sNo}. ${m.name}`);
+                              }}
+                              className="w-10 h-10 mx-auto rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xs hover:scale-110 hover:ring-2 hover:ring-blue-500 cursor-pointer transition-transform relative group"
+                              title="Click to zoom photo"
+                            >
+                              <img src={m.imageUrl} alt={m.name} className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <ZoomIn className="w-3.5 h-3.5 text-white" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 mx-auto rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                              <Package className="w-4 h-4" />
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-2.5 px-4">
+                          <div className="font-bold text-slate-900 dark:text-slate-100">{m.name}</div>
+                          <div className="text-[10px] font-mono text-slate-400">{m.itemCode}</div>
+                        </td>
+
+                        <td className="py-2.5 px-3 text-slate-500">{m.category}</td>
+
+                        <td className="py-2.5 px-3 text-right font-mono text-slate-500">
+                          {min} {m.unit}
+                        </td>
+
+                        <td className="py-2.5 px-3 text-right font-mono font-medium">
+                          ₹ {Number(m.unitCost || m.rate || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </td>
+
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-sm text-blue-600 dark:text-blue-400">
+                          {stock} {m.unit}
+                        </td>
+
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          ₹ {val.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </td>
+
+                        <td className="py-2.5 px-3 text-center">
+                          {isLow ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-200">
+                              <AlertTriangle className="h-3 w-3" /> Low Stock
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200">
+                              <CheckCircle2 className="h-3 w-3" /> Optimal
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Quick +/- Counter */}
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => handleAdjustStock(m.id, -1)}
+                              disabled={stock <= 0}
+                              className="w-6 h-6 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold flex items-center justify-center cursor-pointer transition disabled:opacity-40"
+                              title="Deduct 1"
+                            >
+                              -
+                            </button>
+                            <button
+                              onClick={() => handleAdjustStock(m.id, 1)}
+                              className="w-6 h-6 rounded bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-600 font-bold flex items-center justify-center cursor-pointer transition"
+                              title="Add 1"
+                            >
+                              +
+                            </button>
+                            <button
+                              onClick={() => {
+                                setIssueForm({
+                                  ...issueForm,
+                                  productName: m.name,
+                                  quantity: 1,
+                                });
+                                setShowIssueModal(true);
+                              }}
+                              className="ml-1.5 px-2 py-1 text-[10px] font-bold rounded bg-amber-500 hover:bg-amber-400 text-slate-950 transition cursor-pointer"
+                              title="Dispatch to site"
+                            >
+                              Issue
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: TILES & GODOWN STOCK */}
+      {activeTab === "tiles" && (
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-between items-center">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                Roofing Tiles &amp; Main Godown Stock Matrix
               </h3>
-              <button onClick={() => setShowMovementModal(false)} className="text-muted-foreground text-sm font-bold">
-                ✕
+              <p className="text-xs text-slate-500">
+                Matches Sheets <code className="font-mono font-bold text-blue-600">Tiles Stock</code> and <code className="font-mono font-bold text-blue-600">Godown_Stock</code> &middot; Kerala Clay, Monier &amp; Ceiling Tile varieties
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {tiles.map((tile) => {
+              const qty = Number(tile.availableStock);
+              return (
+                <div
+                  key={tile.id}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-2xs space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                        {tile.tileCode}
+                      </span>
+                      <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 mt-1">{tile.tileName}</h4>
+                      <span className="text-xs text-slate-400">{tile.category}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-black text-blue-600 font-mono">{qty}</div>
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold">Nos on hand</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <span className="text-xs text-slate-500">Quick Adjust</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleAdjustTile(tile.id, qty, -50)}
+                        disabled={qty < 50}
+                        className="px-2 py-1 text-xs rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold disabled:opacity-40"
+                      >
+                        -50
+                      </button>
+                      <button
+                        onClick={() => handleAdjustTile(tile.id, qty, -10)}
+                        disabled={qty < 10}
+                        className="px-2 py-1 text-xs rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold disabled:opacity-40"
+                      >
+                        -10
+                      </button>
+                      <button
+                        onClick={() => handleAdjustTile(tile.id, qty, 10)}
+                        className="px-2 py-1 text-xs rounded bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold"
+                      >
+                        +10
+                      </button>
+                      <button
+                        onClick={() => handleAdjustTile(tile.id, qty, 50)}
+                        className="px-2 py-1 text-xs rounded bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold"
+                      >
+                        +50
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: SITE & TEAM ISSUE REGISTER */}
+      {activeTab === "issues" && (
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                Site &amp; Team Material Issue Register
+              </h3>
+              <p className="text-xs text-slate-500">
+                Matches Sheet <code className="font-mono font-bold text-blue-600">Stock_Out</code> in Excel &middot; Live tracking across project sites
+              </p>
+            </div>
+            <button
+              onClick={() => setShowIssueModal(true)}
+              className="px-3.5 py-2 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> + Issue Material to Site
+            </button>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-700">
+                  <tr>
+                    <th className="py-2.5 px-3">Date</th>
+                    <th className="py-2.5 px-3">Team</th>
+                    <th className="py-2.5 px-3">Project Site</th>
+                    <th className="py-2.5 px-3">Material Description</th>
+                    <th className="py-2.5 px-3 text-center">Quantity Dispatched</th>
+                    <th className="py-2.5 px-3">Issued By</th>
+                    <th className="py-2.5 px-3">Approved By</th>
+                    <th className="py-2.5 px-3">Condition / Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {siteIssues.map((issue) => (
+                    <tr key={issue.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
+                      <td className="py-2.5 px-3 font-mono text-slate-500">
+                        {new Date(issue.date).toLocaleDateString("en-IN")}
+                      </td>
+                      <td className="py-2.5 px-3 font-bold text-blue-600">{issue.team}</td>
+                      <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-slate-100">
+                        {issue.siteName}
+                      </td>
+                      <td className="py-2.5 px-3 font-medium text-slate-800 dark:text-slate-200">
+                        {issue.productName}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono font-bold text-sm text-amber-600">
+                        {Number(issue.quantity)}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">{issue.issuedBy}</td>
+                      <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">{issue.approvedBy}</td>
+                      <td className="py-2.5 px-3 text-slate-500 italic text-[11px]">{issue.condition || issue.notes || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: PRE-DISPATCH CHECKLISTS */}
+      {activeTab === "checklists" && (
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                Pre-Dispatch Quality &amp; Tool Verification Checklists
+              </h3>
+              <p className="text-xs text-slate-500">
+                Matches Sheets <code className="font-mono font-bold text-blue-600">Welder Mechioneries</code> &amp; <code className="font-mono font-bold text-blue-600">Layer Mechioneries</code> with tool photos &amp; supervisor sign-offs
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {(["ALL", "WELDER", "LAYER", "GENERAL"] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setChecklistFilter(type)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                    checklistFilter === type
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                  }`}
+                >
+                  {type === "ALL" ? "All Checklists" : `${type} Team`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredChecklists.map((chk) => {
+              const isVerified = chk.status === "VERIFIED";
+              return (
+                <div
+                  key={chk.id}
+                  className={`border rounded-xl p-4 shadow-2xs transition ${
+                    isVerified
+                      ? "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                      : "bg-amber-50/30 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {chk.imageUrl ? (
+                      <div
+                        onClick={() => {
+                          setZoomImage(chk.imageUrl);
+                          setZoomTitle(chk.itemName);
+                        }}
+                        className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer hover:scale-105 transition"
+                      >
+                        <img src={chk.imageUrl} alt={chk.itemName} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-400">
+                        <ClipboardCheck className="w-5 h-5" />
+                      </div>
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-600">
+                          {chk.checklistType}
+                        </span>
+                        <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
+                          Qty: {chk.standardQty}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100 mt-1 truncate">
+                        {chk.itemName}
+                      </h4>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        Verified by: {chk.verifiedBy || "Gowri Sankar"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 dark:border-slate-800">
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${
+                        isVerified
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-amber-50 text-amber-700 border border-amber-200"
+                      }`}
+                    >
+                      {isVerified ? <Check className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                      {isVerified ? "Verified Ready" : "Pending Check"}
+                    </span>
+
+                    <button
+                      onClick={() => handleToggleChecklist(chk.id, chk.status)}
+                      className="px-3 py-1 text-xs font-bold rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 transition cursor-pointer"
+                    >
+                      {isVerified ? "Mark Pending" : "Verify & Sign"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: IMAGE LIGHTBOX ZOOM */}
+      {zoomImage && (
+        <div
+          onClick={() => setZoomImage(null)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out animate-in fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-slate-900 border border-slate-700 rounded-2xl max-w-xl w-full p-4 space-y-3 shadow-2xl relative"
+          >
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800 text-white">
+              <h3 className="text-sm font-bold flex items-center gap-2">
+                <Eye className="w-4 h-4 text-blue-400" />
+                {zoomTitle || "Material Photo Preview"}
+              </h3>
+              <button
+                onClick={() => setZoomImage(null)}
+                className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center max-h-[70vh]">
+              <img src={zoomImage} alt={zoomTitle} className="w-full h-auto max-h-[70vh] object-contain" />
+            </div>
+            <div className="text-center text-xs text-slate-400 pt-1">
+              Click anywhere outside or press ESC to close preview
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: +ADD CONSUMABLE ITEM */}
+      {showItemModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-blue-600" />
+                Register New Yard Consumable / Material
+              </h3>
+              <button onClick={() => setShowItemModal(false)} className="text-slate-400 hover:text-slate-600">
+                &times;
               </button>
             </div>
 
-            <form onSubmit={handleMovementSubmit} className="space-y-3">
+            <form onSubmit={handleItemSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Material Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder='e.g., 5" Heavy Cutting Wheel'
+                  value={itemForm.name}
+                  onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
+                  className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={movementForm.date}
-                    onChange={(e) => setMovementForm({ ...movementForm, date: e.target.value })}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Material Item *</label>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Category *</label>
                   <select
-                    required
-                    value={movementForm.materialId}
-                    onChange={(e) => {
-                      const m = materials.find((item) => item.id === e.target.value);
-                      setMovementForm({
-                        ...movementForm,
-                        materialId: e.target.value,
-                        unitCost: m ? Number(m.unitCost) : movementForm.unitCost,
-                      });
-                    }}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
+                    value={itemForm.category}
+                    onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
                   >
-                    <option value="">-- Select Material --</option>
-                    {materials.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} ({m.currentStock} {m.unit} in yard)
-                      </option>
-                    ))}
+                    <option value="Cutting Wheels">Cutting Wheels</option>
+                    <option value="Drill Bits">Drill Bits</option>
+                    <option value="Fasteners">Fasteners &amp; Screws</option>
+                    <option value="Safety">Safety &amp; PPE</option>
+                    <option value="Tiles">Roofing Tiles</option>
+                    <option value="General Hardware">General Hardware</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Unit of Measure *</label>
+                  <select
+                    value={itemForm.unit}
+                    onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                  >
+                    <option value="Nos">Nos (Units)</option>
+                    <option value="Boxes">Boxes</option>
+                    <option value="Kg">Kg</option>
+                    <option value="MT">MT</option>
+                    <option value="Sq.Ft">Sq.Ft</option>
+                    <option value="Liters">Liters</option>
                   </select>
                 </div>
               </div>
 
-              {movementType === "SITE_ISSUE" ? (
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Destination Project Site *</label>
-                  <select
-                    required
-                    value={movementForm.projectId}
-                    onChange={(e) => setMovementForm({ ...movementForm, projectId: e.target.value })}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
-                  >
-                    <option value="">-- Select Project Site --</option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.code} - {p.name} ({p.siteLocation})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Cost will automatically transfer from Yard Inventory (1030) to Project Cost (5020).
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Source Supplier (Optional)</label>
-                  <select
-                    value={movementForm.supplierId}
-                    onChange={(e) => setMovementForm({ ...movementForm, supplierId: e.target.value })}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
-                  >
-                    <option value="">-- Direct Yard Inward / Opening --</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.companyName || ""})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Quantity *</label>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Current Stock</label>
                   <input
                     type="number"
-                    step="0.01"
-                    required
-                    value={movementForm.quantity}
-                    onChange={(e) => setMovementForm({ ...movementForm, quantity: parseFloat(e.target.value) || 0 })}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground font-bold"
+                    min="0"
+                    value={itemForm.currentStock}
+                    onChange={(e) => setItemForm({ ...itemForm, currentStock: parseFloat(e.target.value) || 0 })}
+                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Unit Cost (₹)</label>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Min Alert Stock</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={itemForm.minAlertStock}
+                    onChange={(e) => setItemForm({ ...itemForm, minAlertStock: parseFloat(e.target.value) || 0 })}
+                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Rate (₹)</label>
                   <input
                     type="number"
                     step="0.01"
-                    value={movementForm.unitCost}
-                    onChange={(e) => setMovementForm({ ...movementForm, unitCost: parseFloat(e.target.value) || 0 })}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
+                    min="0"
+                    value={itemForm.unitCost}
+                    onChange={(e) => setItemForm({ ...itemForm, unitCost: parseFloat(e.target.value) || 0 })}
+                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-bold"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1">Reference / Delivery Challan No</label>
+                <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Yard Location</label>
                 <input
                   type="text"
-                  placeholder="e.g., DC-2026-042 or Bill #891"
-                  value={movementForm.referenceNo}
-                  onChange={(e) => setMovementForm({ ...movementForm, referenceNo: e.target.value })}
-                  className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
+                  placeholder="e.g. Erode Main Yard - Shelf B2"
+                  value={itemForm.yardLocation}
+                  onChange={(e) => setItemForm({ ...itemForm, yardLocation: e.target.value })}
+                  className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
                 />
               </div>
 
-              <div className="p-3 bg-muted/40 rounded border border-border flex justify-between items-center text-xs">
-                <span className="text-muted-foreground font-semibold">Total Stock Movement Value:</span>
-                <span className="font-bold text-base text-foreground">
-                  ₹ {(movementForm.quantity * movementForm.unitCost).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setShowMovementModal(false)}
-                  className="px-3 py-1.5 text-xs font-semibold rounded border border-border"
+                  onClick={() => setShowItemModal(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className={`px-4 py-1.5 text-xs font-bold rounded text-slate-950 ${
-                    movementType === "SITE_ISSUE"
-                      ? "bg-amber-500 hover:bg-amber-600"
-                      : "bg-emerald-500 hover:bg-emerald-600"
-                  }`}
+                  className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition shadow-2xs cursor-pointer"
                 >
-                  {movementType === "SITE_ISSUE" ? "Issue to Project Site" : "Receive into Yard"}
+                  Save Material
                 </button>
               </div>
             </form>
@@ -637,128 +973,124 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Modal: Add Material Item */}
-      {showItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-card border border-border w-full max-w-md rounded-xl shadow-xl overflow-hidden p-6 space-y-4">
-            <h3 className="font-bold text-base text-foreground flex items-center gap-2">
-              <Package className="h-5 w-5 text-amber-500" /> Register Roofing Raw Material
-            </h3>
+      {/* MODAL: +ISSUE TO PROJECT SITE */}
+      {showIssueModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <ArrowUpRight className="w-5 h-5 text-amber-500" />
+                Issue Materials to Project Site
+              </h3>
+              <button onClick={() => setShowIssueModal(false)} className="text-slate-400 hover:text-slate-600">
+                &times;
+              </button>
+            </div>
 
-            <form onSubmit={handleItemSubmit} className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
+            <form onSubmit={handleIssueSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Item Code</label>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Issue Date *</label>
                   <input
-                    type="text"
-                    placeholder="Auto (MAT-009)"
-                    value={itemForm.itemCode}
-                    onChange={(e) => setItemForm({ ...itemForm, itemCode: e.target.value })}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground uppercase"
+                    type="date"
+                    required
+                    value={issueForm.date}
+                    onChange={(e) => setIssueForm({ ...issueForm, date: e.target.value })}
+                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Category</label>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Destination Team *</label>
                   <select
-                    value={itemForm.category}
-                    onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
+                    value={issueForm.team}
+                    onChange={(e) => setIssueForm({ ...issueForm, team: e.target.value })}
+                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold"
                   >
-                    <option value="Steel">Steel (Sections / Purlins)</option>
-                    <option value="Sheets">Sheets (Galvalume / UPVC)</option>
-                    <option value="Tiles">Clay / Mangalore Tiles</option>
-                    <option value="Fasteners">Fasteners & Screws</option>
-                    <option value="Coatings">Paint & Primers</option>
-                    <option value="Consumables">Site Consumables</option>
+                    {["SRM01", "SRM02", "SMR03", "SRM04", "SRM05", "SRM06", "Office Labour Team", "Suresh Team"].map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1">Material Name *</label>
+                <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Project Site *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Jindal 0.50mm Galvalume Bare Sheet"
-                  value={itemForm.name}
-                  onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
-                  className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
+                  placeholder="e.g. SSM School_Site, Ananthi_Site, Kyro, Vellalar Edu Trust"
+                  value={issueForm.siteName}
+                  onChange={(e) => setIssueForm({ ...issueForm, siteName: e.target.value })}
+                  className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Unit</label>
-                  <select
-                    value={itemForm.unit}
-                    onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
-                  >
-                    <option value="MT">MT</option>
-                    <option value="Kg">Kg</option>
-                    <option value="Sq.Ft">Sq.Ft</option>
-                    <option value="Nos">Nos</option>
-                    <option value="Boxes">Boxes</option>
-                    <option value="Liters">Liters</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Initial Stock</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={itemForm.currentStock}
-                    onChange={(e) => setItemForm({ ...itemForm, currentStock: parseFloat(e.target.value) || 0 })}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Min Alert Level</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={itemForm.minAlertStock}
-                    onChange={(e) => setItemForm({ ...itemForm, minAlertStock: parseFloat(e.target.value) || 0 })}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Unit Cost (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={itemForm.unitCost}
-                    onChange={(e) => setItemForm({ ...itemForm, unitCost: parseFloat(e.target.value) || 0 })}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1">Yard Bay Location</label>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Material Item *</label>
                   <input
                     type="text"
-                    value={itemForm.yardLocation}
-                    onChange={(e) => setItemForm({ ...itemForm, yardLocation: e.target.value })}
-                    className="w-full text-xs p-2 rounded border border-border bg-background text-foreground"
+                    required
+                    placeholder='e.g. 5" Cutting Wheel'
+                    value={issueForm.productName}
+                    onChange={(e) => setIssueForm({ ...issueForm, productName: e.target.value })}
+                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Quantity Dispatched *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={issueForm.quantity}
+                    onChange={(e) => setIssueForm({ ...issueForm, quantity: parseFloat(e.target.value) || 1 })}
+                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-bold"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Issued By *</label>
+                  <input
+                    type="text"
+                    required
+                    value={issueForm.issuedBy}
+                    onChange={(e) => setIssueForm({ ...issueForm, issuedBy: e.target.value })}
+                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Approved By *</label>
+                  <input
+                    type="text"
+                    required
+                    value={issueForm.approvedBy}
+                    onChange={(e) => setIssueForm({ ...issueForm, approvedBy: e.target.value })}
+                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setShowItemModal(false)}
-                  className="px-3 py-1.5 text-xs font-semibold rounded border border-border"
+                  onClick={() => setShowIssueModal(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-xs font-bold rounded bg-amber-500 hover:bg-amber-600 text-slate-950"
+                  className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition shadow-2xs cursor-pointer"
                 >
-                  Save Material
+                  Confirm Dispatch
                 </button>
               </div>
             </form>

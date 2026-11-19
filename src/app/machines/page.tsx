@@ -23,10 +23,15 @@ import {
   Check,
   ChevronRight,
   Sparkles,
+  Eye,
+  X,
+  Save,
+  Edit2,
+  ZoomIn,
 } from "lucide-react";
 
 export default function MachinesPage() {
-  const [activeTab, setActiveTab] = useState<"matrix" | "teams" | "consumables" | "service">("matrix");
+  const [activeTab, setActiveTab] = useState<"matrix" | "teams" | "whohaswhat" | "consumables" | "service">("matrix");
   const [selectedTeam, setSelectedTeam] = useState<string>("SRM01");
   const [loading, setLoading] = useState(true);
   const [machines, setMachines] = useState<any[]>([]);
@@ -34,6 +39,34 @@ export default function MachinesPage() {
   const [siteIssues, setSiteIssues] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Lightbox Zoom Modal State
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [zoomTitle, setZoomTitle] = useState<string>("");
+
+  // Inline Row Editing State
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState<any>({});
+  const [savingInline, setSavingInline] = useState(false);
+
+  // Add Machine Modal State
+  const [showAddMachineModal, setShowAddMachineModal] = useState(false);
+  const [newMachineForm, setNewMachineForm] = useState({
+    name: "",
+    category: "Power Tools",
+    officeCount: 1,
+    srm01Count: 0,
+    srm02Count: 0,
+    srm03Count: 0,
+    srm04Count: 0,
+    srm05Count: 0,
+    srm06Count: 0,
+    spareCount: 0,
+    serviceCount: 0,
+    scrapCount: 0,
+    notes: "",
+    imageUrl: "",
+  });
 
   // Transfer Modal State
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -113,6 +146,90 @@ export default function MachinesPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleStartInlineEdit = (m: any) => {
+    setEditingId(m.id);
+    setEditFormData({
+      id: m.id,
+      name: m.name,
+      category: m.category,
+      officeCount: m.officeCount,
+      srm01Count: m.srm01Count,
+      srm02Count: m.srm02Count,
+      srm03Count: m.srm03Count,
+      srm04Count: m.srm04Count,
+      srm05Count: m.srm05Count,
+      srm06Count: m.srm06Count,
+      spareCount: m.spareCount,
+      serviceCount: m.serviceCount,
+      scrapCount: m.scrapCount,
+      notes: m.notes || "",
+    });
+  };
+
+  const handleSaveInlineEdit = async () => {
+    if (!editingId) return;
+    try {
+      setSavingInline(true);
+      const res = await fetch("/api/machines", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editFormData),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAlertMsg({ text: `Updated "${editFormData.name}" quantities successfully!`, type: "success" });
+        setEditingId(null);
+        loadData();
+      } else {
+        setAlertMsg({ text: data.error || "Update failed", type: "error" });
+      }
+    } catch (err: any) {
+      setAlertMsg({ text: err.message, type: "error" });
+    } finally {
+      setSavingInline(false);
+    }
+  };
+
+  const handleAddMachineSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+      const res = await fetch("/api/machines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMachineForm),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAlertMsg({ text: `New machine "${newMachineForm.name}" registered successfully!`, type: "success" });
+        setShowAddMachineModal(false);
+        setNewMachineForm({
+          name: "",
+          category: "Power Tools",
+          officeCount: 1,
+          srm01Count: 0,
+          srm02Count: 0,
+          srm03Count: 0,
+          srm04Count: 0,
+          srm05Count: 0,
+          srm06Count: 0,
+          spareCount: 0,
+          serviceCount: 0,
+          scrapCount: 0,
+          notes: "",
+          imageUrl: "",
+        });
+        loadData();
+      } else {
+        setAlertMsg({ text: data.error || "Failed to add machine", type: "error" });
+      }
+    } catch (err: any) {
+      setAlertMsg({ text: err.message, type: "error" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleTransferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,32 +368,40 @@ export default function MachinesPage() {
   return (
     <div className="space-y-6 pb-12">
       {/* Top Header Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5" /> 2026 Real Tracking System Synced
             </span>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-              35 Assets Live
+              35 Assets Live with Real Photos
             </span>
           </div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1.5 flex items-center gap-2">
             <Wrench className="w-6 h-6 text-amber-500" />
-            SRM Machine, Tool & Site Material Custody System
+            SRM Machine, Tool &amp; Site Material Custody System
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Exact multi-sheet synchronization matching <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">2026_SRMachines_Tracking_System.xlsx</code> &middot; Live Team Custody &amp; Site Consumables
+            Exact multi-sheet synchronization matching <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">1_SRMachines_Tracking_2026_With_Images.xlsx</code> &middot; Live Team Custody &amp; Site Consumables
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
           <button
+            onClick={() => setShowAddMachineModal(true)}
+            className="px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 flex items-center gap-1.5 shadow-xs transition"
+          >
+            <Plus className="w-4 h-4" />
+            + Add Machine
+          </button>
+
+          <button
             onClick={handleExcelExport}
-            className="px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 shadow-sm transition"
+            className="px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 shadow-xs transition"
           >
             <Download className="w-4 h-4" />
-            Export Tracking Excel (.xlsx)
+            Export Excel
           </button>
 
           <input
@@ -300,7 +425,7 @@ export default function MachinesPage() {
               setTransferTo("SRM01");
               setShowTransferModal(true);
             }}
-            className="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 shadow-sm transition"
+            className="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 shadow-xs transition"
           >
             <ArrowRightLeft className="w-4 h-4" />
             Transfer Machine
@@ -329,7 +454,7 @@ export default function MachinesPage() {
       {/* KPI Stats Bar */}
       {masterSummary && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Machine Count</span>
             <span className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1 block">
               {masterSummary.totalMachineCount}
@@ -337,7 +462,7 @@ export default function MachinesPage() {
             <span className="text-[10px] text-slate-500">All registered physical units</span>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/20 shadow-xs">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/20 shadow-2xs">
             <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">SR Final Working Count</span>
             <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 block">
               {masterSummary.srFinalWorkingCount}
@@ -345,7 +470,7 @@ export default function MachinesPage() {
             <span className="text-[10px] text-emerald-700/80">Active working equipment</span>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">Office &amp; Yard Stock</span>
             <span className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1 block">
               {masterSummary.officeTotal}
@@ -353,7 +478,7 @@ export default function MachinesPage() {
             <span className="text-[10px] text-slate-500">In Head Office Godown</span>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider block">In Field Teams (SRM01-06)</span>
             <span className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1 block">
               {masterSummary.srm01Total + masterSummary.srm02Total + masterSummary.srm03Total + masterSummary.srm04Total + masterSummary.srm05Total + masterSummary.srm06Total}
@@ -361,7 +486,7 @@ export default function MachinesPage() {
             <span className="text-[10px] text-slate-500">Across 6 active site teams</span>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">In Service / Repair</span>
             <span className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1 block">
               {masterSummary.serviceTotal}
@@ -369,7 +494,7 @@ export default function MachinesPage() {
             <span className="text-[10px] text-slate-500">Workshop maintenance</span>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider block">Scrapped / Condemned</span>
             <span className="text-2xl font-black text-red-600 dark:text-red-400 mt-1 block">
               {masterSummary.scrapTotal}
@@ -406,6 +531,18 @@ export default function MachinesPage() {
         </button>
 
         <button
+          onClick={() => setActiveTab("whohaswhat")}
+          className={`px-5 py-3 text-xs font-bold border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
+            activeTab === "whohaswhat"
+              ? "border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20"
+              : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300"
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Tab 3 — &quot;Who Has What&quot; Live Custody Lookup
+        </button>
+
+        <button
           onClick={() => setActiveTab("consumables")}
           className={`px-5 py-3 text-xs font-bold border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
             activeTab === "consumables"
@@ -414,7 +551,7 @@ export default function MachinesPage() {
           }`}
         >
           <FileText className="w-4 h-4" />
-          Tab 3 — Site Consumables &amp; Daily Issue Register ({siteIssues.length})
+          Tab 4 — Site Consumables &amp; Daily Issue Register ({siteIssues.length})
         </button>
 
         <button
@@ -426,7 +563,7 @@ export default function MachinesPage() {
           }`}
         >
           <RotateCcw className="w-4 h-4" />
-          Tab 4 — Service, Repair &amp; Scrap Lifecycle
+          Tab 5 — Service, Repair &amp; Scrap Lifecycle
         </button>
       </div>
 
@@ -462,17 +599,18 @@ export default function MachinesPage() {
           </div>
 
           {/* Master Matrix Table */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-900 text-white font-bold border-b border-slate-800">
                     <th className="py-3 px-3 text-center w-12">S.No</th>
-                    <th className="py-3 px-3 min-w-[220px]">Materials / Machine Name</th>
-                    <th className="py-3 px-2.5 text-center bg-emerald-900/60 text-emerald-300 font-bold min-w-[80px]">
+                    <th className="py-3 px-2 text-center w-16">Photo</th>
+                    <th className="py-3 px-3 min-w-[200px]">Materials / Machine Name</th>
+                    <th className="py-3 px-2.5 text-center bg-emerald-900/60 text-emerald-300 font-bold min-w-[70px]">
                       SR Final
                     </th>
-                    <th className="py-3 px-2.5 text-center bg-blue-950 text-blue-200 font-bold min-w-[80px]">
+                    <th className="py-3 px-2.5 text-center bg-blue-950 text-blue-200 font-bold min-w-[70px]">
                       Total Count
                     </th>
                     <th className="py-3 px-2 text-center bg-slate-800/80">Office</th>
@@ -485,70 +623,163 @@ export default function MachinesPage() {
                     <th className="py-3 px-2 text-center bg-slate-800/80 text-emerald-300">Spare</th>
                     <th className="py-3 px-2 text-center bg-slate-800/80 text-amber-300">Service</th>
                     <th className="py-3 px-2 text-center bg-slate-800/80 text-red-300">Scrap</th>
-                    <th className="py-3 px-3 min-w-[180px]">Notes</th>
-                    <th className="py-3 px-3 text-center">Action</th>
+                    <th className="py-3 px-3 min-w-[140px]">Notes</th>
+                    <th className="py-3 px-3 text-center min-w-[110px]">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredMachines.map((m) => (
-                    <tr key={m.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
-                      <td className="py-2.5 px-3 text-center font-mono text-slate-400 font-bold">{m.sNo}</td>
-                      <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-slate-100">
-                        {m.name}
-                        <span className="block text-[10px] text-slate-400 font-normal">{m.category}</span>
-                      </td>
-                      <td className="py-2.5 px-2.5 text-center font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-950/20 font-mono text-sm">
-                        {m.srFinalCount}
-                      </td>
-                      <td className="py-2.5 px-2.5 text-center font-bold text-blue-700 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-950/20 font-mono text-sm">
-                        {m.totalCount}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-mono text-slate-700 dark:text-slate-300">
-                        {m.officeCount || "-"}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-mono text-slate-700 dark:text-slate-300">
-                        {m.srm01Count || "-"}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-mono text-slate-700 dark:text-slate-300">
-                        {m.srm02Count || "-"}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-mono text-slate-700 dark:text-slate-300">
-                        {m.srm03Count || "-"}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-mono text-slate-700 dark:text-slate-300">
-                        {m.srm04Count || "-"}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-mono text-slate-700 dark:text-slate-300">
-                        {m.srm05Count || "-"}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-mono text-slate-700 dark:text-slate-300">
-                        {m.srm06Count || "-"}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-mono text-emerald-600 dark:text-emerald-400">
-                        {m.spareCount || "-"}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-mono text-amber-600 dark:text-amber-400 font-bold">
-                        {m.serviceCount || "-"}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-mono text-red-600 dark:text-red-400 font-bold">
-                        {m.scrapCount || "-"}
-                      </td>
-                      <td className="py-2.5 px-3 text-[11px] text-slate-500 dark:text-slate-400 italic">
-                        {m.notes || "-"}
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <button
-                          onClick={() => {
-                            setTransferMachineId(m.id);
-                            setShowTransferModal(true);
-                          }}
-                          className="px-2 py-1 text-[11px] font-bold rounded-md bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition cursor-pointer"
-                        >
-                          Transfer
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredMachines.map((m) => {
+                    const isEditing = editingId === m.id;
+                    return (
+                      <tr key={m.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition">
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400 font-bold">{m.sNo}</td>
+
+                        {/* Real Thumbnail with Zoom */}
+                        <td className="py-2 px-2 text-center">
+                          {m.imageUrl ? (
+                            <div
+                              onClick={() => {
+                                setZoomImage(m.imageUrl);
+                                setZoomTitle(`${m.sNo}. ${m.name}`);
+                              }}
+                              className="w-10 h-10 mx-auto rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xs hover:scale-110 hover:ring-2 hover:ring-blue-500 cursor-pointer transition-transform flex items-center justify-center group relative"
+                              title="Click to zoom machine photo"
+                            >
+                              <img src={m.imageUrl} alt={m.name} className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <ZoomIn className="w-3.5 h-3.5 text-white" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 mx-auto rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                              <Wrench className="w-4 h-4" />
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-slate-100">
+                          {m.name}
+                          <span className="block text-[10px] text-slate-400 font-normal">{m.category}</span>
+                        </td>
+
+                        <td className="py-2.5 px-2.5 text-center font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-950/20 font-mono text-sm">
+                          {isEditing ? (
+                            (Number(editFormData.officeCount) || 0) +
+                            (Number(editFormData.srm01Count) || 0) +
+                            (Number(editFormData.srm02Count) || 0) +
+                            (Number(editFormData.srm03Count) || 0) +
+                            (Number(editFormData.srm04Count) || 0) +
+                            (Number(editFormData.srm05Count) || 0) +
+                            (Number(editFormData.srm06Count) || 0) +
+                            (Number(editFormData.spareCount) || 0)
+                          ) : (
+                            m.srFinalCount
+                          )}
+                        </td>
+
+                        <td className="py-2.5 px-2.5 text-center font-bold text-blue-700 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-950/20 font-mono text-sm">
+                          {isEditing ? (
+                            (Number(editFormData.officeCount) || 0) +
+                            (Number(editFormData.srm01Count) || 0) +
+                            (Number(editFormData.srm02Count) || 0) +
+                            (Number(editFormData.srm03Count) || 0) +
+                            (Number(editFormData.srm04Count) || 0) +
+                            (Number(editFormData.srm05Count) || 0) +
+                            (Number(editFormData.srm06Count) || 0) +
+                            (Number(editFormData.spareCount) || 0) +
+                            (Number(editFormData.serviceCount) || 0) +
+                            (Number(editFormData.scrapCount) || 0)
+                          ) : (
+                            m.totalCount
+                          )}
+                        </td>
+
+                        {/* Editable or Display Count Cells */}
+                        {[
+                          { key: "officeCount", val: m.officeCount },
+                          { key: "srm01Count", val: m.srm01Count },
+                          { key: "srm02Count", val: m.srm02Count },
+                          { key: "srm03Count", val: m.srm03Count },
+                          { key: "srm04Count", val: m.srm04Count },
+                          { key: "srm05Count", val: m.srm05Count },
+                          { key: "srm06Count", val: m.srm06Count },
+                          { key: "spareCount", val: m.spareCount, color: "text-emerald-600 dark:text-emerald-400" },
+                          { key: "serviceCount", val: m.serviceCount, color: "text-amber-600 dark:text-amber-400 font-bold" },
+                          { key: "scrapCount", val: m.scrapCount, color: "text-red-600 dark:text-red-400 font-bold" },
+                        ].map((col) => (
+                          <td key={col.key} className={`py-2 px-1 text-center font-mono ${col.color || "text-slate-700 dark:text-slate-300"}`}>
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                min="0"
+                                value={editFormData[col.key] || 0}
+                                onChange={(e) =>
+                                  setEditFormData({ ...editFormData, [col.key]: parseInt(e.target.value) || 0 })
+                                }
+                                className="w-11 px-1 py-1 text-center text-xs font-bold rounded border border-blue-400 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                              />
+                            ) : (
+                              col.val || "-"
+                            )}
+                          </td>
+                        ))}
+
+                        <td className="py-2.5 px-3 text-[11px] text-slate-500 dark:text-slate-400 italic">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editFormData.notes || ""}
+                              onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                              className="w-full px-2 py-1 text-xs rounded border border-blue-400 bg-white dark:bg-slate-800"
+                            />
+                          ) : (
+                            m.notes || "-"
+                          )}
+                        </td>
+
+                        <td className="py-2.5 px-3 text-center">
+                          {isEditing ? (
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={handleSaveInlineEdit}
+                                disabled={savingInline}
+                                className="px-2 py-1 text-[11px] font-bold rounded bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1 shadow-2xs cursor-pointer"
+                                title="Save changes"
+                              >
+                                <Save className="w-3 h-3" /> Save
+                              </button>
+                              <button
+                                onClick={() => setEditingId(null)}
+                                className="px-1.5 py-1 text-[11px] font-bold rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 cursor-pointer"
+                                title="Cancel"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => handleStartInlineEdit(m)}
+                                className="px-2 py-1 text-[11px] font-bold rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
+                                title="Edit quantities directly"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setTransferMachineId(m.id);
+                                  setShowTransferModal(true);
+                                }}
+                                className="px-2 py-1 text-[11px] font-bold rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition cursor-pointer"
+                              >
+                                Transfer
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -567,7 +798,7 @@ export default function MachinesPage() {
                 onClick={() => setSelectedTeam(grp)}
                 className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   selectedTeam === grp
-                    ? "bg-blue-600 text-white shadow-xs"
+                    ? "bg-blue-600 text-white shadow-2xs"
                     : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                 }`}
               >
@@ -622,7 +853,7 @@ export default function MachinesPage() {
                       setTransferTo(selectedTeam);
                       setShowTransferModal(true);
                     }}
-                    className="px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     + Allocate Machine to {selectedTeam}
@@ -633,7 +864,7 @@ export default function MachinesPage() {
           )}
 
           {/* Filtered Team Inventory Table */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
               <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                 Equipment &amp; Tools Allocated to {selectedTeam}
@@ -648,6 +879,7 @@ export default function MachinesPage() {
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-700">
                     <th className="py-2.5 px-3 w-12 text-center">#</th>
+                    <th className="py-2.5 px-2 w-14 text-center">Photo</th>
                     <th className="py-2.5 px-3">Materials / Machine Name</th>
                     <th className="py-2.5 px-3">Category</th>
                     <th className="py-2.5 px-3 text-center">Quantity</th>
@@ -669,6 +901,23 @@ export default function MachinesPage() {
                       return (
                         <tr key={m.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
                           <td className="py-2.5 px-3 text-center font-mono text-slate-400">{idx + 1}</td>
+                          <td className="py-2 px-2 text-center">
+                            {m.imageUrl ? (
+                              <div
+                                onClick={() => {
+                                  setZoomImage(m.imageUrl);
+                                  setZoomTitle(`${m.name}`);
+                                }}
+                                className="w-9 h-9 mx-auto rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 cursor-pointer hover:scale-110 transition"
+                              >
+                                <img src={m.imageUrl} alt={m.name} className="w-full h-full object-cover" />
+                              </div>
+                            ) : (
+                              <div className="w-9 h-9 mx-auto rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                                <Wrench className="w-3.5 h-3.5" />
+                              </div>
+                            )}
+                          </td>
                           <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-slate-100">{m.name}</td>
                           <td className="py-2.5 px-3 text-slate-500">{m.category}</td>
                           <td className="py-2.5 px-3 text-center font-mono font-bold text-sm text-blue-600 dark:text-blue-400">
@@ -705,7 +954,115 @@ export default function MachinesPage() {
         </div>
       )}
 
-      {/* TAB 3: SITE CONSUMABLES & DAILY ISSUE REGISTER */}
+      {/* TAB 3: "WHO HAS WHAT" LIVE CUSTODY LOOKUP */}
+      {activeTab === "whohaswhat" && (
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                &quot;Who Has What&quot; &mdash; Real-Time Custody Search
+              </h3>
+              <p className="text-xs text-slate-500">
+                Locate any specific machine or tool across all 6 site teams, office stores, spare stock, or workshop repair
+              </p>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Filter by machine or team..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredMachines.map((m) => {
+              const activeHolders = [
+                { grp: "OFFICE", count: m.officeCount },
+                { grp: "SRM01", count: m.srm01Count },
+                { grp: "SRM02", count: m.srm02Count },
+                { grp: "SMR03", count: m.srm03Count },
+                { grp: "SRM04", count: m.srm04Count },
+                { grp: "SRM05", count: m.srm05Count },
+                { grp: "SRM06", count: m.srm06Count },
+                { grp: "SPARE", count: m.spareCount },
+                { grp: "SERVICE", count: m.serviceCount },
+                { grp: "SCRAP", count: m.scrapCount },
+              ].filter((h) => h.count > 0);
+
+              return (
+                <div
+                  key={m.id}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-2xs space-y-3"
+                >
+                  <div className="flex items-start gap-3">
+                    {m.imageUrl ? (
+                      <div
+                        onClick={() => {
+                          setZoomImage(m.imageUrl);
+                          setZoomTitle(m.name);
+                        }}
+                        className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer hover:scale-105 transition"
+                      >
+                        <img src={m.imageUrl} alt={m.name} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-400">
+                        <Wrench className="w-5 h-5" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">{m.name}</h4>
+                      <span className="text-[10px] text-slate-400 block">{m.category}</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
+                          Working: {m.srFinalCount}
+                        </span>
+                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded">
+                          Total: {m.totalCount}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 dark:border-slate-800 pt-2 space-y-1.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Current Custody Breakdown</span>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {activeHolders.map((h) => {
+                        const meta = teamMetadata[h.grp];
+                        return (
+                          <div key={h.grp} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-slate-50 dark:bg-slate-800/60">
+                            <div>
+                              <span className="font-bold text-slate-800 dark:text-slate-200">{h.grp}</span>
+                              {meta?.lead && <span className="text-[10px] text-slate-500 ml-1.5">({meta.lead})</span>}
+                            </div>
+                            <span className="font-mono font-bold text-blue-600">{h.count} unit(s)</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setTransferMachineId(m.id);
+                      setShowTransferModal(true);
+                    }}
+                    className="w-full py-1.5 text-xs font-bold rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" /> Quick Transfer
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: SITE CONSUMABLES & DAILY ISSUE REGISTER */}
       {activeTab === "consumables" && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
@@ -720,14 +1077,14 @@ export default function MachinesPage() {
 
             <button
               onClick={() => setShowIssueModal(true)}
-              className="px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+              className="px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 shadow-xs transition cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               + Log Daily Site Consumable Issue
             </button>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-2xs">
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead>
@@ -799,7 +1156,7 @@ export default function MachinesPage() {
         </div>
       )}
 
-      {/* TAB 4: SERVICE, REPAIR & SCRAP LIFECYCLE */}
+      {/* TAB 5: SERVICE, REPAIR & SCRAP LIFECYCLE */}
       {activeTab === "service" && (
         <div className="space-y-4">
           <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-between items-center">
@@ -817,7 +1174,7 @@ export default function MachinesPage() {
                 setTransferTo("SERVICE");
                 setShowTransferModal(true);
               }}
-              className="px-3.5 py-2 text-xs font-bold rounded-xl bg-amber-600 hover:bg-amber-500 text-white flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+              className="px-3.5 py-2 text-xs font-bold rounded-xl bg-amber-600 hover:bg-amber-500 text-white flex items-center gap-1.5 shadow-xs transition cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
               + Send Machine to Service / Workshop
@@ -896,6 +1253,137 @@ export default function MachinesPage() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: IMAGE LIGHTBOX ZOOM */}
+      {zoomImage && (
+        <div
+          onClick={() => setZoomImage(null)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out animate-in fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-slate-900 border border-slate-700 rounded-2xl max-w-xl w-full p-4 space-y-3 shadow-2xl relative"
+          >
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800 text-white">
+              <h3 className="text-sm font-bold flex items-center gap-2">
+                <Eye className="w-4 h-4 text-blue-400" />
+                {zoomTitle || "Machine Photo Preview"}
+              </h3>
+              <button
+                onClick={() => setZoomImage(null)}
+                className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center max-h-[70vh]">
+              <img src={zoomImage} alt={zoomTitle} className="w-full h-auto max-h-[70vh] object-contain" />
+            </div>
+            <div className="text-center text-xs text-slate-400 pt-1">
+              Click anywhere outside or press ESC to close preview
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: +ADD MACHINE */}
+      {showAddMachineModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-blue-600" />
+                Add New Machine / Tool Asset
+              </h3>
+              <button onClick={() => setShowAddMachineModal(false)} className="text-slate-400 hover:text-slate-600">
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleAddMachineSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                  Machine / Tool Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Magnetic Core Drill Machine"
+                  value={newMachineForm.name}
+                  onChange={(e) => setNewMachineForm({ ...newMachineForm, name: e.target.value })}
+                  className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Category *</label>
+                  <select
+                    value={newMachineForm.category}
+                    onChange={(e) => setNewMachineForm({ ...newMachineForm, category: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold"
+                  >
+                    <option value="Power Tools">Power Tools</option>
+                    <option value="Bits & Scales">Bits &amp; Scales</option>
+                    <option value="Bags & Safety">Bags &amp; Safety</option>
+                    <option value="Heavy Vehicles">Heavy Vehicles</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Initial Office Count</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newMachineForm.officeCount}
+                    onChange={(e) => setNewMachineForm({ ...newMachineForm, officeCount: parseInt(e.target.value) || 0 })}
+                    className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Photo URL / Path (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="/uploads/machines/m_new.png"
+                  value={newMachineForm.imageUrl}
+                  onChange={(e) => setNewMachineForm({ ...newMachineForm, imageUrl: e.target.value })}
+                  className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Notes / Remarks</label>
+                <input
+                  type="text"
+                  placeholder="Model number, specifications, purchase notes"
+                  value={newMachineForm.notes}
+                  onChange={(e) => setNewMachineForm({ ...newMachineForm, notes: e.target.value })}
+                  className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddMachineModal(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition shadow-xs"
+                >
+                  {submitting ? "Adding..." : "Add Machine to Master"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1058,7 +1546,7 @@ export default function MachinesPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition shadow-sm"
+                  className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition shadow-xs"
                 >
                   {submitting ? "Processing..." : "Confirm Transfer & Update Master Matrix"}
                 </button>
@@ -1197,7 +1685,7 @@ export default function MachinesPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition shadow-sm"
+                  className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition shadow-xs"
                 >
                   {submitting ? "Logging..." : "Save to Site Register"}
                 </button>
