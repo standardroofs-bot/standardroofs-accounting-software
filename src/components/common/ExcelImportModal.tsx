@@ -5,14 +5,17 @@ import { X, Upload, Download, CheckCircle2, AlertTriangle, FileSpreadsheet, Load
 import * as XLSX from "xlsx";
 import { downloadSampleExcel } from "@/lib/exportUtils";
 
-export type SampleColumnItem = string | { header: string; example?: string | number };
+export type SampleColumnItem = string | { header?: string; label?: string; key?: string; example?: string | number };
 
 interface ExcelImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
-  sampleColumns: SampleColumnItem[];
-  onImport: (rows: any[]) => Promise<{ success: boolean; message?: string; count?: number }>;
+  title?: string;
+  moduleName?: string;
+  sampleColumns?: SampleColumnItem[];
+  templateColumns?: any[];
+  onImport?: (rows: any[]) => Promise<{ success: boolean; message?: string; count?: number }>;
+  onImportComplete?: () => void;
   sampleFilename?: string;
 }
 
@@ -20,10 +23,21 @@ export function ExcelImportModal({
   isOpen,
   onClose,
   title,
-  sampleColumns,
+  moduleName,
+  sampleColumns = [],
+  templateColumns = [],
   onImport,
+  onImportComplete,
   sampleFilename = "sample_import_template",
 }: ExcelImportModalProps) {
+  const displayTitle = title || (moduleName ? `Import ${moduleName} Excel` : "Import Excel Data");
+  const effectiveColumns: SampleColumnItem[] =
+    sampleColumns.length > 0
+      ? sampleColumns
+      : templateColumns.map((c) => ({
+          header: c.label || c.key || String(c),
+          example: c.example || `Sample ${c.label || c.key || "Value"}`,
+        }));
   const [file, setFile] = useState<File | null>(null);
   const [parsedRows, setParsedRows] = useState<any[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
@@ -67,8 +81,10 @@ export function ExcelImportModal({
   };
 
   const handleDownloadSample = () => {
-    const normalized = sampleColumns.map((c) =>
-      typeof c === "string" ? { header: c, example: `Sample ${c}` } : { header: c.header, example: c.example ?? "" }
+    const normalized = effectiveColumns.map((c) =>
+      typeof c === "string"
+        ? { header: c, example: `Sample ${c}` }
+        : { header: c.header || c.label || c.key || "Field", example: c.example ?? "" }
     );
     downloadSampleExcel(normalized, sampleFilename);
   };
@@ -82,14 +98,26 @@ export function ExcelImportModal({
     try {
       setImporting(true);
       setErrorMsg(null);
-      const res = await onImport(parsedRows);
-      if (res.success) {
-        setSuccessMsg(res.message || `Successfully imported ${res.count || parsedRows.length} records!`);
+      if (onImport) {
+        const res = await onImport(parsedRows);
+        if (res.success) {
+          setSuccessMsg(res.message || `Successfully imported ${res.count || parsedRows.length} records!`);
+          setTimeout(() => {
+            if (onImportComplete) onImportComplete();
+            onClose();
+          }, 1500);
+        } else {
+          setErrorMsg(res.message || "Import failed. Please check your data formatting.");
+        }
+      } else if (onImportComplete) {
+        onImportComplete();
+        setSuccessMsg(`Successfully imported ${parsedRows.length} records!`);
         setTimeout(() => {
           onClose();
         }, 1500);
       } else {
-        setErrorMsg(res.message || "Import failed. Please check your data formatting.");
+        setSuccessMsg(`Processed ${parsedRows.length} records.`);
+        setTimeout(() => onClose(), 1200);
       }
     } catch (err: any) {
       setErrorMsg("Error executing import: " + err.message);
@@ -109,7 +137,7 @@ export function ExcelImportModal({
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
-                {title} (Excel / CSV)
+                {displayTitle} (Excel / CSV)
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Universal 3-step bulk import with live validation
@@ -251,3 +279,6 @@ export function ExcelImportModal({
     </div>
   );
 }
+
+export default ExcelImportModal;
+

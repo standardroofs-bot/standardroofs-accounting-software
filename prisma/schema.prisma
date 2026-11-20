@@ -728,10 +728,17 @@ model Contractor {
   code          String?               @unique // CON001, SRM01-CONT
   name          String
   specialty     String                // Roofing Installation, Fabrication, Sheeting
+  fatherName    String?
+  address       String?
+  aadhaarNumber String?
   panNumber     String?
   phone         String?
+  bankName      String?
   bankAccountNo String?
+  bankIfsc      String?
   ifscCode      String?
+  category      String                @default("CONTRACTOR_TEAM")
+  status        String                @default("ACTIVE")
   contractValue Decimal               @default(0.00) @db.Decimal(15, 2)
   active        Boolean               @default(true)
   createdAt     DateTime              @default(now())
@@ -739,6 +746,7 @@ model Contractor {
 
   milestones    ContractorMilestone[]
   journalLines  JournalLine[]
+  dailyLogs     ContractorDailyLog[]
 }
 
 model ContractorMilestone {
@@ -799,24 +807,80 @@ model ImportBatch {
 // -------------------------------------------------------------
 
 model EmployeeOrLabour {
-  id                 String          @id @default(cuid())
-  employeeCode       String          @unique // EMP001, LAB001
+  id                 String             @id @default(cuid())
+  employeeCode       String             @unique // EMP001, LAB001, SR001, Invi001, 20001
+  empCode            String?            // Alias / searchable workforce code
   name               String
-  roleType           RoleType        @default(DAILY_LABOUR)
-  payCycle           PayCycle        @default(FIFTEEN_DAYS) // 15-day pay cycle default
-  baseWage           Decimal         @default(0.00) @db.Decimal(15, 2) // 15-day cycle base wage
-  cashAdvanceBalance Decimal         @default(0.00) @db.Decimal(15, 2)
+  fatherName         String?
   phone              String?
+  address            String?
+  aadhaarNumber      String?
+  panNumber          String?
+  bankName           String?
   bankAccountNo      String?
+  bankIfsc           String?
   ifscCode           String?
-  active             Boolean         @default(true)
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  designation        String?
+  role               String?
+  roleType           RoleType           @default(DAILY_LABOUR)
+  payCycle           PayCycle           @default(FIFTEEN_DAYS) // 15-day pay cycle default
+  category           String             @default("TAMIL_LABOUR") // OFFICE_STAFF, TAMIL_LABOUR, HINDI_LABOUR, CONTRACTOR_TEAM
+  companyUnit        String             @default("STANDARD_ROOFS") // STANDARD_ROOFS, INVI_CREATION
+  status             String             @default("ACTIVE") // ACTIVE, ARCHIVED
+  baseWage           Decimal            @default(0.00) @db.Decimal(15, 2) // Per day / 15-day base wage
+  dailyWage          Decimal            @default(0.00) @db.Decimal(15, 2) // Per day wage for site labours
+  monthlySalary      Decimal            @default(0.00) @db.Decimal(15, 2) // Fixed monthly salary for office staff
+  cashAdvanceBalance Decimal            @default(0.00) @db.Decimal(15, 2)
+  active             Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   expenses           ExpenseClaim[]
   musters            LabourMuster[]
   advances           LabourAdvance[]
   payrolls           StaffPayroll[]
+  attendances        AttendanceRecord[]
+}
+
+model AttendanceRecord {
+  id           String           @id @default(cuid())
+  employeeId   String
+  date         DateTime         @db.Date
+  status       String           // P (Present), H (Half-Day), A (Absent), L (Leave/Sunday)
+  inTime       String?          // e.g. "09:05 AM"
+  outTime      String?          // e.g. "07:05 PM"
+  siteName     String?          // e.g. "SSM School", "Kalloviyam Gokul", "Unloading", "Office"
+  dailyAdvance Decimal          @default(0.00) @db.Decimal(15, 2) // Optional ₹ petty advance on site
+  workNotes    String?          // Remarks, work notes
+  category     String?          // OFFICE_STAFF, TAMIL_LABOUR, HINDI_LABOUR
+  companyUnit  String?          // STANDARD_ROOFS, INVI_CREATION
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  employee     EmployeeOrLabour @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, date])
+  @@index([date])
+  @@index([category])
+}
+
+model ContractorDailyLog {
+  id                 String      @id @default(cuid())
+  contractorTeamName String      // "Nandeeshwaran Team", "Contractor Sakthi", "Prashop Team", "Monier Suresh Team", "Suthish Team", "Hydarali Team"
+  contractorId       String?
+  date               DateTime    @db.Date
+  siteName           String?     // "Ravichandran Chennai", "Arunprasad Uthukuli", "Ananthi Thindal", etc.
+  headcount          Int         @default(0) // Number of labours working
+  workerBreakdown    String?     // "Rajkumar-F, Mani-H, Selvam-H"
+  siteWorkStatus     String?     // "Fabrication Work", "Purlin Work Welding", "Sheeting", "Rain season", "Absent/No Work"
+  remarks            String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  contractor         Contractor? @relation(fields: [contractorId], references: [id], onDelete: SetNull)
+
+  @@index([date])
+  @@index([contractorTeamName])
 }
 
 model LabourMuster {

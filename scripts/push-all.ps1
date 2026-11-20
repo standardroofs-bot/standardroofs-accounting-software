@@ -1,24 +1,9 @@
-﻿<#
-.SYNOPSIS
-  Universal Dual-Remote Push & Local Storage Backup Engine for SR-Books ERP.
-  Maintains Srimanikandan K (@Srimani26) personal ownership and Standard Roofs company deployment.
-
-.DESCRIPTION
-  1. Stages and commits all modified code, documentation, and schema migrations.
-  2. Pushes to Personal GitHub Repository (Owner: Srimanikandan K):
-     https://github.com/Srimani26/standardroof-accounting-software.git
-  3. Pushes to Company GitHub Repository (Owner: Standard Roofs):
-     https://github.com/standardroofs-bot/standardroof-accounting-software.git
-  4. Creates an offline, portable Local Storage Git Bundle (sr-books-backup.bundle)
-     and timestamped backup archive in the local 'backups' directory.
-#>
-
 param(
-    [string]$CommitMessage = "feat: upgrade executive dashboard visual analytics, dual-push sync & local storage backup"
+    [string]$CommitMessage = "feat: upgrade executive dashboard visual analytics, attendance command center and workforce directory"
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   SR-BOOKS ERP — DUAL GITHUB SYNC & LOCAL STORAGE BACKUP  " -ForegroundColor Cyan
+Write-Host "   SR-BOOKS ERP -- DUAL GITHUB SYNC AND LOCAL BACKUP      " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 $RepoDir = Split-Path -Parent $PSScriptRoot
@@ -34,12 +19,12 @@ if (-not (Test-Path $BackupDir)) {
 # Step 2: Stage and Commit Changes
 Write-Host "`n[1/4] Staging and Committing Local Code Changes..." -ForegroundColor Yellow
 git add .
-$status = git status --porcelain
-if ($status) {
+$gitStatus = git status --porcelain
+if ($gitStatus) {
     git commit -m $CommitMessage
-    Write-Host "[✓] Changes committed: $CommitMessage" -ForegroundColor Green
+    Write-Host "[OK] Changes committed: $CommitMessage" -ForegroundColor Green
 } else {
-    Write-Host "[i] Working tree clean. No new changes to commit." -ForegroundColor Cyan
+    Write-Host "[INFO] Working tree clean. No new changes to commit." -ForegroundColor Cyan
 }
 
 # Step 3: Push to Personal GitHub Repo (Srimanikandan K)
@@ -47,7 +32,7 @@ Write-Host "`n[2/4] Pushing to Personal GitHub Repo (Owner: Srimanikandan K)..."
 Write-Host "     Remote: https://github.com/Srimani26/standardroof-accounting-software.git" -ForegroundColor DarkGray
 try {
     git push origin main
-    Write-Host "[✓] Personal repository pushed successfully!" -ForegroundColor Green
+    Write-Host "[OK] Personal repository pushed successfully!" -ForegroundColor Green
 } catch {
     Write-Host "[!] Error pushing to origin: $_" -ForegroundColor Red
 }
@@ -62,43 +47,23 @@ if ($remotes -notcontains "company") {
 
 Write-Host "     Remote: https://github.com/standardroofs-bot/standardroof-accounting-software.git" -ForegroundColor DarkGray
 try {
-    git push company main 2>&1 | Tee-Object -Variable companyOutput
+    $companyOutput = git push company main 2>&1
     if ($companyOutput -match "fatal|error|Repository not found") {
-        Write-Host "[!] Company repo push pending: The repository has not yet been initialized on github.com/standardroofs-bot." -ForegroundColor DarkYellow
-        Write-Host "    To complete company repo setup:" -ForegroundColor Yellow
-        Write-Host "    1. Log in to https://github.com/standardroofs-bot" -ForegroundColor White
-        Write-Host "    2. Create empty repo 'standardroof-accounting-software'" -ForegroundColor White
-        Write-Host "    3. Invite @Srimani26 as a collaborator or configure your PAT." -ForegroundColor White
-        Write-Host "    Once created, running this script will push to both automatically!" -ForegroundColor Cyan
+        Write-Host "[INFO] Company repo push pending: Repository not yet initialized on github.com/standardroofs-bot." -ForegroundColor DarkYellow
     } else {
-        Write-Host "[✓] Company repository pushed successfully!" -ForegroundColor Green
+        Write-Host "[OK] Company repository pushed successfully!" -ForegroundColor Green
     }
 } catch {
     Write-Host "[!] Company push note: $_" -ForegroundColor DarkYellow
 }
 
-# Step 5: Generate Portable Local Storage Git Bundle & Archive
+# Step 5: Generate Portable Local Storage Git Bundle
 Write-Host "`n[4/4] Creating Local Storage Offline Backup..." -ForegroundColor Yellow
 $bundlePath = Join-Path $BackupDir "sr-books-backup.bundle"
 git bundle create $bundlePath --all
 if (Test-Path $bundlePath) {
-    $bundleSize = (Get-Item $bundlePath).Length / 1MB
-    Write-Host ("[✓] Git Bundle created: {0} ({1:N2} MB)" -f $bundlePath, $bundleSize) -ForegroundColor Green
-}
-
-$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$archiveName = "sr-books-source-$timestamp.zip"
-$archivePath = Join-Path $BackupDir $archiveName
-try {
-    # Fast zip creation excluding large build folders
-    $filesToZip = Get-ChildItem -Path $RepoDir -Exclude node_modules, .next, .git, backups
-    Compress-Archive -Path $filesToZip.FullName -DestinationPath $archivePath -Force
-    if (Test-Path $archivePath) {
-        $zipSize = (Get-Item $archivePath).Length / 1MB
-        Write-Host ("[✓] Local Storage ZIP Archive created: {0} ({1:N2} MB)" -f $archivePath, $zipSize) -ForegroundColor Green
-    }
-} catch {
-    Write-Host "[!] Could not create zip archive: $_" -ForegroundColor DarkYellow
+    $bundleSize = [math]::Round((Get-Item $bundlePath).Length / 1MB, 2)
+    Write-Host "[OK] Git Bundle created: $bundlePath ($bundleSize MB)" -ForegroundColor Green
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Cyan

@@ -96,6 +96,14 @@ export interface ModuleHeaderWithAnalyticsProps {
   
   onRefresh?: () => void;
   extraControls?: React.ReactNode;
+
+  // Convenience count & export props
+  totalCount?: number;
+  activeCount?: number;
+  archivedCount?: number;
+  charts?: any[];
+  onImportExcel?: () => void;
+  onPrintPDF?: () => void;
 }
 
 export function ModuleHeaderWithAnalytics({

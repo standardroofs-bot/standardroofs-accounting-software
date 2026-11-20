@@ -142,9 +142,9 @@ const WORKSPACES: WorkspaceConfig[] = [
         id: "workforce",
         title: "Workforce Management",
         items: [
-          { name: "Staff & Workers Muster", href: "/labour", icon: Users2, badge: "3-in-1", moduleKey: "labour" },
-          { name: "Daily Site Attendance", href: "/labour?tab=attendance", icon: Clock, moduleKey: "labour" },
-          { name: "Salary & Wage Payroll", href: "/labour?tab=payroll", icon: Coins, moduleKey: "labour" },
+          { name: "Attendance Command Center", href: "/attendance", icon: Clock, badge: "Nov Live", moduleKey: "attendance" },
+          { name: "Workforce & KYC Directory", href: "/labour", icon: Users2, badge: "88 Master", moduleKey: "labour" },
+          { name: "Salary & Wage Payroll", href: "/payroll", icon: Coins, moduleKey: "payroll" },
         ],
       },
     ],
@@ -216,7 +216,7 @@ export function Sidebar() {
       if (currentWorkspace !== "site_fleet" && currentWorkspace !== "all") {
         setCurrentWorkspace("site_fleet");
       }
-    } else if (pathname.startsWith("/labour")) {
+    } else if (pathname.startsWith("/labour") || pathname.startsWith("/attendance")) {
       if (currentWorkspace !== "hr_payroll" && currentWorkspace !== "all") {
         setCurrentWorkspace("hr_payroll");
       }
