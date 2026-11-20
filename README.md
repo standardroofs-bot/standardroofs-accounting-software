@@ -12,6 +12,12 @@
 
 ---
 
+### 📚 Official Documentation & Manuals
+* 📘 **[End-to-End User Guide & Operations Manual (USER_GUIDE.md)](./USER_GUIDE.md):** Complete operational handbook for Super Admin, Managing Director, Accountant, HR Manager, and Site Supervisors with step-by-step invoice printing, bank reconciliation, muster rolls, and Excel import guides.
+* 🏛️ **[Technical Architecture & Project Documentation (PROJECT_DOCUMENTATION.md)](./PROJECT_DOCUMENTATION.md):** Comprehensive engineering documentation covering full-stack data flow, 60-model relational schema, double-entry CA journal engine, GST taxation math, and API endpoint specifications.
+
+---
+
 ## 🌟 Key Highlights & Architectural Capabilities
 
 * **Zoho Books Pixel-Exact GST Tax Invoicing:** Full GST compliance with automatic CGST, SGST, IGST calculations, reverse charge, HSN/SAC codes, and print-ready A4 landscape/portrait invoices matching official Zoho Books formats.
