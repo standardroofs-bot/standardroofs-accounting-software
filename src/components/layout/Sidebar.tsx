@@ -269,7 +269,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-slate-900 text-slate-100 flex flex-col border-r border-slate-800 shadow-2xl ${
+      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-[#1E2638] text-slate-100 flex flex-col border-r border-[#2B364C] shadow-2xl ${
         isCollapsed ? "w-20" : "w-64"
       } ${
         isMobileOpen
@@ -278,7 +278,7 @@ export function Sidebar() {
       }`}
     >
       {/* Brand Header */}
-      <div className="h-16 flex items-center justify-between px-3.5 border-b border-slate-800 bg-slate-950/60 shrink-0">
+      <div className="h-14 flex items-center justify-between px-3.5 border-b border-[#2B364C] bg-[#161C2B] shrink-0">
         <Link
           href="/"
           onClick={() => setIsMobileOpen(false)}
@@ -328,10 +328,10 @@ export function Sidebar() {
 
       {/* 4-Workspace Switcher Bar (Zoho One Style) */}
       {!isCollapsed ? (
-        <div className="p-2 border-b border-slate-800 bg-slate-950/40 relative">
+        <div className="p-2 border-b border-[#2B364C] bg-[#161C2B]/80 relative">
           <button
             onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-            className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 text-left transition group shadow-sm"
+            className="w-full flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-left transition group shadow-xs"
           >
             <div className="flex items-center gap-2.5 truncate">
               <div
@@ -339,7 +339,7 @@ export function Sidebar() {
                   currentWorkspace === "all"
                     ? "from-blue-600 to-indigo-600"
                     : activeWsConfig.color
-                } text-white flex items-center justify-center shrink-0 shadow`}
+                } text-white flex items-center justify-center shrink-0 shadow-xs`}
               >
                 {currentWorkspace === "all" ? (
                   <Layers size={14} />
@@ -472,16 +472,16 @@ export function Sidebar() {
                         href={item.href}
                         onClick={() => setIsMobileOpen(false)}
                         title={isCollapsed ? item.name : undefined}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors group relative ${
+                        className={`flex items-center gap-3 px-3 py-2 text-xs transition-colors group relative ${
                           isActive
-                            ? "bg-blue-600 text-white shadow-sm font-bold"
-                            : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                            ? "border-l-3 border-blue-500 bg-white/10 text-white font-semibold shadow-xs rounded-r-lg"
+                            : "text-slate-300 hover:bg-white/5 hover:text-white rounded-lg"
                         }`}
                       >
                         <Icon
-                          size={18}
+                          size={17}
                           className={`shrink-0 transition-colors ${
-                            isActive ? "text-white" : "text-slate-400 group-hover:text-white"
+                            isActive ? "text-blue-400" : "text-slate-400 group-hover:text-white"
                           }`}
                         />
                         {!isCollapsed && (

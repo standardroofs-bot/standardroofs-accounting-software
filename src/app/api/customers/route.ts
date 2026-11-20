@@ -91,6 +91,56 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+
+    // Universal Bulk Excel/CSV Import handler
+    if (body.bulk && Array.isArray(body.items)) {
+      let inserted = 0;
+      for (const item of body.items) {
+        const cName = item.name || item["Customer Name"] || item["Name"];
+        const bAddress =
+          item.billingAddress || item["Billing Address"] || item["Address"] || "Erode, Tamil Nadu";
+        if (!cName) continue;
+        const gstin = item.gstNumber || item["GSTIN"] || item["GST Number"] || null;
+        const phone = item.phone || item["Phone"] || item["Mobile"] || null;
+        const email = item.email || item["Email"] || null;
+        const state = item.state || item["State"] || "Tamil Nadu";
+        const stateCode = gstin ? getStateCodeFromGSTIN(gstin) : "33";
+
+        const existing = await prisma.customer.findFirst({
+          where: { name: cName },
+        });
+
+        if (existing) {
+          await prisma.customer.update({
+            where: { id: existing.id },
+            data: {
+              phone: phone ? String(phone) : existing.phone,
+              email: email ? String(email) : existing.email,
+              gstNumber: gstin ? gstin.trim().toUpperCase() : existing.gstNumber,
+            },
+          });
+        } else {
+          await prisma.customer.create({
+            data: {
+              name: cName,
+              billingAddress: bAddress,
+              shippingAddress: bAddress,
+              gstNumber: gstin ? gstin.trim().toUpperCase() : null,
+              phone: phone ? String(phone) : null,
+              email: email ? String(email) : null,
+              state: state,
+              stateCode: stateCode,
+              creditDays: 30,
+              openingBalance: "0.00",
+              outstandingBalance: "0.00",
+            },
+          });
+        }
+        inserted++;
+      }
+      return NextResponse.json({ success: true, count: inserted });
+    }
+
     const {
       name,
       companyName,

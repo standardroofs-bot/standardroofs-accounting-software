@@ -19,6 +19,11 @@ import {
   PieChart,
   Sparkles,
 } from "lucide-react";
+import {
+  PnLRevenueCostChart,
+  GstComparisonChart,
+  ProjectSiteMarginChart,
+} from "@/components/reports/ReportCharts";
 
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<"pnl_bs" | "trial" | "projects" | "gst" | "cash_bank" | "monthly_matrix">("pnl_bs");
@@ -304,6 +309,19 @@ export default function ReportsPage() {
           {/* TAB 1: P&L & BALANCE SHEET */}
           {activeTab === "pnl_bs" && (
             <div className="space-y-6">
+              {/* Visual P&L Revenue vs Cost Chart */}
+              {data.siteVsOfficePnL && (
+                <PnLRevenueCostChart
+                  totalRevenue={data.siteVsOfficePnL.totalSiteRevenue}
+                  directCosts={data.siteVsOfficePnL.totalDirectSiteCosts}
+                  grossProfit={data.siteVsOfficePnL.grossSiteProfit}
+                  officeOverheads={data.siteVsOfficePnL.totalOfficeOverheads}
+                  netProfit={data.siteVsOfficePnL.netCompanyProfit}
+                  grossMarginPct={data.siteVsOfficePnL.grossSiteMarginPct}
+                  netMarginPct={data.siteVsOfficePnL.netCompanyMarginPct}
+                />
+              )}
+
               {/* Executive Site vs. Office P&L Summary */}
               {data.siteVsOfficePnL && (
                 <div className="bg-gradient-to-r from-slate-900 to-blue-950 text-white rounded-xl p-6 shadow-md border border-slate-800 space-y-4">
@@ -600,7 +618,21 @@ export default function ReportsPage() {
 
           {/* TAB 3: PROJECT-WISE PROFITABILITY COMPARISON */}
           {activeTab === "projects" && (
-            <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+            <div className="space-y-6">
+              {data.projectProfitability && data.projectProfitability.length > 0 && (
+                <ProjectSiteMarginChart
+                  projects={data.projectProfitability.map((p: any) => ({
+                    id: p.id,
+                    code: p.code,
+                    name: p.name,
+                    contractValue: p.contractValue,
+                    incurredCost: p.totalCost,
+                    profit: p.netProfit,
+                    marginPct: p.marginPct,
+                  }))}
+                />
+              )}
+              <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-border flex justify-between items-center">
                 <div>
                   <h3 className="font-semibold text-foreground">Roofing Projects Profitability Matrix</h3>
@@ -691,11 +723,31 @@ export default function ReportsPage() {
                 </table>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
           {/* TAB 4: GSTR-1 & GSTR-3B GST HUB */}
           {activeTab === "gst" && (
             <div className="space-y-6">
+              {data.gst && (
+                <GstComparisonChart
+                  outwardTaxable={data.gst.gstr1?.totalValue || 0}
+                  outputGst={data.gst.gstr1?.totalTax || 0}
+                  inwardTaxable={data.gst.gstr3b?.totalTaxablePurchase || 0}
+                  inputItc={
+                    (data.gst.gstr3b?.itcAvailable?.cgst || 0) +
+                    (data.gst.gstr3b?.itcAvailable?.sgst || 0) +
+                    (data.gst.gstr3b?.itcAvailable?.igst || 0)
+                  }
+                  netPayable={
+                    (data.gst.gstr1?.totalTax || 0) -
+                    ((data.gst.gstr3b?.itcAvailable?.cgst || 0) +
+                      (data.gst.gstr3b?.itcAvailable?.sgst || 0) +
+                      (data.gst.gstr3b?.itcAvailable?.igst || 0))
+                  }
+                />
+              )}
+
               {/* GST Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-card p-5 rounded-lg border border-border shadow-sm">

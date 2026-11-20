@@ -28,6 +28,9 @@ import {
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
 import { validateGSTIN, getStateCodeFromGSTIN, INDIAN_STATES_LIST } from "@/lib/gst";
+import { exportToExcel, exportToPDF, downloadSampleExcel } from "@/lib/exportUtils";
+import { ExcelImportModal } from "@/components/common/ExcelImportModal";
+import { Download, Upload, Loader2 } from "lucide-react";
 
 interface CustomerItem {
   id: string;
@@ -63,6 +66,7 @@ export default function CustomersPage() {
 
   // Modal States
   const [showModal, setShowModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<CustomerItem | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<CustomerItem | null>(null);
   const [archiving, setArchiving] = useState(false);
@@ -274,6 +278,50 @@ export default function CustomersPage() {
   const bucket31_60Total = customers.reduce((s, c) => s + Number(c.ageing?.bucket31_60 || 0), 0);
   const bucket60_plusTotal = customers.reduce((s, c) => s + Number(c.ageing?.bucket60_plus || 0), 0);
 
+  const handleImportCustomers = async (rows: any[]) => {
+    const res = await fetch("/api/customers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bulk: true, items: rows }),
+    });
+    const json = await res.json();
+    if (json.success) {
+      fetchCustomers();
+    }
+    return json;
+  };
+
+  const handleExportExcel = () => {
+    exportToExcel(
+      customers.map((c) => ({
+        "Customer Name": c.name,
+        "Company Name": c.companyName || "",
+        "GSTIN": c.gstNumber || "",
+        "Phone": c.phone || "",
+        "Email": c.email || "",
+        "Billing Address": c.billingAddress,
+        "State": c.state,
+        "Outstanding Due (₹)": Number(c.outstandingBalance || 0),
+      })),
+      "Standard_Roofs_Customers"
+    );
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF(
+      "Standard Roofs - Customers Directory",
+      [
+        { header: "Customer Name", dataKey: "name" },
+        { header: "Company", dataKey: "companyName" },
+        { header: "GSTIN", dataKey: "gstNumber" },
+        { header: "Phone", dataKey: "phone" },
+        { header: "State", dataKey: "state" },
+        { header: "Outstanding (₹)", dataKey: "outstandingBalance" },
+      ],
+      customers
+    );
+  };
+
   const filteredCustomers = customers.filter((c) => {
     const bal = Number(c.outstandingBalance || 0);
     if (tabFilter === "DUE" && bal <= 0) return false;
@@ -302,12 +350,35 @@ export default function CustomersPage() {
             Clients master, GSTIN validation, credit limits, AR ageing & double-entry ledger statements
           </p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow transition active:scale-95 cursor-pointer"
-        >
-          <Plus size={16} /> + New Customer
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
+          >
+            <Upload size={14} className="text-blue-600 dark:text-blue-400" />
+            <span>Import Excel</span>
+          </button>
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
+          >
+            <Download size={14} className="text-emerald-600 dark:text-emerald-400" />
+            <span>Export (.xlsx)</span>
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
+          >
+            <FileText size={14} className="text-indigo-600 dark:text-indigo-400" />
+            <span>Print / PDF</span>
+          </button>
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer"
+          >
+            <Plus size={16} /> + New Customer
+          </button>
+        </div>
       </div>
 
       {/* AR Ageing Summary Strip */}
@@ -815,6 +886,22 @@ export default function CustomersPage() {
           </div>
         </div>
       )}
+      {/* Universal Zoho Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        title="Import Customers & Clients"
+        sampleColumns={[
+          { header: "Customer Name", example: "Sri Murugan Steels" },
+          { header: "Billing Address", example: "12, Sathy Road, Erode, Tamil Nadu 638003" },
+          { header: "GSTIN", example: "33AAAAA0000A1Z5" },
+          { header: "Phone", example: "9842712345" },
+          { header: "Email", example: "accounts@murugansteels.in" },
+          { header: "State", example: "Tamil Nadu" },
+        ]}
+        sampleFilename="standard_roofs_customers_sample"
+        onImport={handleImportCustomers}
+      />
     </div>
   );
 }

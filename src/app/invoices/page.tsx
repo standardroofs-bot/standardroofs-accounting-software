@@ -21,6 +21,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
+import { Download, FileText } from "lucide-react";
 
 interface InvoiceItem {
   id: string;
@@ -171,6 +173,45 @@ export default function InvoicesPage() {
     return matchesStatus && matchesSearch;
   });
 
+  const handleExportExcel = () => {
+    exportToExcel(
+      filteredInvoices.map((inv) => ({
+        "Invoice #": inv.invoiceNumber,
+        "Date": new Date(inv.date).toLocaleDateString("en-IN"),
+        "Due Date": inv.dueDate ? new Date(inv.dueDate).toLocaleDateString("en-IN") : "",
+        "Customer": inv.customer?.name || "",
+        "Taxable Amount (₹)": Number(inv.subTotal || 0),
+        "CGST (₹)": Number(inv.cgstTotal || 0),
+        "SGST (₹)": Number(inv.sgstTotal || 0),
+        "IGST (₹)": Number(inv.igstTotal || 0),
+        "Grand Total (₹)": Number(inv.totalAmount || 0),
+        "Amount Paid (₹)": Number(inv.amountPaid || 0),
+        "Balance Due (₹)": Number(inv.balanceDue || 0),
+        "Status": inv.status,
+      })),
+      "Standard_Roofs_Tax_Invoices"
+    );
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF(
+      "Standard Roofs - Tax Invoices Register",
+      [
+        { header: "Invoice #", dataKey: "invoiceNumber" },
+        { header: "Date", dataKey: "date" },
+        { header: "Customer", dataKey: "customerName" },
+        { header: "Total (₹)", dataKey: "totalAmount" },
+        { header: "Balance Due (₹)", dataKey: "balanceDue" },
+        { header: "Status", dataKey: "status" },
+      ],
+      filteredInvoices.map((i) => ({
+        ...i,
+        customerName: i.customer?.name || "",
+        date: new Date(i.date).toLocaleDateString("en-IN"),
+      }))
+    );
+  };
+
   const nextSeq = invoices.length > 0 ? Math.max(...invoices.map((i) => i.sequenceNumber)) + 1 : 33;
   const nextInvoicePadded = `SR/26-27/${String(nextSeq).padStart(4, "0")}`;
 
@@ -199,6 +240,20 @@ export default function InvoicesPage() {
               ({displayPlainNumber ? "show prefix" : "show plain #"})
             </button>
           </div>
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
+          >
+            <Download size={14} className="text-emerald-600 dark:text-emerald-400" />
+            <span>Export (.xlsx)</span>
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
+          >
+            <FileText size={14} className="text-indigo-600 dark:text-indigo-400" />
+            <span>Print / PDF</span>
+          </button>
           <Link
             href="/invoices/new"
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow transition active:scale-95 cursor-pointer"

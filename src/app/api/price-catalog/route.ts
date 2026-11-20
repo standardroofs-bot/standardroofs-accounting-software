@@ -37,6 +37,51 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+
+    // Universal Bulk Excel/CSV Import handler
+    if (body.bulk && Array.isArray(body.items)) {
+      let count = 0;
+      for (const item of body.items) {
+        const name = item.name || item["Item Name"] || item["Name"];
+        if (!name) continue;
+        const code =
+          item.itemCode ||
+          item["Item Code"] ||
+          item["SKU"] ||
+          `ITEM-${String(Date.now()).slice(-4)}-${count}`;
+        const hsn = item.hsnSacCode || item["HSN/SAC"] || item["HSN"] || "73089090";
+        const unit = item.unit || item["Usage Unit"] || item["Unit"] || "nos";
+        const rate = parseFloat(item.defaultRate || item["Selling Rate"] || item["Rate"] || 0);
+        const purchaseRate = parseFloat(item.purchaseRate || item["Purchase Rate"] || 0);
+        const gstRate = parseFloat(item.gstRate || item["GST Rate %"] || 18);
+
+        await prisma.roofingPriceItem.upsert({
+          where: { itemCode: code },
+          update: {
+            name,
+            hsnSacCode: String(hsn),
+            unit: String(unit).toLowerCase(),
+            defaultRate: rate,
+            purchaseRate: purchaseRate,
+            gstRate: gstRate,
+          },
+          create: {
+            itemCode: code,
+            name,
+            category: "ROOFING_MATERIAL",
+            roofType: "TILES",
+            hsnSacCode: String(hsn),
+            unit: String(unit).toLowerCase(),
+            defaultRate: rate,
+            purchaseRate: purchaseRate,
+            gstRate: gstRate,
+          },
+        });
+        count++;
+      }
+      return NextResponse.json({ success: true, count });
+    }
+
     const {
       itemCode,
       name,

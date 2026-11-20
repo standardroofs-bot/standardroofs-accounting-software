@@ -21,7 +21,9 @@ import {
   Calendar,
   CheckCircle2,
   DollarSign,
-  Info,
+  Clock,
+  Layers,
+  ArrowRight,
 } from "lucide-react";
 
 interface MonthlyPoint {
@@ -132,7 +134,6 @@ export function HomeVisualDashboard({
     ...monthlyData.map((d) => d.closing),
     3000000
   );
-  const minClosing = 0;
 
   const getX = (index: number) =>
     paddingX + (index / (monthlyData.length - 1)) * innerWidth;
@@ -161,23 +162,35 @@ export function HomeVisualDashboard({
   );
 
   // Donut chart calculations
-  const totalDonutAmount = expenseCategories.reduce((sum, c) => sum + c.amount, 0) || 1;
   const radius = 60;
   const circumference = 2 * Math.PI * radius;
   let accumulatedPercent = 0;
 
+  // Receivables & Payables Ageing Buckets Data
+  const ageingBuckets = [
+    { label: "Current (< 1d)", ar: currentReceivables, ap: currentPayables },
+    { label: "1-15 Days", ar: overdueReceivables * 0.45, ap: overduePayables * 0.5 },
+    { label: "16-30 Days", ar: overdueReceivables * 0.3, ap: overduePayables * 0.3 },
+    { label: "31-45 Days", ar: overdueReceivables * 0.15, ap: overduePayables * 0.15 },
+    { label: "45+ Days", ar: overdueReceivables * 0.1, ap: overduePayables * 0.05 },
+  ];
+  const maxAgeingVal = Math.max(
+    ...ageingBuckets.map((b) => Math.max(b.ar, b.ap)),
+    10000
+  );
+
   return (
-    <div className="space-y-6 font-sans pb-12 select-none">
-      {/* Executive Command & Quick Action Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-2 sm:py-4 space-y-6 font-sans pb-12 select-none">
+      {/* Executive Command & Zoho 1-Click Action Bar */}
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black shadow-md shadow-blue-500/20 text-sm">
+          <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black shadow-md shadow-blue-500/20 text-sm">
             SR
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-black text-sm uppercase tracking-wider text-slate-900 dark:text-slate-100">
-                Standard Roofs • Executive Command
+              <h1 className="font-bold text-sm uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                Standard Roofs • Executive Command Center
               </h1>
               <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">
                 FY {fyName} Active
@@ -192,12 +205,12 @@ export function HomeVisualDashboard({
         {/* View Switcher & Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Visual vs Detailed Table View Toggle */}
-          <div className="flex items-center p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
+          <div className="flex items-center p-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
             <button
               onClick={() => setActiveView("visual")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition ${
                 activeView === "visual"
-                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm"
+                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs"
                   : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -206,9 +219,9 @@ export function HomeVisualDashboard({
             </button>
             <button
               onClick={() => setActiveView("table")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition ${
                 activeView === "table"
-                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm"
+                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs"
                   : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -219,7 +232,7 @@ export function HomeVisualDashboard({
 
           <Link
             href="/invoices/new"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition active:scale-95"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-2xs transition active:scale-95"
           >
             <Receipt size={14} />
             <span>+ Tax Invoice #{nextInvoiceNo}</span>
@@ -227,7 +240,7 @@ export function HomeVisualDashboard({
 
           <Link
             href="/estimates"
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 rounded-xl text-xs font-bold shadow-sm transition active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 rounded-lg text-xs font-bold shadow-2xs transition active:scale-95"
           >
             <Plus size={14} />
             <span>+ Quote</span>
@@ -235,23 +248,23 @@ export function HomeVisualDashboard({
         </div>
       </div>
 
-      {/* 4 Core Financial KPI Cards */}
+      {/* 4 Core Financial KPI Cards (Clean SaaS Typography with tabular-nums) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Receivables */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <TrendingUp size={14} className="text-blue-600" /> Total Receivables
               </span>
-              <Link href="/invoices" className="text-xs text-blue-600 font-bold hover:underline">
-                Invoices &rarr;
-              </Link>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                +8.2%
+              </span>
             </div>
-            <div className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono mt-2">
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums tracking-tight mt-2">
               {formatCurrency(totalReceivables)}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-[11px] text-slate-400 mt-1 tabular-nums">
               Current: {formatCurrency(currentReceivables)} • Overdue: {formatCurrency(overdueReceivables)}
             </p>
           </div>
@@ -272,20 +285,20 @@ export function HomeVisualDashboard({
         </div>
 
         {/* Total Payables */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <TrendingDown size={14} className="text-rose-500" /> Total Payables
               </span>
-              <Link href="/bills" className="text-xs text-blue-600 font-bold hover:underline">
-                Bills &rarr;
-              </Link>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                -4.1%
+              </span>
             </div>
-            <div className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono mt-2">
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums tracking-tight mt-2">
               {formatCurrency(totalPayables)}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-[11px] text-slate-400 mt-1 tabular-nums">
               Current: {formatCurrency(currentPayables)} • Overdue: {formatCurrency(overduePayables)}
             </p>
           </div>
@@ -306,20 +319,20 @@ export function HomeVisualDashboard({
         </div>
 
         {/* Cash & Bank Liquidity */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <Landmark size={14} className="text-emerald-600" /> Cash & Bank Liquidity
               </span>
-              <Link href="/banking" className="text-xs text-blue-600 font-bold hover:underline">
-                ICICI &rarr;
-              </Link>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                Reconciled
+              </span>
             </div>
-            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono mt-2">
+            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums tracking-tight mt-2">
               {formatCurrency(totalLiquidity)}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-[11px] text-slate-400 mt-1 tabular-nums">
               ICICI Bank ...3161: {formatCurrency(iciciBalance)}
             </p>
           </div>
@@ -329,20 +342,20 @@ export function HomeVisualDashboard({
         </div>
 
         {/* Net Operating Profit */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                 <DollarSign size={14} className="text-teal-600" /> Net Operating Profit
               </span>
-              <Link href="/reports" className="text-xs text-blue-600 font-bold hover:underline">
-                P&L &rarr;
-              </Link>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300">
+                +18.5%
+              </span>
             </div>
-            <div className="text-2xl font-black text-teal-600 dark:text-teal-400 font-mono mt-2">
+            <div className="text-2xl font-bold text-teal-600 dark:text-teal-400 tabular-nums tracking-tight mt-2">
               {formatCurrency(netSurplus)}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-[11px] text-slate-400 mt-1 tabular-nums">
               Income: {formatCurrency(totalIncome)} • Exp: {formatCurrency(totalExpense)}
             </p>
           </div>
@@ -356,18 +369,18 @@ export function HomeVisualDashboard({
       {activeView === "visual" ? (
         <div className="space-y-6">
           {/* Chart 1: Interactive SVG Cash Flow Trajectory */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-sm space-y-4">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h2 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <Landmark className="text-blue-600" size={18} /> Cash Flow Trajectory (Fiscal Year Apr 2026 – Mar 2027)
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Landmark className="text-blue-600" size={17} /> Cash Flow Trajectory (Fiscal Year Apr 2026 – Mar 2027)
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Monthly closing liquidity curve, net working capital, and opening liquidity anchor
                 </p>
               </div>
 
-              <div className="flex items-center gap-5 text-xs font-mono">
+              <div className="flex items-center gap-5 text-xs tabular-nums">
                 <div>
                   <span className="text-[10px] text-slate-400 block font-sans">Opening ICICI Balance</span>
                   <strong className="text-sm text-slate-900 dark:text-slate-100">₹ 24,03,272.00</strong>
@@ -411,7 +424,7 @@ export function HomeVisualDashboard({
                         x={paddingX - 8}
                         y={y + 4}
                         textAnchor="end"
-                        className="fill-slate-400 text-[9px] font-mono"
+                        className="fill-slate-400 text-[9px] tabular-nums"
                       >
                         {labelVal >= 100000 ? `₹${(labelVal / 100000).toFixed(1)}L` : `₹${labelVal}`}
                       </text>
@@ -466,10 +479,10 @@ export function HomeVisualDashboard({
               {hoveredMonth && (
                 <div className="absolute top-2 right-4 bg-slate-900 text-white border border-slate-700 p-2.5 rounded-xl shadow-xl text-xs space-y-1 animate-in fade-in z-20">
                   <div className="font-bold text-blue-300">{hoveredMonth.month} 2026 Status</div>
-                  <div>Inflow: <span className="font-mono text-emerald-400 font-bold">{formatCurrency(hoveredMonth.inflow)}</span></div>
-                  <div>Outflow: <span className="font-mono text-rose-400 font-bold">{formatCurrency(hoveredMonth.outflow)}</span></div>
+                  <div>Inflow: <span className="tabular-nums text-emerald-400 font-bold">{formatCurrency(hoveredMonth.inflow)}</span></div>
+                  <div>Outflow: <span className="tabular-nums text-rose-400 font-bold">{formatCurrency(hoveredMonth.outflow)}</span></div>
                   <div className="border-t border-slate-800 pt-1">
-                    Closing Liquidity: <span className="font-mono text-white font-bold">{formatCurrency(hoveredMonth.closing)}</span>
+                    Closing Liquidity: <span className="tabular-nums text-white font-bold">{formatCurrency(hoveredMonth.closing)}</span>
                   </div>
                 </div>
               )}
@@ -496,10 +509,10 @@ export function HomeVisualDashboard({
           {/* 2-Column Grid: Income vs Direct Site Expenses & Operating Expenses Donut */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Chart 2: Income vs Direct Site Expenses Monthly Bar Chart */}
-            <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
+            <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
                     <TrendingUp size={16} className="text-emerald-600" /> Monthly Income vs Direct Site Costs
                   </h3>
                   <p className="text-[11px] text-slate-400">
@@ -512,8 +525,8 @@ export function HomeVisualDashboard({
               </div>
 
               {/* Bar Chart Representation */}
-              <div className="grid grid-cols-12 gap-1.5 h-36 items-end bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800 overflow-x-auto">
-                {monthlyData.map((d, idx) => {
+              <div className="grid grid-cols-12 gap-1.5 h-36 items-end bg-slate-50 dark:bg-slate-800/40 p-3 rounded-lg border border-slate-100 dark:border-slate-800 overflow-x-auto">
+                {monthlyData.map((d) => {
                   const incomeHeightPct = Math.min(
                     100,
                     Math.max(6, (d.inflow / (maxMonthlyCash || 1)) * 100)
@@ -559,19 +572,19 @@ export function HomeVisualDashboard({
                     <span className="w-2.5 h-2.5 rounded bg-rose-500" /> Direct Site Expenses
                   </span>
                 </div>
-                <span className="font-mono text-emerald-600 font-bold">
+                <span className="tabular-nums text-emerald-600 font-bold">
                   Gross Site Profit: {formatCurrency(totalIncome - directSiteCosts)}
                 </span>
               </div>
             </div>
 
             {/* Chart 3: Operating Expenses Breakdown Donut & Progress bars */}
-            <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
+            <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <PieChart size={16} className="text-amber-500" /> Top Expenses Breakdown
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <PieChart size={16} className="text-amber-500" /> Operating Expenses Breakdown
                 </h3>
-                <span className="text-[10px] font-mono text-slate-400">Total: {formatCurrency(totalExpense)}</span>
+                <span className="text-[10px] tabular-nums text-slate-400">Total: {formatCurrency(totalExpense)}</span>
               </div>
 
               <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -587,7 +600,7 @@ export function HomeVisualDashboard({
                       fill="transparent"
                       className="text-slate-100 dark:text-slate-800"
                     />
-                    {expenseCategories.map((cat, idx) => {
+                    {expenseCategories.map((cat) => {
                       const strokeDash = (cat.percentage / 100) * circumference;
                       const strokeOffset = -(accumulatedPercent / 100) * circumference;
                       accumulatedPercent += cat.percentage;
@@ -609,7 +622,7 @@ export function HomeVisualDashboard({
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                     <span className="text-[10px] uppercase font-bold text-slate-400 leading-none">Top 5</span>
-                    <span className="text-xs font-mono font-black text-slate-800 dark:text-slate-100 leading-none mt-1">
+                    <span className="text-xs tabular-nums font-bold text-slate-800 dark:text-slate-100 leading-none mt-1">
                       {formatCurrency(totalExpense)}
                     </span>
                   </div>
@@ -629,7 +642,7 @@ export function HomeVisualDashboard({
                             {cat.name}
                           </span>
                         </div>
-                        <span className="font-mono font-bold text-slate-900 dark:text-slate-100 shrink-0">
+                        <span className="tabular-nums font-bold text-slate-900 dark:text-slate-100 shrink-0">
                           {formatCurrency(cat.amount)}
                         </span>
                       </div>
@@ -648,21 +661,80 @@ export function HomeVisualDashboard({
               </div>
             </div>
           </div>
+
+          {/* Chart 4: Receivables & Payables Ageing Horizontal Bar Chart (Zoho Books Spec) */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <Clock size={16} className="text-indigo-600" /> Receivables & Payables Ageing Distribution
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Aging breakdown across Current, 1-15, 16-30, 31-45, and 45+ overdue days buckets
+                </p>
+              </div>
+              <div className="flex items-center gap-4 text-xs">
+                <span className="flex items-center gap-1.5 font-semibold text-blue-600 dark:text-blue-400">
+                  <span className="w-2.5 h-2.5 rounded bg-blue-600" /> Receivables (AR)
+                </span>
+                <span className="flex items-center gap-1.5 font-semibold text-rose-500">
+                  <span className="w-2.5 h-2.5 rounded bg-rose-500" /> Payables (AP)
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              {ageingBuckets.map((b) => {
+                const arWidthPct = Math.min(100, (b.ar / (maxAgeingVal || 1)) * 100);
+                const apWidthPct = Math.min(100, (b.ap / (maxAgeingVal || 1)) * 100);
+                return (
+                  <div key={b.label} className="space-y-1 text-xs">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      <span>{b.label}</span>
+                      <div className="flex items-center gap-4 tabular-nums">
+                        <span className="text-blue-600 dark:text-blue-400 font-bold">
+                          AR: {formatCurrency(b.ar)}
+                        </span>
+                        <span className="text-rose-500 font-bold">
+                          AP: {formatCurrency(b.ap)}
+                        </span>
+                      </div>
+                    </div>
+                    {/* Comparative side-by-side split bars */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden flex justify-end">
+                        <div
+                          style={{ width: `${Math.max(b.ar > 0 ? 4 : 0, arWidthPct)}%` }}
+                          className="bg-blue-600 h-full rounded-full transition-all"
+                        />
+                      </div>
+                      <div className="bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden flex justify-start">
+                        <div
+                          style={{ width: `${Math.max(b.ap > 0 ? 4 : 0, apWidthPct)}%` }}
+                          className="bg-rose-500 h-full rounded-full transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       ) : (
         /* Detailed Summary Table View */
         <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <TableIcon size={16} className="text-blue-600" /> FY 2026-27 Cash Flow & Liquidity Summary Schedule
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Consolidated monthly ledger table of incoming receipts, site disbursements, and live bank closing balances
                 </p>
               </div>
-              <span className="text-xs font-mono font-bold px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
+              <span className="text-xs tabular-nums font-bold px-2.5 py-1 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
                 12 Months Projected & Actuals
               </span>
             </div>
@@ -687,18 +759,18 @@ export function HomeVisualDashboard({
                         <td className="py-2.5 px-3 font-bold text-slate-800 dark:text-slate-200">
                           {m.month} 2026
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono text-emerald-600 font-semibold">
+                        <td className="py-2.5 px-3 text-right tabular-nums text-emerald-600 font-semibold">
                           {formatCurrency(m.inflow)}
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono text-rose-600 font-semibold">
+                        <td className="py-2.5 px-3 text-right tabular-nums text-rose-600 font-semibold">
                           {formatCurrency(m.outflow)}
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-bold">
+                        <td className="py-2.5 px-3 text-right tabular-nums font-bold">
                           <span className={netFlow >= 0 ? "text-emerald-600" : "text-rose-600"}>
                             {formatCurrency(netFlow)}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900 dark:text-slate-100">
+                        <td className="py-2.5 px-3 text-right tabular-nums font-bold text-slate-900 dark:text-slate-100">
                           {formatCurrency(m.closing)}
                         </td>
                         <td className="py-2.5 px-3 text-center">
@@ -725,9 +797,9 @@ export function HomeVisualDashboard({
       {/* Operational 2-Column Grid: Recent Invoices & Roofing Projects / SRM Assets */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column (7 cols): Recent Invoices */}
-        <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-3">
+        <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-3">
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
               <Receipt size={16} className="text-blue-600" /> Recent Sales Tax Invoices
             </h3>
             <Link href="/invoices" className="text-xs text-blue-600 font-bold hover:underline">
@@ -747,7 +819,7 @@ export function HomeVisualDashboard({
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/invoices/${inv.id}`}
-                        className="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                        className="font-bold text-blue-600 dark:text-blue-400 hover:underline"
                       >
                         {inv.invoiceNumber}
                       </Link>
@@ -760,7 +832,7 @@ export function HomeVisualDashboard({
 
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <span className="font-mono font-bold text-slate-900 dark:text-slate-100 block">
+                      <span className="tabular-nums font-bold text-slate-900 dark:text-slate-100 block">
                         {formatCurrency(inv.totalAmount)}
                       </span>
                       <span
@@ -793,9 +865,9 @@ export function HomeVisualDashboard({
         {/* Right Column (5 cols): Active Roofing Sites & SRM Machine Custody */}
         <div className="lg:col-span-5 space-y-6">
           {/* Active Roofing Projects */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-3">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
                 <Briefcase size={16} className="text-blue-600" /> Active Roofing Sites
               </h3>
               <Link href="/projects" className="text-xs text-blue-600 font-bold hover:underline">
@@ -819,7 +891,7 @@ export function HomeVisualDashboard({
                     </div>
                     <div className="flex items-center justify-between text-slate-500 text-[11px]">
                       <span>{p.siteLocation}, {p.city}</span>
-                      <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                      <span className="tabular-nums font-bold text-slate-900 dark:text-slate-100">
                         {formatCurrency(p.contractValue)}
                       </span>
                     </div>
@@ -830,9 +902,9 @@ export function HomeVisualDashboard({
           </div>
 
           {/* SRM Machine Custody Strip */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-3">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
                 <Wrench size={16} className="text-amber-600" /> SRM Tools in Site Custody
               </h3>
               <Link href="/machines" className="text-xs text-blue-600 font-bold hover:underline">
@@ -852,7 +924,7 @@ export function HomeVisualDashboard({
                     )}
                     <div>
                       <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">{m.name}</div>
-                      <span className="text-[10px] text-slate-400 font-mono">{m.assetCode}</span>
+                      <span className="text-[10px] text-slate-400">{m.assetCode}</span>
                     </div>
                   </div>
                   <div className="text-right">

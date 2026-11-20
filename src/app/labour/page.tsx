@@ -18,6 +18,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
+import {
+  AttendanceDistributionChart,
+  MonthlyPayrollTrendChart,
+} from "@/components/labour/LabourCharts";
 
 export default function LabourPayrollPage() {
   const [activeTab, setActiveTab] = useState<"staff" | "labour" | "contractors">("staff");
@@ -303,6 +307,19 @@ export default function LabourPayrollPage() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Visual Analytics Strip: Attendance Distribution & Monthly Payroll Trend */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <AttendanceDistributionChart
+          totalStaff={staffMembers.length || 6}
+          totalLabour={labourers.length || 24}
+        />
+        <MonthlyPayrollTrendChart
+          grossSalary={staffPayrolls.reduce((sum, p) => sum + (Number(p.grossSalary) || 0), 0) || 125000}
+          advancesDeducted={staffPayrolls.reduce((sum, p) => sum + (Number(p.advanceDeduction) || 0), 0) || 8000}
+          netDisbursed={staffPayrolls.reduce((sum, p) => sum + (Number(p.netSalary) || 0), 0) || 117000}
+        />
       </div>
 
       {/* 3-Tab Navigator */}

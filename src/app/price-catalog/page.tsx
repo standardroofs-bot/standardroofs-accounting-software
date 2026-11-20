@@ -12,7 +12,12 @@ import {
   Check,
   X,
   FileSpreadsheet,
+  Download,
+  Upload,
+  FileText,
 } from "lucide-react";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
+import { ExcelImportModal } from "@/components/common/ExcelImportModal";
 
 interface PriceItem {
   id: string;
@@ -35,7 +40,53 @@ export default function PriceCatalogPage() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const handleExportExcel = () => {
+    exportToExcel(
+      items.map((i) => ({
+        "Item Code": i.itemCode,
+        "Item Name": i.name,
+        "Category": i.category,
+        "Roof Type": i.roofType,
+        "HSN/SAC": i.hsnSacCode,
+        "Unit": i.unit,
+        "Selling Rate (₹)": Number(i.defaultRate || 0),
+        "Purchase Rate (₹)": Number(i.purchaseRate || 0),
+        "GST Rate %": Number(i.gstRate || 18),
+      })),
+      "Standard_Roofs_Price_Catalog_290_Items"
+    );
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF(
+      "Standard Roofs - 290 Items Catalog & Price List",
+      [
+        { header: "Item Code", dataKey: "itemCode" },
+        { header: "Item Name", dataKey: "name" },
+        { header: "HSN/SAC", dataKey: "hsnSacCode" },
+        { header: "Unit", dataKey: "unit" },
+        { header: "Selling Rate (₹)", dataKey: "defaultRate" },
+        { header: "GST %", dataKey: "gstRate" },
+      ],
+      items
+    );
+  };
+
+  const handleImportItems = async (rows: any[]) => {
+    const res = await fetch("/api/price-catalog", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bulk: true, items: rows }),
+    });
+    const json = await res.json();
+    if (json.success) {
+      fetchItems();
+    }
+    return json;
+  };
 
   const [newItem, setNewItem] = useState({
     itemCode: "",
@@ -138,13 +189,36 @@ export default function PriceCatalogPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition active:scale-95"
-        >
-          <Plus size={16} />
-          <span>+ Add Price Item</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
+          >
+            <Upload size={14} className="text-blue-600 dark:text-blue-400" />
+            <span>Import Excel</span>
+          </button>
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
+          >
+            <Download size={14} className="text-emerald-600 dark:text-emerald-400" />
+            <span>Export (.xlsx)</span>
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
+          >
+            <FileText size={14} className="text-indigo-600 dark:text-indigo-400" />
+            <span>Print / PDF</span>
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition active:scale-95"
+          >
+            <Plus size={16} />
+            <span>+ Add Price Item</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -389,6 +463,23 @@ export default function PriceCatalogPage() {
           </div>
         </div>
       )}
+      {/* Universal Zoho Excel Import Modal */}
+      <ExcelImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        title="Import Price Catalog & Roofing Materials"
+        sampleColumns={[
+          { header: "Item Code", example: "SRM-001" },
+          { header: "Item Name", example: "1'' SCREW TATA SDS 12-14X25MM" },
+          { header: "HSN/SAC", example: "73181500" },
+          { header: "Usage Unit", example: "nos" },
+          { header: "Selling Rate", example: 1.85 },
+          { header: "Purchase Rate", example: 1.45 },
+          { header: "GST Rate %", example: 18 },
+        ]}
+        sampleFilename="standard_roofs_items_sample"
+        onImport={handleImportItems}
+      />
     </div>
   );
 }

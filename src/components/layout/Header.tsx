@@ -125,7 +125,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
       .toUpperCase() || "PT";
 
   return (
-    <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-5 lg:px-6 sticky top-0 z-30 transition-colors whitespace-nowrap select-none">
+    <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-5 lg:px-6 sticky top-0 z-30 transition-colors whitespace-nowrap select-none">
       {/* Left: Hamburger (mobile) + Organization context + Search */}
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         {/* Mobile Hamburger Drawer Button */}
