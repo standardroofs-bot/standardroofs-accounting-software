@@ -1,194 +1,209 @@
-# Standard Roofs Books (SR-Books) — Project Architecture & Technical Documentation 🏛️⚙️
+# Standard Roofs Books (SR-Books) — Master Technical Architecture & Project Documentation 🏛️⚙️
 
-**Application Name:** Standard Roofs Books (SR-Books)  
+**System Identification:** Standard Roofs Books (SR-Books)  
+**Enterprise Code:** `SR-BOOKS-ERP`  
 **Target Enterprise:** Standard Roofs, Erode, Tamil Nadu  
 **GSTIN:** `33AEWFS5187G1ZD` | **State Code:** `33 (Tamil Nadu)`  
-**Architecture Standard:** Commercial SaaS ERP & Double-Entry Accounting System  
-**Technical Document Version:** 2.0 (Enterprise Specification)  
+**Architecture Classification:** Enterprise Cloud ERP & Double-Entry Accounting System  
+**Engine Specification:** Fixed-Point Precision (`Decimal.js`), Next.js 15.5, React 19, Prisma 6.5, Neon PostgreSQL  
+**Document Version:** 2.0 (Complete Technical Specification)  
 
 ---
 
 ## 📑 Table of Contents
 
-1. [Executive Summary & Architectural Overview](#1-executive-summary--architectural-overview)
-2. [Full-Stack Architecture & Data Flow](#2-full-stack-architecture--data-flow)
-3. [Database Schema & Entity-Relationship (ER) Dictionary](#3-database-schema--entity-relationship-er-dictionary)
-4. [Indian GST Calculation & Double-Entry Accounting Engine](#4-indian-gst-calculation--double-entry-accounting-engine)
+1. [Architectural Overview & System Design](#1-architectural-overview--system-design)
+2. [Full-Stack Topology & Infrastructure](#2-full-stack-topology--infrastructure)
+3. [Exhaustive Database Schema & Model Dictionary (60 Models)](#3-exhaustive-database-schema--model-dictionary-60-models)
+4. [Double-Entry Accounting Engine & GST Taxation Math](#4-double-entry-accounting-engine--gst-taxation-math)
 5. [Security, Session Guard & Zero BFcache Architecture](#5-security-session-guard--zero-bfcache-architecture)
-6. [Complete API Endpoints Specification](#6-complete-api-endpoints-specification)
-7. [Universal UI Components & Visual Analytics Architecture](#7-universal-ui-components--visual-analytics-architecture)
-8. [Data Protection, Backup & Disaster Recovery Guide](#8-data-protection-backup--disaster-recovery-guide)
-9. [Deployment, Environment Setup & Cloudflare Tunneling](#9-deployment-environment-setup--cloudflare-tunneling)
+6. [Complete REST API & Server Action Specifications](#6-complete-rest-api--server-action-specifications)
+7. [Universal UI Component Engine & Mathematical Spline Charting](#7-universal-ui-component-engine--mathematical-spline-charting)
+8. [Data Protection, Point-in-Time Recovery & JSON Backups](#8-data-protection-point-in-time-recovery--json-backups)
+9. [Production Deployment, Cloudflare Tunneling & CI/CD](#9-production-deployment-cloudflare-tunneling--cicd)
 
 ---
 
-## 1. Executive Summary & Architectural Overview
+## 1. Architectural Overview & System Design
 
-Standard Roofs Books (SR-Books) is an in-house enterprise ERP and Indian GST accounting web application built specifically for **Standard Roofs**, a premier industrial roofing and pre-engineered building (PEB) contractor based in Erode, Tamil Nadu.
+Standard Roofs Books (SR-Books) is an in-house enterprise Resource Planning (ERP) and double-entry accounting platform engineered for **Standard Roofs**, an industrial roofing and pre-engineered steel building (PEB) contractor in Erode, Tamil Nadu.
 
-The application combines the ease-of-use and aesthetic clarity of **Zoho Books** with the operational depth of **Zoho One**, delivering:
-* **Statutory Compliance:** Full compliance with Central Goods and Services Tax Act, 2017 (CGST, SGST, IGST, HSN/SAC codes, reverse charge mechanism, and state code 33 validation).
-* **Double-Entry General Ledger:** Instant balanced debit and credit journal generation for every transaction without manual posting.
-* **Operational Workspaces:** Unifies Accounting, Site Operations, Heavy Machinery & Fleet Vehicles, Labour Muster & Sub-Contractor Management, and Corporate Security under a single responsive interface.
+### 1.1 Core Engineering Principles
+* **Mathematical Exactness:** Floating-point rounding anomalies common in standard JavaScript (`0.1 + 0.2 !== 0.3`) are strictly prohibited in the financial ledger. All currency computations use `Decimal.js` fixed-point arithmetic (`db.Decimal(15, 2)`).
+* **Double-Entry Equilibrium:** No isolated numbers can exist in the ledger. Every financial transaction generates a minimum of one debit leg and one credit leg satisfying:
+  $$\sum \text{Debits} = \sum \text{Credits}$$
+* **Non-Destructive Data Retention:** Records are never hard-deleted via normal operations. The system enforces soft-delete flags (`isArchived = true`) to preserve immutable audit trails and tax records.
+* **Ergonomic Zoho Design System:** Layouts, color palettes, and data density mirror Zoho Books and Stripe enterprise software, prioritizing speed, responsive tabular numbers (`tabular-nums`), and clean typography.
 
 ---
 
-## 2. Full-Stack Architecture & Data Flow
+## 2. Full-Stack Topology & Infrastructure
 
 ```mermaid
-flowchart TD
-    Client["Browser Client (Desktop, Tablet, Mobile)"]
-    Edge["Edge Middleware (Anti-Cache Headers & Session Verification)"]
-    NextServer["Next.js 15 Server (React 19 Server Components & Actions)"]
-    Prisma["Prisma ORM 6.5 (Decimal.js Arithmetic)"]
-    NeonDB[("Neon Cloud PostgreSQL (High Availability Pooler)")]
-    Tunnel["Cloudflare Zero-Trust Secure Tunnel"]
+graph TD
+    Client["Browser (Desktop, Tablet, Mobile)"]
+    CF["Cloudflare Zero-Trust Edge Tunnel"]
+    MW["Next.js Edge Middleware (Anti-Cache & Security Guard)"]
+    RSC["Next.js 15 Server (React 19 Server Components)"]
+    SA["Next.js Server Actions & API Route Handlers"]
+    Prisma["Prisma ORM 6.5 (Connection Pooler)"]
+    Neon["Neon Cloud PostgreSQL (Serverless)"]
 
-    Client -->|HTTPS / WSS| Edge
-    Edge --> NextServer
-    NextServer --> Prisma
-    Prisma --> NeonDB
-    NextServer <--> Tunnel
-    Tunnel <--> Client
+    Client -->|HTTPS / WSS| CF
+    CF --> MW
+    MW --> RSC
+    RSC --> SA
+    SA --> Prisma
+    Prisma --> Neon
 ```
 
-### Key Architectural Layers
-1. **Presentation Layer (React 19 & Tailwind CSS v4):** Pure server-rendered pages by default with client-side interactive islands (`"use client"`) for charts, filter toolbars, and modals.
-2. **Security & Routing Layer (Next.js Middleware):** Enforces strict anti-cache HTTP headers on all `/invoices`, `/banking`, `/customers`, etc., and intercepts unauthorized requests.
-3. **Business Logic & Accounting Engine:** Encapsulated within server actions and route handlers using `Decimal.js` to ensure zero rounding or floating-point discrepancy.
-4. **Persistence Layer (Prisma 6.5 on Neon PostgreSQL):** Serverless PostgreSQL database hosted on Neon Cloud with automated connection pooling (`DATABASE_URL`) and direct migrations (`DIRECT_URL`).
+### 2.1 Technology Stack Details
+* **Frontend Framework:** Next.js `15.5.29` utilizing the App Router architecture.
+* **UI Runtime:** React `19.0.0` with React Server Components (RSC) and server actions.
+* **Styling & Design System:** Tailwind CSS `v4.0` with CSS variables for seamless light/dark slate themes.
+* **Database & ORM:** Prisma ORM `6.5.0` backed by Neon Cloud Serverless PostgreSQL with pgBouncer pooling.
+* **Spreadsheet Engine:** SheetJS (`xlsx`) `0.18.5` and `exceljs` `4.4.0` for universal Excel import/export.
+* **Authentication:** Stateless JWT using `jose` `6.2.17` and password hashing via `bcryptjs` `3.0.2`.
+* **Vector Icons:** `lucide-react` `0.475.0`.
 
 ---
 
-## 3. Database Schema & Entity-Relationship (ER) Dictionary
+## 3. Exhaustive Database Schema & Model Dictionary (60 Models)
 
-The database schema (`prisma/schema.prisma`) comprises 60 distinct models partitioned into core operational domains:
+The database schema (`prisma/schema.prisma`) comprises 60 relational models divided into operational domains:
 
 ```mermaid
 erDiagram
+    User ||--o{ JournalEntry : creates
     FinancialYear ||--o{ VoucherSequence : contains
     FinancialYear ||--o{ Invoice : records
-    Customer ||--o{ Invoice : bills
-    Customer ||--o{ Project : owns
-    Project ||--o{ Invoice : generates
-    Invoice ||--o{ InvoiceItem : lists
+    Customer ||--o{ Invoice : receives
+    Invoice ||--o{ InvoiceItem : contains
     Invoice ||--o{ InvoicePayment : collects
     Account ||--o{ JournalLine : tracks
-    JournalEntry ||--o{ JournalLine : balances
-    BankAccount ||--o{ BankTransaction : records
-    Supplier ||--o{ PurchaseOrder : receives
+    JournalEntry ||--o{ JournalLine : contains
+    BankAccount ||--o{ BankTransaction : logs
+    Supplier ||--o{ PurchaseOrder : fulfills
     PurchaseOrder ||--o{ PurchaseBill : converts
-    Contractor ||--o{ ContractorMilestone : assigns
+    Contractor ||--o{ ContractorMilestone : completes
 ```
 
-### Domain Model Specifications
+### 3.1 Core Entity Dictionary
 
-#### 1. Core & Accounting Ledger
-* **`User`:** Corporate identity, hashed password (bcrypt), role enum (`SUPER_ADMIN`, `MANAGING_DIRECTOR`, `ACCOUNTANT`, `HR_MANAGER`, `SITE_SUPERVISOR`), and active status.
-* **`Account`:** General ledger chart of accounts. Includes code (`1010`, `1020`, `2010`, etc.), name, type (`ASSET`, `LIABILITY`, `EQUITY`, `INCOME`, `EXPENSE`), subtype, opening balance, and current balance.
-* **`JournalEntry` & `JournalLine`:** The core double-entry foundation. Every entry carries an auto-generated entry number, date, voucher type, status (`POSTED`, `DRAFT`, `REVERSED`), and child lines with debit and credit amounts.
-* **`FinancialYear` & `VoucherSequence`:** Controls fiscal period bounds (e.g. `2026-27`), period lock status (`isLocked`), and per-voucher sequential numbering.
-
-#### 2. Sales & Accounts Receivable (AR)
-* **`Customer`:** Client profile, legal business name, GSTIN, PAN, state code, credit terms, and opening receivables.
-* **`Invoice`:** Works contract tax invoice. Tracks `invoiceNumber` (e.g. `SR/26-27/0033`), customer relation, project relation, subtotal, CGST, SGST, IGST, adjustment, total amount, balance due, and status (`DRAFT`, `UNPAID`, `PARTIAL`, `PAID`, `VOID`).
-* **`InvoiceItem`:** Line item with description, HSN/SAC code, quantity, unit rate, tax rate, and computed taxable value.
-* **`Estimate` & `SalesOrder`:** Pre-billing workflow records with status lifecycle and 1-click conversion to invoices.
-* **`CreditDebitNote`:** Downward tax and price adjustments referencing original invoices.
-
-#### 3. Banking, Liquidity & Cash Flow
-* **`BankAccount`:** Bank accounts (primarily ICICI Bank `155205003161`). Stores branch, IFSC, account type, opening balance, and live ledger balance.
-* **`BankTransaction`:** Inflow/outflow entries with voucher reference, payee/payer details, and reconciliation status.
-* **`CashBookEntry` & `DailyCashClosing`:** Petty cash register with physical denomination validation and shift balance verification.
-
-#### 4. Site Operations, Inventory & Heavy Machinery
-* **`Project`:** Site profile, location, contract value, customer, status (`PLANNING`, `IN_PROGRESS`, `COMPLETED`), and milestone costing.
-* **`MachineAsset`:** Heavy equipment (Welding Sets, Cutting Machines, Breakers, Screwing Machines, Testers) with serial numbers, count, and custody location.
-* **`CargoVehicle` & `VehicleTripLog`:** Logistics vehicles, driver details, odometer readings, and delivery fuel logs.
-* **`RoofingPriceItem`:** 290 standard pre-configured catalog items with HSN codes, default rates, and category classifications.
+| Model | Table Name | Purpose | Key Attributes |
+| :--- | :--- | :--- | :--- |
+| **`User`** | `User` | Corporate user accounts & RBAC | `email`, `passwordHash`, `role`, `permissions`, `active` |
+| **`FinancialYear`**| `FinancialYear`| Fiscal year bounds & lock status | `name` ("2026-27"), `startDate`, `endDate`, `isLocked`, `isCurrent` |
+| **`VoucherSequence`**| `VoucherSequence`| Sequential numbering engine | `voucherType`, `prefix` ("SR/26-27/"), `nextNumber`, `paddingLength` |
+| **`Account`** | `Account` | Chart of accounts general ledger | `code` ("1010"), `name`, `type`, `subType`, `currentBalance` |
+| **`JournalEntry`** | `JournalEntry` | Master double-entry voucher header | `entryNumber` ("JV/26-27/0001"), `date`, `voucherType`, `totalDebit`, `totalCredit`, `status` |
+| **`JournalLine`** | `JournalLine` | Individual debit/credit lines | `accountId`, `debit`, `credit`, `narration`, `projectId`, `customerId` |
+| **`Customer`** | `Customer` | Accounts Receivable clients | `name`, `gstin`, `pan`, `billingAddress`, `shippingAddress`, `creditPeriodDays` |
+| **`Invoice`** | `Invoice` | Sales GST tax invoices | `invoiceNumber` ("SR/26-27/0033"), `subTotal`, `cgstTotal`, `sgstTotal`, `totalAmount`, `balanceDue`, `status` |
+| **`InvoiceItem`** | `InvoiceItem` | Invoice line items | `description`, `hsnCode`, `quantity`, `unitRate`, `cgstRate`, `sgstRate`, `totalAmount` |
+| **`Supplier`** | `Supplier` | Creditors & material vendors | `name`, `gstin`, `pan`, `bankName`, `accountNumber`, `ifsc` |
+| **`PurchaseBill`** | `PurchaseBill` | Vendor accounts payable bills | `billNumber`, `supplierId`, `billDate`, `dueDate`, `totalAmount`, `balanceDue` |
+| **`BankAccount`** | `BankAccount` | Bank accounts & treasury | `bankName` ("ICICI Bank"), `accountNumber` ("155205003161"), `ifsc`, `currentBalance` |
+| **`BankTransaction`**| `BankTransaction`| Bank deposit/withdrawal ledger | `voucherNumber`, `type`, `amount`, `payeeOrPayer`, `isReconciled` |
+| **`CashBookEntry`**| `CashBookEntry`| Petty cash daily transactions | `entryType` (`INFLOW`/`OUTFLOW`), `amount`, `partyName`, `runningBalance` |
+| **`DailyCashClosing`**| `DailyCashClosing`| Cash verification with denominations | `date`, `bookBalance`, `physicalBalance`, `discrepancy`, `denominations` |
+| **`Project`** | `Project` | Roofing & PEB site contracts | `code` ("SR-PRJ-2601"), `name`, `contractValue`, `siteLocation`, `status` |
+| **`MachineAsset`** | `MachineAsset` | SRM heavy tools & plant assets | `assetCode` ("SRM-WLD-01"), `name`, `srFinalCount`, `status` |
+| **`CargoVehicle`** | `CargoVehicle` | Transport & logistics vehicles | `registrationNumber`, `vehicleType`, `capacityTons`, `status` |
+| **`Contractor`** | `Contractor` | Subcontractor directory | `name`, `pan`, `tdsRate`, `specialization`, `active` |
+| **`ContractorMilestone`**| `ContractorMilestone`| Subcontractor progress claims | `contractorId`, `projectId`, `milestoneName`, `claimAmount`, `tdsAmount`, `netPayable` |
+| **`LabourMuster`** | `LabourMuster` | Daily labour shift attendance | `date`, `labourId`, `shiftType`, `overtimeHours`, `wageRate`, `netPayable` |
+| **`RoofingPriceItem`**| `RoofingPriceItem`| 290 catalog master items | `itemCode`, `name`, `category`, `hsnSacCode`, `unitPrice`, `taxRate` |
+| **`AuditLog`** | `AuditLog` | Immutable system audit trail | `userId`, `action`, `entityName`, `entityId`, `details`, `ipAddress` |
+| **`CompanySettings`**| `CompanySettings`| Global enterprise parameters | `companyName`, `gstin`, `pan`, `address`, `phone`, `email` |
 
 ---
 
-## 4. Indian GST Calculation & Double-Entry Accounting Engine
+## 4. Double-Entry Accounting Engine & GST Taxation Math
 
-### 4.1 Statutory GST Taxation Math
-* **Place of Supply Rule:**
-  * When `Customer.stateCode === "33"` (Tamil Nadu):
-    $$\text{CGST} = \text{Taxable Value} \times 9\%$$
-    $$\text{SGST} = \text{Taxable Value} \times 9\%$$
-    $$\text{IGST} = 0$$
-  * When `Customer.stateCode !== "33"` (Outside Tamil Nadu):
-    $$\text{CGST} = 0, \quad \text{SGST} = 0$$
-    $$\text{IGST} = \text{Taxable Value} \times 18\%$$
-* **Rounding / Adjustment (5999):**
-  $$\text{Invoice Total} = \text{Round}(\text{SubTotal} + \text{Taxes})$$
-  $$\text{Adjustment} = \text{Invoice Total} - (\text{SubTotal} + \text{Taxes})$$
+### 4.1 Statutory Indian GST Rules & Calculations
+* **Place of Supply Logic:**
+  * When `Customer.stateCode === "33"` (Tamil Nadu intra-state transaction):
+    $$\text{Taxable Value} = \sum (\text{Qty} \times \text{Rate})$$
+    $$\text{CGST Amount} = \text{Taxable Value} \times 9\%$$
+    $$\text{SGST Amount} = \text{Taxable Value} \times 9\%$$
+    $$\text{IGST Amount} = 0$$
+  * When `Customer.stateCode !== "33"` (Inter-state transaction):
+    $$\text{CGST Amount} = 0, \quad \text{SGST Amount} = 0$$
+    $$\text{IGST Amount} = \text{Taxable Value} \times 18\%$$
+* **Rounding / Adjustment (Account 5999):**
+  $$\text{Invoice Total} = \text{Round}(\text{Taxable Value} + \text{Taxes})$$
+  $$\text{Adjustment} = \text{Invoice Total} - (\text{Taxable Value} + \text{Taxes})$$
 
-### 4.2 Standard Double-Entry Ledger Posting Rules
+### 4.2 Balanced Double-Entry Journal Posting Matrix
 
-| Transaction Type | Debit Leg (Dr) | Credit Leg (Cr) | Purpose |
+| Transaction Type | Debit Ledger (Dr) | Credit Ledger (Cr) | Mathematical Integrity |
 | :--- | :--- | :--- | :--- |
-| **Sales Works Tax Invoice** | **Dr** Debtors Control (1030) | **Cr** Works Contract Revenue (4010)<br>**Cr** Output CGST (2020)<br>**Cr** Output SGST (2030)<br>**Cr/Dr** Round Off (5999) | Recognizes sales revenue and statutory GST output liability. |
-| **Client Invoice Payment** | **Dr** ICICI Bank (1020) or Cash (1010) | **Cr** Debtors Control (1030) | Extinguishes customer receivable upon receipt. |
-| **Vendor Purchase Bill** | **Dr** Raw Material Purchases (5010)<br>**Dr** Input CGST (1050)<br>**Dr** Input SGST (1060) | **Cr** Creditors Control (2010) | Records procurement expense and claims statutory ITC. |
-| **Bank Contra (Cash Deposit)** | **Dr** ICICI Bank (1020) | **Cr** Cash in Hand (1010) | Transfers physical petty cash into bank account. |
-| **Site Expense Claim** | **Dr** Relevant Direct Site Expense (50XX) | **Cr** Cash (1010) or Employee Payable | Records daily site operational costs. |
+| **Sales Tax Invoice** | **Dr** Debtors Control (`1030`) | **Cr** Sales Revenue (`4010`)<br>**Cr** Output CGST (`2020`)<br>**Cr** Output SGST (`2030`)<br>**Cr/Dr** Round Off (`5999`) | $\text{Dr}(1030) = \text{Cr}(4010) + \text{Cr}(2020) + \text{Cr}(2030) \pm \text{RoundOff}$ |
+| **Customer Payment Received** | **Dr** ICICI Bank (`1020`) | **Cr** Debtors Control (`1030`) | $\text{Dr}(1020) = \text{Cr}(1030)$ |
+| **Vendor Purchase Bill** | **Dr** Material Purchases (`5010`)<br>**Dr** Input CGST (`1050`)<br>**Dr** Input SGST (`1060`) | **Cr** Creditors Control (`2010`) | $\text{Dr}(5010) + \text{Dr}(1050) + \text{Dr}(1060) = \text{Cr}(2010)$ |
+| **Bank Contra (Cash Deposit)**| **Dr** ICICI Bank (`1020`) | **Cr** Cash in Hand (`1010`) | $\text{Dr}(1020) = \text{Cr}(1010)$ |
+| **Bank Contra (Cash Withdrawal)**| **Dr** Cash in Hand (`1010`) | **Cr** ICICI Bank (`1020`) | $\text{Dr}(1010) = \text{Cr}(1020)$ |
+| **Contractor Milestone Claim** | **Dr** Sub-Contractor Charges (`5020`)| **Cr** Contractor Payable (`2010`)<br>**Cr** TDS Payable Sec 194C (`2040`) | $\text{Dr}(5020) = \text{Cr}(2010) + \text{Cr}(2040)$ |
 
 ---
 
 ## 5. Security, Session Guard & Zero BFcache Architecture
 
-### 5.1 HTTP Anti-Cache Edge Security (`src/middleware.ts`)
-To protect financial confidentiality on shared or office desktop terminals, the application intercepts all requests to protected routes (`/invoices`, `/banking`, `/customers`, etc.) and attaches strict HTTP response headers:
-```http
-Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate
-Pragma: no-cache
-Expires: 0
-Surrogate-Control: no-store
+### 5.1 HTTP Anti-Cache Response Headers (`src/middleware.ts`)
+To prevent sensitive financial and tax information from residing in browser disk caches:
+```typescript
+const response = NextResponse.next();
+response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+response.headers.set('Pragma', 'no-cache');
+response.headers.set('Expires', '0');
+response.headers.set('Surrogate-Control', 'no-store');
+return response;
 ```
 
 ### 5.2 Client Session Guard (`src/components/layout/AppShell.tsx`)
-A client-side listener listens to browser navigation events:
+Prevents unauthorized history traversal via the browser's Back/Forward Cache (BFcache):
 ```typescript
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) {
-    // Page was restored from bfcache (Back/Forward cache)
-    window.location.reload();
-  }
-});
+useEffect(() => {
+  const handlePageShow = (event: PageTransitionEvent) => {
+    if (event.persisted) {
+      window.location.reload();
+    }
+  };
+  window.addEventListener('pageshow', handlePageShow);
+  return () => window.removeEventListener('pageshow', handlePageShow);
+}, []);
 ```
-When a user logs out, the authentication cookie is destroyed, local cache is flushed, and `window.location.replace('/login')` replaces browser history. Pressing the Back arrow immediately forces a server re-validation which redirects to `/login`.
 
 ---
 
-## 6. Complete API Endpoints Specification
+## 6. Complete REST API & Server Action Specifications
 
-| Endpoint | Method | Role Required | Description |
-| :--- | :--- | :--- | :--- |
-| `/api/auth/login` | `POST` | Public | Authenticates credentials, sets HTTP-only session cookie. |
-| `/api/auth/logout` | `POST` | Authenticated | Clears JWT session cookie and invalidates session. |
-| `/api/invoices` | `GET, POST` | Accountant+ | Lists invoices or creates a new GST tax invoice with journal posting. |
-| `/api/invoices/[id]` | `GET, PUT, DELETE`| Accountant+ | Retrieves, updates, or soft-deletes (archives) an invoice. |
-| `/api/banking/contra` | `POST` | Accountant+ | Executes cash-to-bank or bank-to-bank double-entry contra transfer. |
-| `/api/banking/reconcile`| `POST` | Accountant+ | Matches ledger records against imported bank statements. |
-| `/api/cashbook/closing`| `POST` | Accountant+ | Records physical denomination count and shift verification. |
-| `/api/import/[entity]` | `POST` | Accountant+ | Bulk spreadsheet parser and dry-run upsert validator. |
-| `/api/reports/export` | `GET` | Accountant+ | Generates downloadable Excel reports for P&L, Balance Sheet, GSTR. |
-| `/api/settings/backup` | `GET` | Super Admin | Generates encrypted full JSON snapshot of all database tables. |
-| `/api/settings/fy-lock`| `POST` | Super Admin | Toggles period lock status for closed financial quarters. |
+| Endpoint | Method | Role | Payload Schema | Response Format |
+| :--- | :--- | :--- | :--- | :--- |
+| `/api/auth/login` | `POST` | Public | `{ email, password }` | `{ success: true, user: { id, name, role } }` |
+| `/api/auth/logout` | `POST` | Any | None | Sets expired cookie, flushes session |
+| `/api/invoices` | `GET` | Accountant+ | Query: `?status=&page=&search=` | `{ invoices: Invoice[], totalCount: number }` |
+| `/api/invoices` | `POST` | Accountant+ | `{ customerId, date, dueDate, items: [...] }` | `{ success: true, invoice: Invoice, journalId }` |
+| `/api/invoices/[id]` | `DELETE` | Accountant+ | None | Soft-deletes: sets `isArchived: true` |
+| `/api/banking/contra` | `POST` | Accountant+ | `{ fromAccountId, toAccountId, amount, date }` | `{ success: true, voucherNumber: string }` |
+| `/api/banking/reconcile`| `POST` | Accountant+ | `{ transactionId, statementRef, reconciledDate }` | `{ success: true, updatedBalance: number }` |
+| `/api/cashbook/closing`| `POST` | Accountant+ | `{ date, denominations: { 2000, 500... }, physicalTotal }` | `{ success: true, status: "BALANCED" \| "DISCREPANCY" }` |
+| `/api/settings/backup` | `GET` | Super Admin | None | Application/json attachment with full table dump |
+| `/api/settings/fy-lock`| `POST` | Super Admin | `{ financialYearId, isLocked: boolean }` | `{ success: true, lockedStatus: boolean }` |
 
 ---
 
-## 7. Universal UI Components & Visual Analytics Architecture
+## 7. Universal UI Component Engine & Mathematical Spline Charting
 
-### 7.1 Universal Module Header (`ModuleHeaderWithAnalytics.tsx`)
-A shared component deployed across all 28 modules providing:
-* 4 mini trend cards with positive/negative delta badges.
-* Collapsible charts section with `Show / Hide Analytics` toggle.
-* Standardized Zoho module toolbar with status dropdown, search bar, bulk import, Excel export, and PDF print buttons.
+### 7.1 Master Header with Analytics (`ModuleHeaderWithAnalytics.tsx`)
+A unified modular wrapper providing:
+* 4 real-time KPI trend cards with delta pills.
+* Smooth collapsible visual analytics strip with responsive SVG charting.
+* Standardized Zoho module toolbar with status filter dropdown, search bar with debounce, bulk import modal launcher, Excel export, and PDF print buttons.
 
 ### 7.2 Mathematical Cubic Bézier Spline Chart Engine
-Used in the home financial command center for silky, organic cash flow curves:
+Used in the Executive Command Center to render silky smooth curves:
 ```typescript
 function getSmoothSpline(points: { x: number; y: number }[]): string {
   if (points.length === 0) return "";
@@ -212,40 +227,36 @@ function getSmoothSpline(points: { x: number; y: number }[]): string {
 
 ---
 
-## 8. Data Protection, Backup & Disaster Recovery Guide
+## 8. Data Protection, Point-in-Time Recovery & JSON Backups
 
-1. **Strict Soft-Delete Principle:** No row in `Invoice`, `Customer`, `Project`, `Account`, or `MachineAsset` is ever permanently deleted via standard UI actions. Every model implements `isArchived: Boolean @default(false)` and `archivedAt: DateTime?`.
-2. **Neon Cloud Automated Snapshots:** Neon PostgreSQL provides point-in-time recovery (PITR) with continuous write-ahead log (WAL) archiving.
-3. **JSON Database Export:** The Super Admin can trigger `/api/settings/backup` at any time to receive a single portable JSON file containing all relational table rows for cold offline storage.
+### 8.1 Non-Destructive Data Protection
+Every critical accounting model implements soft-delete semantics:
+```prisma
+isArchived  Boolean   @default(false)
+archivedAt  DateTime?
+```
+Database indexes filter by `WHERE isArchived = false` for active operational views while preserving records for statutory auditing and historical reporting.
+
+### 8.2 JSON Cold Backup & Restoration
+* **Trigger:** Accessed via **Settings > Database Backup** (`/api/settings/backup`).
+* **Format:** Generates an encrypted JSON payload containing relational dumps of all tables.
+* **Restoration:** Restores complete ledger state in case of platform migration.
 
 ---
 
-## 9. Deployment, Environment Setup & Cloudflare Tunneling
+## 9. Production Deployment, Cloudflare Tunneling & CI/CD
 
-### 9.1 Environment Configuration (`.env`)
-```env
-# Neon Cloud Serverless PostgreSQL connection
-DATABASE_URL="postgresql://[user]:[password]@ep-sample-pooler.us-east-2.aws.neon.tech/standardroofs_db?sslmode=require"
-DIRECT_URL="postgresql://[user]:[password]@ep-sample.us-east-2.aws.neon.tech/standardroofs_db?sslmode=require"
-
-# JWT Secret for Session Cookies
-JWT_SECRET="e9a71b...min-32-chars-hex..."
-
-# Application Public Hostname
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-```
-
-### 9.2 Build & Execution
+### 9.1 Production Compilation
 ```bash
-# Compile optimized production bundle
+# Build optimized production bundle
 npm run build
 
-# Start production server
+# Start Next.js server on designated port
 npm run start
 ```
 
-### 9.3 Cloudflare Zero-Trust Secure Tunnelling
+### 9.2 Zero-Trust Cloudflare Tunnel
 ```bash
 cloudflared tunnel --url http://localhost:3000
 ```
-Provides an encrypted public URL with DDoS mitigation and SSL termination without opening local router firewall ports.
+This enables secure external connectivity to the Next.js server without requiring public IP exposure or router port forwarding.
