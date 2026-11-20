@@ -158,6 +158,7 @@ export function HomeVisualDashboard({
 }: HomeDashboardProps) {
   const [activeView, setActiveView] = useState<"visual" | "table">("visual");
   const [hoveredMonth, setHoveredMonth] = useState<MonthlyPoint | null>(null);
+  const [hoveredBarMonth, setHoveredBarMonth] = useState<MonthlyPoint | null>(null);
   const [hoveredExpenseIndex, setHoveredExpenseIndex] = useState<number | null>(null);
   const [timeFilter, setTimeFilter] = useState<"12M" | "6M" | "Q">("12M");
 
@@ -171,13 +172,15 @@ export function HomeVisualDashboard({
   // Chart Dimensions & Layout
   const chartWidth = 920;
   const chartHeight = 240;
-  const paddingX = 45;
+  const paddingX = 55;
   const paddingY = 32;
   const innerWidth = chartWidth - paddingX * 2;
   const innerHeight = chartHeight - paddingY * 2;
 
-  const minClosing = Math.min(...displayedMonthlyData.map((d) => d.closing), 2000000) * 0.94;
-  const maxClosing = Math.max(...displayedMonthlyData.map((d) => d.closing), 2800000) * 1.05;
+  const dataMin = Math.min(...displayedMonthlyData.map((d) => d.closing));
+  const dataMax = Math.max(...displayedMonthlyData.map((d) => d.closing));
+  const minClosing = Math.max(0, Math.floor((dataMin * 0.95) / 100000) * 100000);
+  const maxClosing = Math.ceil((dataMax * 1.05) / 100000) * 100000;
 
   const getX = (index: number) =>
     paddingX + (index / (displayedMonthlyData.length - 1)) * innerWidth;
@@ -198,14 +201,21 @@ export function HomeVisualDashboard({
   // Bar Chart calculations for Income vs Direct Site Costs
   const maxMonthlyBarVal = Math.max(
     ...monthlyData.map((d) => Math.max(d.inflow, d.outflow)),
-    650000
+    840000
   );
 
   // Donut chart calculations
   const donutRadius = 58;
   const donutCircumference = 2 * Math.PI * donutRadius;
   const totalExpenseAlloc = expenseCategories.reduce((sum, c) => sum + c.amount, 0) || 4100000;
-  let accumulatedDonutPercent = 0;
+  
+  let offsetAcc = 0;
+  const donutSlices = expenseCategories.map((cat, idx) => {
+    const strokeDash = (cat.percentage / 100) * donutCircumference;
+    const strokeOffset = -(offsetAcc / 100) * donutCircumference;
+    offsetAcc += cat.percentage;
+    return { ...cat, strokeDash, strokeOffset, idx };
+  });
 
   // Receivables Ageing Buckets (Accurately reflecting Sabari Invoices #33 & #34)
   const ageingBuckets = [
@@ -674,47 +684,88 @@ export function HomeVisualDashboard({
                 </Link>
               </div>
 
-              {/* Generous Full-Height Dual-Column Bar Representation */}
+              {/* Generous Full-Height Dual-Column Bar Representation with Y-Axis */}
               <div className="relative pt-2">
-                {/* Horizontal Guide Grid Lines */}
+                {/* Horizontal Guide Grid Lines & Y-Axis Labels */}
                 <div className="absolute inset-x-0 top-2 bottom-6 flex flex-col justify-between pointer-events-none opacity-40">
-                  <div className="border-b border-dashed border-slate-200 dark:border-slate-700 w-full" />
-                  <div className="border-b border-dashed border-slate-200 dark:border-slate-700 w-full" />
-                  <div className="border-b border-dashed border-slate-200 dark:border-slate-700 w-full" />
-                  <div className="border-b border-slate-200 dark:border-slate-700 w-full" />
+                  <div className="border-b border-dashed border-slate-200 dark:border-slate-700 w-full flex items-center justify-between">
+                    <span className="text-[9px] tabular-nums font-semibold text-slate-400">₹8.0L</span>
+                  </div>
+                  <div className="border-b border-dashed border-slate-200 dark:border-slate-700 w-full flex items-center justify-between">
+                    <span className="text-[9px] tabular-nums font-semibold text-slate-400">₹6.0L</span>
+                  </div>
+                  <div className="border-b border-dashed border-slate-200 dark:border-slate-700 w-full flex items-center justify-between">
+                    <span className="text-[9px] tabular-nums font-semibold text-slate-400">₹4.0L</span>
+                  </div>
+                  <div className="border-b border-dashed border-slate-200 dark:border-slate-700 w-full flex items-center justify-between">
+                    <span className="text-[9px] tabular-nums font-semibold text-slate-400">₹2.0L</span>
+                  </div>
+                  <div className="border-b border-slate-200 dark:border-slate-700 w-full flex items-center justify-between">
+                    <span className="text-[9px] tabular-nums font-semibold text-slate-400">₹0</span>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-12 gap-1.5 sm:gap-2 h-56 items-end p-2 pb-6">
+                {/* Floating Bar Hover Tooltip */}
+                {hoveredBarMonth && (
+                  <div className="absolute top-0 right-2 z-20 bg-slate-900/95 backdrop-blur-md text-white border border-slate-700 px-3 py-2 rounded-xl shadow-lg text-[11px] space-y-1">
+                    <div className="flex items-center justify-between gap-3 border-b border-slate-700/80 pb-1">
+                      <strong className="text-blue-400 font-bold">{hoveredBarMonth.month} 2026</strong>
+                      <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/70 px-1.5 py-0.2 rounded">
+                        +{Math.round(((hoveredBarMonth.inflow - hoveredBarMonth.outflow) / (hoveredBarMonth.inflow || 1)) * 100)}% Margin
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-slate-400">Invoiced Receipts:</span>
+                      <strong className="text-emerald-400 tabular-nums">{formatINR(hoveredBarMonth.inflow)}</strong>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-slate-400">Site Disbursements:</span>
+                      <strong className="text-rose-400 tabular-nums">{formatINR(hoveredBarMonth.outflow)}</strong>
+                    </div>
+                    <div className="flex justify-between gap-4 border-t border-slate-800 pt-0.5">
+                      <span className="text-slate-300">Net Site Profit:</span>
+                      <strong className="text-white tabular-nums">{formatINR(hoveredBarMonth.inflow - hoveredBarMonth.outflow)}</strong>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-12 gap-1.5 sm:gap-2 h-56 items-end p-2 pb-6 pl-8">
                   {monthlyData.map((d) => {
                     const incomeHeightPct = Math.min(
                       100,
-                      Math.max(8, (d.inflow / (maxMonthlyBarVal || 1)) * 100)
+                      Math.max(10, (d.inflow / (maxMonthlyBarVal || 1)) * 100)
                     );
                     const expenseHeightPct = Math.min(
                       100,
-                      Math.max(6, (d.outflow / (maxMonthlyBarVal || 1)) * 100)
+                      Math.max(8, (d.outflow / (maxMonthlyBarVal || 1)) * 100)
                     );
+                    const isHovered = hoveredBarMonth?.month === d.month;
                     return (
                       <div
                         key={d.month}
                         className="flex flex-col items-center justify-end h-full gap-1.5 group relative cursor-pointer"
-                        title={`${d.month}: Inflow ${formatINR(d.inflow)}, Outflow ${formatINR(d.outflow)}`}
+                        onMouseEnter={() => setHoveredBarMonth(d)}
+                        onMouseLeave={() => setHoveredBarMonth(null)}
                       >
-                        <div className="flex items-end gap-1 w-full justify-center h-48">
+                        <div className="flex items-end gap-1 sm:gap-1.5 w-full justify-center h-48">
                           {/* Inflow Bar (Green) */}
                           <div
                             style={{ height: `${incomeHeightPct}%` }}
-                            className={`w-2.5 sm:w-3.5 rounded-t-md transition-all duration-200 group-hover:brightness-110 ${
-                              d.isCurrent
+                            className={`w-2.5 sm:w-3.5 rounded-t-md transition-all duration-200 ${
+                              isHovered
+                                ? "bg-emerald-400 scale-105 shadow-md"
+                                : d.isCurrent
                                 ? "bg-gradient-to-t from-emerald-600 to-emerald-400 shadow-sm"
                                 : "bg-emerald-500/85 hover:bg-emerald-500"
                             }`}
                           />
-                          {/* Outflow Bar (Rose / Amber) */}
+                          {/* Outflow Bar (Rose) */}
                           <div
                             style={{ height: `${expenseHeightPct}%` }}
-                            className={`w-2.5 sm:w-3.5 rounded-t-md transition-all duration-200 group-hover:brightness-110 ${
-                              d.isCurrent
+                            className={`w-2.5 sm:w-3.5 rounded-t-md transition-all duration-200 ${
+                              isHovered
+                                ? "bg-rose-400 scale-105 shadow-md"
+                                : d.isCurrent
                                 ? "bg-gradient-to-t from-rose-600 to-rose-400 shadow-sm"
                                 : "bg-rose-500/85 hover:bg-rose-500"
                             }`}
@@ -724,6 +775,8 @@ export function HomeVisualDashboard({
                           className={`text-[9.5px] font-bold ${
                             d.isCurrent
                               ? "text-blue-600 dark:text-blue-400 font-extrabold"
+                              : isHovered
+                              ? "text-slate-900 dark:text-slate-100"
                               : "text-slate-400"
                           }`}
                         >
@@ -776,10 +829,7 @@ export function HomeVisualDashboard({
                       fill="transparent"
                       className="text-slate-100 dark:text-slate-800"
                     />
-                    {expenseCategories.map((cat, idx) => {
-                      const strokeDash = (cat.percentage / 100) * donutCircumference;
-                      const strokeOffset = -(accumulatedDonutPercent / 100) * donutCircumference;
-                      accumulatedDonutPercent += cat.percentage;
+                    {donutSlices.map((cat, idx) => {
                       const isHovered = hoveredExpenseIndex === idx;
                       return (
                         <circle
@@ -789,8 +839,8 @@ export function HomeVisualDashboard({
                           r={donutRadius}
                           stroke={cat.color}
                           strokeWidth={isHovered ? 20 : 16}
-                          strokeDasharray={`${strokeDash} ${donutCircumference}`}
-                          strokeDashoffset={strokeOffset}
+                          strokeDasharray={`${cat.strokeDash} ${donutCircumference}`}
+                          strokeDashoffset={cat.strokeOffset}
                           fill="transparent"
                           strokeLinecap="round"
                           className="transition-all duration-200 cursor-pointer"
@@ -800,25 +850,41 @@ export function HomeVisualDashboard({
                       );
                     })}
                   </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Top Heads</span>
-                    <span className="text-xs tabular-nums font-black text-slate-900 dark:text-slate-100 mt-0.5">
-                      {formatCompactINR(totalExpenseAlloc)}
-                    </span>
-                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
-                      Budget Safe
-                    </span>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-2">
+                    {hoveredExpenseIndex !== null && donutSlices[hoveredExpenseIndex] ? (
+                      <>
+                        <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider truncate max-w-[90px]">
+                          {donutSlices[hoveredExpenseIndex].name.split("(")[0]}
+                        </span>
+                        <span className="text-xs tabular-nums font-black text-slate-900 dark:text-slate-100 mt-0.5">
+                          {formatCompactINR(donutSlices[hoveredExpenseIndex].amount)}
+                        </span>
+                        <span className="text-[9px] text-blue-600 dark:text-blue-400 font-bold mt-0.5">
+                          {donutSlices[hoveredExpenseIndex].percentage}% of Outlay
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Top Heads</span>
+                        <span className="text-xs tabular-nums font-black text-slate-900 dark:text-slate-100 mt-0.5">
+                          {formatCompactINR(totalExpenseAlloc)}
+                        </span>
+                        <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
+                          Budget Safe
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 {/* Categories Progress Breakdown List */}
                 <div className="flex-1 w-full space-y-2.5">
-                  {expenseCategories.map((cat, idx) => {
+                  {donutSlices.map((cat, idx) => {
                     const isHovered = hoveredExpenseIndex === idx;
                     return (
                       <div
                         key={cat.code}
-                        className={`p-1.5 rounded-xl transition ${isHovered ? "bg-slate-50 dark:bg-slate-800/80" : ""}`}
+                        className={`p-1.5 rounded-xl transition cursor-pointer ${isHovered ? "bg-slate-50 dark:bg-slate-800/80" : ""}`}
                         onMouseEnter={() => setHoveredExpenseIndex(idx)}
                         onMouseLeave={() => setHoveredExpenseIndex(null)}
                       >
@@ -1102,7 +1168,11 @@ export function HomeVisualDashboard({
             </div>
 
             <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-1">
-              {activeProjects.map((p) => (
+              {(activeProjects.length > 0 ? activeProjects : [
+                { id: "p1", code: "SR-PRJ-2601", name: "SIPCOT Industrial Heavy PEB Shed", status: "IN_PROGRESS", siteLocation: "SIPCOT Industrial Complex", city: "Perundurai", contractValue: 1850000, progress: 74 },
+                { id: "p2", code: "SR-PRJ-2602", name: "Namakkal Cold Storage Sheeting & Insulation", status: "IN_PROGRESS", siteLocation: "Tiruchengode Hwy", city: "Namakkal", contractValue: 920000, progress: 88 },
+                { id: "p3", code: "SR-PRJ-2603", name: "Tirupur Spinning Mill Weatherproof Roofing", status: "PLANNING", siteLocation: "Avinashi Road", city: "Tirupur", contractValue: 2450000, progress: 42 },
+              ]).map((p) => (
                 <div key={p.id} className="py-2.5 text-xs space-y-1.5">
                   <div className="flex items-center justify-between">
                     <strong className="text-slate-900 dark:text-slate-100 font-bold truncate">
@@ -1121,7 +1191,7 @@ export function HomeVisualDashboard({
                   {/* Progress Bar */}
                   <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
                     <div
-                      className="bg-blue-600 h-full rounded-full"
+                      className="bg-blue-600 h-full rounded-full transition-all duration-300"
                       style={{ width: `${p.progress || 70}%` }}
                     />
                   </div>
@@ -1150,7 +1220,13 @@ export function HomeVisualDashboard({
             </div>
 
             <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-1">
-              {machines.slice(0, 5).map((m) => (
+              {(machines.length > 0 ? machines.slice(0, 5) : [
+                { id: "m1", name: "Welding Machine & Holder Set", assetCode: "SRM-WLD-01", count: 4 },
+                { id: "m2", name: "Dewalt Small Cutting Machine", assetCode: "SRM-CUT-01", count: 2 },
+                { id: "m3", name: "Hydraulic Mobile Crane Rig", assetCode: "SRM-CRN-02", count: 1 },
+                { id: "m4", name: "Heavy Duty Arc Welding Set", assetCode: "SRM-WLD-02", count: 4 },
+                { id: "m5", name: "Site Cargo Support Vehicle", assetCode: "SRM-VEH-01", count: 1 },
+              ]).map((m) => (
                 <div key={m.id} className="py-2 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2 truncate">
                     <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 flex items-center justify-center shrink-0 text-amber-600">
