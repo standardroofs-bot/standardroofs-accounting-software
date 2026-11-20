@@ -37,3 +37,9 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Local Storage Backups & Bundles
+backups/
+*.bundle
+*.zip
+
