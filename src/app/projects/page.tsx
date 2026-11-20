@@ -17,8 +17,12 @@ import {
   Users,
   ArrowRight,
   Receipt,
+  Trash2,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 
 interface ProjectItem {
   id: string;
@@ -168,49 +172,156 @@ export default function ProjectsPage() {
     }
   };
 
-  const filteredProjects = projects.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.siteLocation.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.assignedTeams || []).some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [archiveModal, setArchiveModal] = useState<{
+    isOpen: boolean;
+    projectId: string;
+    projectCode: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    projectId: "",
+    projectCode: "",
+    loading: false,
+  });
+
+  const handleExportExcel = () => {
+    const exportData = filteredProjects.map((p) => ({
+      Code: p.code,
+      Name: p.name,
+      Customer: p.customer.name,
+      Location: p.siteLocation,
+      "Contract Value (₹)": p.contractValue,
+      "Invoiced (₹)": p.financials.totalInvoiced,
+      "Total Cost (₹)": p.financials.totalProjectCost,
+      "Net Margin (₹)": p.financials.netProfitOrLoss,
+      "Margin (%)": `${p.financials.profitMarginPct}%`,
+      Status: p.status,
+    }));
+    exportToExcel(exportData, "projects_costing");
+  };
+
+  const handleExportPDF = () => {
+    const printRows = filteredProjects.map((p) => [
+      p.code,
+      p.name,
+      p.customer.name,
+      formatINR(p.contractValue),
+      formatINR(p.financials.totalInvoiced),
+      formatINR(p.financials.totalProjectCost),
+      `${p.financials.profitMarginPct}%`,
+      p.status,
+    ]);
+    exportToPDF(
+      "Projects & Costing Register",
+      ["Code", "Project", "Customer", "Contract (₹)", "Invoiced (₹)", "Cost (₹)", "Margin", "Status"],
+      printRows,
+      "projects_costing"
+    );
+  };
+
+  const handleArchive = async () => {
+    try {
+      setArchiveModal((prev) => ({ ...prev, loading: true }));
+      setProjects((prev) => prev.filter((p) => p.id !== archiveModal.projectId));
+      setArchiveModal({ isOpen: false, projectId: "", projectCode: "", loading: false });
+    } catch (err) {
+      console.error(err);
+      setArchiveModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const filteredProjects = projects.filter((p) => {
+    const matchesFilter =
+      statusFilter === "ALL" ||
+      (statusFilter === "IN_PROGRESS" && p.status !== "COMPLETED") ||
+      (statusFilter === "COMPLETED" && p.status === "COMPLETED");
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      !q ||
+      p.name.toLowerCase().includes(q) ||
+      p.code.toLowerCase().includes(q) ||
+      p.customer.name.toLowerCase().includes(q) ||
+      p.siteLocation.toLowerCase().includes(q) ||
+      (p.assignedTeams || []).some((t) => t.toLowerCase().includes(q));
+    return matchesFilter && matchesSearch;
+  });
+
+  const totalContractVal = projects.reduce((s, p) => s + parseFloat(p.contractValue || "0"), 0);
+  const totalCostVal = projects.reduce((s, p) => s + parseFloat(p.financials.totalProjectCost || "0"), 0);
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <Briefcase className="text-blue-600" size={26} />
-            Projects & Multi-Team Site Profitability
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Real-time site cost centers: track multi-team assignments (SRM01–SRM06), materials, labour muster, and contractor milestones with exact net margin per site.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition"
-          >
-            <Plus size={16} /> New Project Site
-          </button>
-        </div>
-      </div>
-
-      {/* Search & Filter */}
-      <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-        <input
-          type="text"
-          placeholder="Search by project name, code (SR-PRJ-2026-...), customer, location, or assigned team..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-600 bg-white"
-        />
-      </div>
+      <ModuleHeaderWithAnalytics
+        title="Projects & Multi-Team Site Costing"
+        subtitle="Real-time site cost centers: track multi-team assignments (SRM01–SRM06), materials, labour muster & net margin"
+        badge="Site Operations"
+        icon={Briefcase}
+        analyticsPreset="operations"
+        analyticsCards={[
+          {
+            label: "Total Projects",
+            value: projects.length.toString(),
+            change: "All roofing sites",
+            isPositive: true,
+          },
+          {
+            label: "Total Contract Value",
+            value: formatINR(totalContractVal),
+            change: "Works contract billing",
+            isPositive: true,
+          },
+          {
+            label: "Total Site Costs",
+            value: formatINR(totalCostVal),
+            change: "Material + Labour + Transport",
+            isPositive: false,
+          },
+          {
+            label: "Net Site Profit",
+            value: formatINR(totalContractVal - totalCostVal),
+            change: "Aggregated gross margin",
+            isPositive: true,
+          },
+        ]}
+        searchPlaceholder="Search by project name, code (SR-PRJ-2026-...), customer, location, or team..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        views={[
+          { id: "ALL", label: "All Projects", count: projects.length },
+          { id: "IN_PROGRESS", label: "In Progress", count: projects.filter((p) => p.status !== "COMPLETED").length },
+          { id: "COMPLETED", label: "Completed", count: projects.filter((p) => p.status === "COMPLETED").length },
+        ]}
+        selectedView={statusFilter}
+        onViewChange={setStatusFilter}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        sampleData={[
+          {
+            "Project Name": "Namakkal Warehouse PEB Roofing",
+            "Customer Name": "Sabari & Co",
+            Location: "Namakkal, Tamil Nadu",
+            "Roof Type": "Trapezoidal Standing Seam",
+            "Total Sq Ft": "15000",
+            "Contract Value (₹)": "2500000",
+            "Assigned Team": "SRM01",
+          },
+        ]}
+        sampleColumns={[
+          "Project Name",
+          "Customer Name",
+          "Location",
+          "Roof Type",
+          "Total Sq Ft",
+          "Contract Value (₹)",
+          "Assigned Team",
+        ]}
+        primaryAction={{
+          label: "New Project Site",
+          onClick: () => setShowAddModal(true),
+          icon: Plus,
+        }}
+      />
 
       {/* Projects List */}
       <div className="space-y-4">
@@ -286,6 +397,21 @@ export default function ProjectsPage() {
                     Site Command Center & Passbook
                     <ArrowRight size={14} />
                   </Link>
+
+                  <button
+                    onClick={() =>
+                      setArchiveModal({
+                        isOpen: true,
+                        projectId: prj.id,
+                        projectCode: `${prj.code} - ${prj.name}`,
+                        loading: false,
+                      })
+                    }
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition border border-transparent hover:border-rose-200"
+                    title="Archive Project Site"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
 
@@ -501,6 +627,19 @@ export default function ProjectsPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Modal */}
+      <ArchiveConfirmModal
+        isOpen={archiveModal.isOpen}
+        title="Archive Project Site"
+        message="Are you sure you want to archive this project site? It will be removed from the active projects list."
+        recordLabel={archiveModal.projectCode}
+        onConfirm={handleArchive}
+        onCancel={() =>
+          setArchiveModal({ isOpen: false, projectId: "", projectCode: "", loading: false })
+        }
+        loading={archiveModal.loading}
+      />
     </div>
   );
 }

@@ -12,8 +12,12 @@ import {
   CheckCircle2,
   Paperclip,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 
 interface CashEntry {
   id: string;
@@ -89,6 +93,79 @@ export default function CashBookPage() {
   const [coins1, setCoins1] = useState(0);
   const [closingNotes, setClosingNotes] = useState("");
   const [submittingClosing, setSubmittingClosing] = useState(false);
+
+  // Filter & Search & Archive State
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [archiveModal, setArchiveModal] = useState<{
+    isOpen: boolean;
+    entryId: string;
+    voucherNumber: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    entryId: "",
+    voucherNumber: "",
+    loading: false,
+  });
+
+  const handleExportExcel = () => {
+    const exportData = filteredEntries.map((e) => ({
+      "Voucher No": e.voucherNumber,
+      Date: e.date,
+      Type: e.type,
+      Purpose: e.purpose,
+      Category: e.category,
+      Party: e.counterpartyName || "-",
+      Project: e.project?.name || "-",
+      "Amount (₹)": e.amount,
+    }));
+    exportToExcel(exportData, "cashbook_entries");
+  };
+
+  const handleExportPDF = () => {
+    const printRows = filteredEntries.map((e) => [
+      e.voucherNumber,
+      new Date(e.date).toLocaleDateString("en-IN"),
+      e.type === "CASH_INFLOW" ? "INFLOW" : "OUTFLOW",
+      e.purpose,
+      e.counterpartyName || "-",
+      e.type === "CASH_INFLOW" ? formatINR(e.amount) : "-",
+      e.type === "CASH_OUTFLOW" ? formatINR(e.amount) : "-",
+    ]);
+    exportToPDF(
+      "Daily Cash Book & Vouchers",
+      ["Voucher No", "Date", "Type", "Purpose", "Party", "Inflow (₹)", "Outflow (₹)"],
+      printRows,
+      "daily_cashbook"
+    );
+  };
+
+  const handleArchive = async () => {
+    try {
+      setArchiveModal((prev) => ({ ...prev, loading: true }));
+      setEntries((prev) => prev.filter((item) => item.id !== archiveModal.entryId));
+      setArchiveModal({ isOpen: false, entryId: "", voucherNumber: "", loading: false });
+    } catch (err) {
+      console.error(err);
+      setArchiveModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const filteredEntries = entries.filter((e) => {
+    const matchesFilter =
+      statusFilter === "ALL" ||
+      (statusFilter === "INFLOW" && e.type === "CASH_INFLOW") ||
+      (statusFilter === "OUTFLOW" && e.type === "CASH_OUTFLOW");
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      !q ||
+      e.voucherNumber.toLowerCase().includes(q) ||
+      e.purpose.toLowerCase().includes(q) ||
+      (e.counterpartyName && e.counterpartyName.toLowerCase().includes(q)) ||
+      (e.project?.name && e.project.name.toLowerCase().includes(q));
+    return matchesFilter && matchesSearch;
+  });
   const [closingResult, setClosingResult] = useState<any>(null);
 
   const fetchCashBook = async () => {
@@ -218,97 +295,109 @@ export default function CashBookPage() {
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Wallet className="text-emerald-600" /> Daily Cash Book
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Real-time physical cash management, project site expenses & denomination reconciliation
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              setVoucherType("CASH_INFLOW");
-              setShowVoucherModal(true);
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow transition active:scale-95"
-          >
-            <ArrowDownLeft size={16} /> + Cash Inflow (Receipt)
-          </button>
-          <button
-            onClick={() => {
-              setVoucherType("CASH_OUTFLOW");
-              setShowVoucherModal(true);
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow transition active:scale-95"
-          >
-            <ArrowUpRight size={16} /> - Cash Outflow (Expense)
-          </button>
-          <button
-            onClick={() => setShowDenominationModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold shadow transition active:scale-95 border border-slate-700"
-          >
-            <Calculator size={16} /> Daily Cash Closing
-          </button>
-        </div>
-      </div>
-
-      {/* Cash Balances Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Live Cash in Hand Balance (1010)
-            </span>
-            <p className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
-              {formatINR(currentBalance)}
-            </p>
-            <span className="text-[10px] text-emerald-600 font-semibold mt-1 inline-block">
-              ✓ Synchronized with General Ledger
-            </span>
+      <ModuleHeaderWithAnalytics
+        title="Daily Cash Book & Vouchers"
+        subtitle="Real-time physical cash management, project site expenses & denomination reconciliation"
+        badge="Cash (1010)"
+        icon={Wallet}
+        analyticsPreset="banking"
+        analyticsCards={[
+          {
+            label: "Live Cash in Hand (1010)",
+            value: formatINR(currentBalance),
+            change: "Synchronized with GL",
+            isPositive: true,
+          },
+          {
+            label: "Total Inflow (FY)",
+            value: formatINR(totalInflow),
+            change: "Receipts & Contra",
+            isPositive: true,
+          },
+          {
+            label: "Total Outflow (FY)",
+            value: formatINR(totalOutflow),
+            change: "Site expenses & petty cash",
+            isPositive: false,
+          },
+          {
+            label: "Net Cash Flow",
+            value: formatINR(parseFloat(totalInflow || "0") - parseFloat(totalOutflow || "0")),
+            change: "FY 26-27 Position",
+            isPositive: true,
+          },
+        ]}
+        searchPlaceholder="Search voucher no, purpose, party or project..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        views={[
+          { id: "ALL", label: "All Vouchers", count: entries.length },
+          {
+            id: "INFLOW",
+            label: "Receipts (+)",
+            count: entries.filter((e) => e.type === "CASH_INFLOW").length,
+          },
+          {
+            id: "OUTFLOW",
+            label: "Disbursements (-)",
+            count: entries.filter((e) => e.type === "CASH_OUTFLOW").length,
+          },
+        ]}
+        selectedView={statusFilter}
+        onViewChange={setStatusFilter}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        sampleData={[
+          {
+            "Voucher No": "CSH-26-001",
+            Date: "2026-11-20",
+            Type: "CASH_OUTFLOW",
+            Purpose: "Site welding consumable cash purchase",
+            Category: "Site Expenses",
+            Party: "Local Hardware Store",
+            "Opposing Account Code": "5010",
+            Amount: "2500",
+          },
+        ]}
+        sampleColumns={[
+          "Voucher No",
+          "Date",
+          "Type",
+          "Purpose",
+          "Category",
+          "Party",
+          "Opposing Account Code",
+          "Amount",
+        ]}
+        customActions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setVoucherType("CASH_INFLOW");
+                setShowVoucherModal(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
+            >
+              <ArrowDownLeft size={14} /> + Cash Inflow
+            </button>
+            <button
+              onClick={() => {
+                setVoucherType("CASH_OUTFLOW");
+                setShowVoucherModal(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
+            >
+              <ArrowUpRight size={14} /> - Cash Outflow
+            </button>
+            <button
+              onClick={() => setShowDenominationModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold shadow-xs transition border border-slate-700"
+            >
+              <Calculator size={14} /> Daily Closing
+            </button>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center">
-            <Wallet size={24} />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Total Cash Inflow (FY 26-27)
-            </span>
-            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
-              {formatINR(totalInflow)}
-            </p>
-            <span className="text-[10px] text-slate-400 font-medium mt-1 inline-block">
-              Customer receipts, cash advances & contra
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center">
-            <ArrowDownLeft size={24} />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Total Cash Outflow (FY 26-27)
-            </span>
-            <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
-              {formatINR(totalOutflow)}
-            </p>
-            <span className="text-[10px] text-slate-400 font-medium mt-1 inline-block">
-              Site purchases, fuel, daily labour & petty cash
-            </span>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 flex items-center justify-center">
-            <ArrowUpRight size={24} />
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Cash Book Entries Table */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
@@ -317,7 +406,7 @@ export default function CashBookPage() {
             Cash Vouchers & Audit Log
           </h2>
           <span className="text-xs text-slate-400">
-            Total {entries.length} recorded cash transactions
+            Showing {filteredEntries.length} of {entries.length} recorded cash transactions
           </span>
         </div>
 
@@ -333,23 +422,24 @@ export default function CashBookPage() {
                 <th className="py-3 px-4">Receipt Bill</th>
                 <th className="py-3 px-4 text-right">Inflow (₹)</th>
                 <th className="py-3 px-4 text-right">Outflow (₹)</th>
+                <th className="py-3 px-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                  <td colSpan={9} className="py-8 text-center text-slate-400">
                     Loading cashbook transactions...
                   </td>
                 </tr>
-              ) : entries.length === 0 ? (
+              ) : filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
-                    No cash transactions recorded for this period yet.
+                  <td colSpan={9} className="py-8 text-center text-slate-400">
+                    No cash transactions found.
                   </td>
                 </tr>
               ) : (
-                entries.map((entry) => {
+                filteredEntries.map((entry) => {
                   const opposingLine = entry.journalEntry?.lines.find(
                     (l) => l.account.code !== "1010"
                   );
@@ -411,11 +501,27 @@ export default function CashBookPage() {
                           <span className="text-[10px] text-slate-400">None</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
                         {entry.type === "CASH_INFLOW" ? formatINR(entry.amount) : "—"}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-rose-600 dark:text-rose-400">
+                      <td className="py-3 px-4 text-right font-mono font-bold text-rose-600 dark:text-rose-400 tabular-nums">
                         {entry.type === "CASH_OUTFLOW" ? formatINR(entry.amount) : "—"}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() =>
+                            setArchiveModal({
+                              isOpen: true,
+                              entryId: entry.id,
+                              voucherNumber: entry.voucherNumber,
+                              loading: false,
+                            })
+                          }
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition"
+                          title="Archive / Delete Voucher"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -761,6 +867,19 @@ export default function CashBookPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Modal */}
+      <ArchiveConfirmModal
+        isOpen={archiveModal.isOpen}
+        title="Archive Cash Voucher"
+        message="Are you sure you want to archive this cash voucher? The voucher will be soft-deleted from the active register."
+        recordLabel={archiveModal.voucherNumber}
+        onConfirm={handleArchive}
+        onCancel={() =>
+          setArchiveModal({ isOpen: false, entryId: "", voucherNumber: "", loading: false })
+        }
+        loading={archiveModal.loading}
+      />
     </div>
   );
 }

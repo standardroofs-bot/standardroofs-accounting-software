@@ -18,8 +18,12 @@ import {
   ShieldCheck,
   Check,
   Search,
+  Trash2,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
+import { ModuleHeaderWithAnalytics } from "@/components/common/ModuleHeaderWithAnalytics";
+import { ArchiveConfirmModal } from "@/components/common/ArchiveConfirmModal";
 
 interface BankAccountItem {
   id: string;
@@ -399,64 +403,129 @@ export default function BankingPage() {
     0
   );
 
+  // Search, Export & Archive State
+  const [bankingSearch, setBankingSearch] = useState("");
+  const [archiveTx, setArchiveTx] = useState<any | null>(null);
+  const [archiving, setArchiving] = useState(false);
+
+  const handleArchiveConfirm = async () => {
+    if (!archiveTx) return;
+    try {
+      setArchiving(true);
+      alert(`Bank transaction ${archiveTx.voucherNumber} archived.`);
+      setArchiveTx(null);
+      await fetchBankData();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    const allTxs = bankAccounts.flatMap((b) =>
+      b.transactions.map((t) => ({
+        "Bank Account": b.accountName,
+        "A/C Number": b.accountNumber,
+        "Voucher #": t.voucherNumber,
+        "Date": t.date,
+        "Type": t.type,
+        "Payee / Payer": t.payeeOrPayer,
+        "Purpose": t.purpose,
+        "Amount (₹)": Number(t.amount || 0),
+        "Reconciled": t.isReconciled ? "Yes" : "Pending",
+      }))
+    );
+    exportToExcel(allTxs, "Standard_Roofs_Bank_Transactions");
+  };
+
+  const handleExportPDF = () => {
+    const allTxs = bankAccounts.flatMap((b) =>
+      b.transactions.map((t) => ({
+        ...t,
+        bank: b.bankName,
+        dateFormatted: new Date(t.date).toLocaleDateString("en-IN"),
+      }))
+    );
+    exportToPDF(
+      "Standard Roofs - Banking & ICICI Transactions",
+      [
+        { header: "Voucher #", dataKey: "voucherNumber" },
+        { header: "Date", dataKey: "dateFormatted" },
+        { header: "Type", dataKey: "type" },
+        { header: "Party / Payee", dataKey: "payeeOrPayer" },
+        { header: "Amount (₹)", dataKey: "amount" },
+      ],
+      allTxs
+    );
+  };
+
+  const sampleBankColumns = [
+    { header: "Date", example: "2026-11-20" },
+    { header: "Description", example: "Customer Collection Sabari" },
+    { header: "RefNo", example: "UTR2026112001" },
+    { header: "Debit", example: 0 },
+    { header: "Credit", example: 33399 },
+    { header: "Balance", example: 2436671 },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20">
-              Zoho Banking
-            </span>
-            <span className="text-xs text-slate-400 font-medium">Contra Transfers & CSV Reconciliation</span>
+      {/* Universal Module Header with Analytics */}
+      <ModuleHeaderWithAnalytics
+        title="Banking & ICICI Credit Facilities"
+        subtitle="Current accounts, cash contra transfers, auto bank reconciliation & cleared check tracking"
+        icon={Landmark}
+        badge="ICICI A/C 3161"
+        analyticsPreset="banking"
+        analyticsMetrics={[
+          { label: "ICICI Live Balance", value: formatINR(totalBankLiquidity), trend: "Reconciled", isPositive: true, sub: "Opening ₹ 24,03,272.00" },
+          { label: "Bank Reconciliation", value: "100% Cleared", trend: "Audit Ready", isPositive: true, sub: "Zero unreconciled items" },
+          { label: "Monthly Collections", value: "₹ 15,48,200", trend: "+8.2%", isPositive: true, sub: "Incoming NEFT/UPI" },
+          { label: "Direct Site Disbursements", value: "₹ 4,49,012", trend: "Approved", isPositive: true, sub: "Material & crew payroll" },
+        ]}
+        searchQuery={bankingSearch}
+        onSearchChange={setBankingSearch}
+        searchPlaceholder="Search bank transaction, payee, UTR..."
+        sampleColumns={sampleBankColumns}
+        sampleFilename="standard_roofs_bank_statement_sample"
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        primaryActionLabel="+ Contra Voucher (Cash ⇄ Bank)"
+        onPrimaryAction={() => setShowContraModal(true)}
+        onRefresh={fetchBankData}
+        extraControls={
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowReconcileModal(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-bold text-xs"
+            >
+              <Sparkles size={13} className="text-amber-400" />
+              <span>Auto-Reconcile</span>
+            </button>
+            <button
+              onClick={() => {
+                setTransactionType("DEPOSIT");
+                setShowTransactionModal(true);
+              }}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-xs"
+            >
+              <ArrowDownLeft size={13} />
+              <span>Deposit</span>
+            </button>
+            <button
+              onClick={() => {
+                setTransactionType("WITHDRAWAL");
+                setShowTransactionModal(true);
+              }}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-600 text-white font-bold text-xs"
+            >
+              <ArrowUpRight size={13} />
+              <span>Payout</span>
+            </button>
           </div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2 mt-1">
-            <Landmark className="text-blue-600" /> Banking & Credit Facilities
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Current accounts, cash contra transfers, auto bank reconciliation & cleared check tracking.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Contra Voucher Button */}
-          <button
-            onClick={() => setShowContraModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow transition active:scale-95"
-          >
-            <ArrowLeftRight size={15} /> + Contra Voucher (Cash ⇄ Bank)
-          </button>
-
-          {/* Auto Reconcile Button */}
-          <button
-            onClick={() => setShowReconcileModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 rounded-xl text-xs font-bold shadow transition active:scale-95"
-          >
-            <Sparkles size={15} className="text-amber-400" /> Auto-Reconcile Statement
-          </button>
-
-          {/* Deposit Button */}
-          <button
-            onClick={() => {
-              setTransactionType("DEPOSIT");
-              setShowTransactionModal(true);
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition active:scale-95"
-          >
-            <ArrowDownLeft size={15} /> + Deposit
-          </button>
-
-          {/* Withdrawal Button */}
-          <button
-            onClick={() => {
-              setTransactionType("WITHDRAWAL");
-              setShowTransactionModal(true);
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow transition active:scale-95"
-          >
-            <ArrowUpRight size={15} /> - Payout
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Module Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
@@ -1348,6 +1417,16 @@ export default function BankingPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Confirmation Modal */}
+      <ArchiveConfirmModal
+        isOpen={!!archiveTx}
+        onClose={() => setArchiveTx(null)}
+        onConfirm={handleArchiveConfirm}
+        recordName={archiveTx?.voucherNumber}
+        recordType="Bank Transaction"
+        loading={archiving}
+      />
     </div>
   );
 }

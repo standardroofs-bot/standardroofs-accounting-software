@@ -16,6 +16,8 @@ import {
   Calendar,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 
 export default function ApprovalsPage() {
   const [loading, setLoading] = useState(true);
@@ -82,31 +84,94 @@ export default function ApprovalsPage() {
     }
   }
 
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const handleExportExcel = () => {
+    let exportData: any[] = [];
+    if (activeTab === "expenses") {
+      exportData = data.pendingExpenses.map((exp) => ({
+        Purpose: exp.purpose,
+        Amount: exp.amount,
+        Mode: exp.paymentMode,
+        Project: exp.project?.name || "-",
+        Employee: exp.employee?.name || "-",
+        Date: exp.date,
+      }));
+    } else if (activeTab === "milestones") {
+      exportData = data.pendingMilestones.map((m) => ({
+        Project: m.project?.name || "-",
+        Contractor: m.contractor?.name || "-",
+        Milestone: m.title || "-",
+        Amount: m.amount,
+      }));
+    } else {
+      exportData = data.pendingReversals.map((r) => ({
+        Voucher: r.entryNumber,
+        Reason: r.reversalReason || "-",
+        Amount: r.totalDebit,
+      }));
+    }
+    exportToExcel(exportData, `approvals_${activeTab}`);
+  };
+
+  const handleExportPDF = () => {
+    const printRows = data.pendingExpenses.map((exp) => [
+      exp.purpose,
+      exp.project?.name || "-",
+      formatINR(exp.amount),
+      exp.paymentMode,
+      new Date(exp.date).toLocaleDateString("en-IN"),
+    ]);
+    exportToPDF("Pending Approvals Queue", ["Purpose", "Project", "Amount (₹)", "Mode", "Date"], printRows, "pending_approvals");
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-50 text-blue-700 rounded-lg">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Approvals Center</h1>
-              <p className="text-sm text-slate-500">
-                Authorized queue for site expenses, contractor milestone payouts, and voucher reversals
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-            <Clock className="w-3.5 h-3.5" />
-            {data.totalPending} Pending Approval
-          </span>
-        </div>
-      </div>
+      <ModuleHeaderWithAnalytics
+        title="Approvals & Compliance Queue"
+        subtitle="Authorized queue for site expenses, contractor milestone payouts, and voucher reversals"
+        badge="Manager Controls"
+        icon={ShieldCheck}
+        analyticsPreset="banking"
+        analyticsCards={[
+          {
+            label: "Total Items Pending",
+            value: data.totalPending.toString(),
+            change: data.totalPending > 0 ? "Requires review" : "Queue clear",
+            isPositive: data.totalPending === 0,
+          },
+          {
+            label: "Site & Travel Expenses",
+            value: data.pendingExpenses.length.toString(),
+            change: "Field vouchers",
+            isPositive: data.pendingExpenses.length === 0,
+          },
+          {
+            label: "Contractor Milestones",
+            value: data.pendingMilestones.length.toString(),
+            change: "Works contract billing",
+            isPositive: true,
+          },
+          {
+            label: "Journal Reversals",
+            value: data.pendingReversals.length.toString(),
+            change: "Audit compliance",
+            isPositive: true,
+          },
+        ]}
+        searchPlaceholder="Search approvals by purpose, contractor, project..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        views={[
+          { id: "expenses", label: "Site & Travel Expenses", count: data.pendingExpenses.length },
+          { id: "milestones", label: "Contractor Milestones", count: data.pendingMilestones.length },
+          { id: "reversals", label: "Journal Reversals", count: data.pendingReversals.length },
+        ]}
+        selectedView={activeTab}
+        onViewChange={(v) => setActiveTab(v as any)}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+      />
 
       {message && (
         <div

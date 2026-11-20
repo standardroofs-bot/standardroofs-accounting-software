@@ -5,11 +5,13 @@ import { X, Upload, Download, CheckCircle2, AlertTriangle, FileSpreadsheet, Load
 import * as XLSX from "xlsx";
 import { downloadSampleExcel } from "@/lib/exportUtils";
 
+export type SampleColumnItem = string | { header: string; example?: string | number };
+
 interface ExcelImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  sampleColumns: { header: string; example: string | number }[];
+  sampleColumns: SampleColumnItem[];
   onImport: (rows: any[]) => Promise<{ success: boolean; message?: string; count?: number }>;
   sampleFilename?: string;
 }
@@ -65,7 +67,10 @@ export function ExcelImportModal({
   };
 
   const handleDownloadSample = () => {
-    downloadSampleExcel(sampleColumns, sampleFilename);
+    const normalized = sampleColumns.map((c) =>
+      typeof c === "string" ? { header: c, example: `Sample ${c}` } : { header: c.header, example: c.example ?? "" }
+    );
+    downloadSampleExcel(normalized, sampleFilename);
   };
 
   const handleConfirmImport = async () => {

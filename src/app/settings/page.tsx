@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   RefreshCw,
 } from "lucide-react";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
 
 export default function SettingsPage() {
   const [form, setForm] = useState({
@@ -208,19 +209,40 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Settings className="h-7 w-7 text-amber-500" />
-            Company Profile, Locking & System Backup
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Configure Standard Roofs Erode identity, GSTIN, invoice sequence, period locks, and JSON database backup
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6 max-w-5xl pb-12">
+      <ModuleHeaderWithAnalytics
+        title="Company Profile, Locking & Settings"
+        subtitle="Configure Standard Roofs Erode identity, GSTIN, invoice sequence (#33), period locks, and JSON database backup"
+        badge="Super Admin"
+        icon={Settings}
+        analyticsPreset="banking"
+        analyticsCards={[
+          {
+            label: "Company GSTIN",
+            value: form.gstin || "33AEWFS5187G1ZD",
+            change: "Tamil Nadu (33) Registered",
+            isPositive: true,
+          },
+          {
+            label: "Invoice Sequence",
+            value: `#${form.invoiceNextNo || 33}`,
+            change: "Clean billing sequence",
+            isPositive: true,
+          },
+          {
+            label: "Active FY",
+            value: "FY 2026-27",
+            change: "Unlocked for postings",
+            isPositive: true,
+          },
+          {
+            label: "Default Bank",
+            value: "ICICI Bank",
+            change: "Account ...3161 active",
+            isPositive: true,
+          },
+        ]}
+      />
 
       {successMsg && (
         <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg text-emerald-800 dark:text-emerald-300 flex items-center gap-2 text-sm font-medium">

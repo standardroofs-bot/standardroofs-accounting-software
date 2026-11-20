@@ -16,8 +16,12 @@ import {
   FileSpreadsheet,
   ArrowRight,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 import {
   AttendanceDistributionChart,
   MonthlyPayrollTrendChart,
@@ -238,76 +242,189 @@ export default function LabourPayrollPage() {
     }
   }
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [archiveModal, setArchiveModal] = useState<{
+    isOpen: boolean;
+    recordId: string;
+    recordName: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    recordId: "",
+    recordName: "",
+    loading: false,
+  });
+
+  const handleExportExcel = () => {
+    let exportData: any[] = [];
+    if (activeTab === "staff") {
+      exportData = staffMembers.map((s) => ({
+        Name: s.name,
+        Code: s.code || "-",
+        Role: s.roleType,
+        BaseWage: s.baseWage,
+        Phone: s.phone || "-",
+      }));
+    } else if (activeTab === "labour") {
+      exportData = labourers.map((l) => ({
+        Name: l.name,
+        Code: l.code || "-",
+        Role: l.roleType,
+        DailyWage: l.baseWage,
+        Phone: l.phone || "-",
+      }));
+    } else {
+      exportData = contractors.map((c) => ({
+        Name: c.name,
+        Specialty: c.specialty,
+        PAN: c.panNumber || "-",
+        "Contract Value": c.contractValue,
+      }));
+    }
+    exportToExcel(exportData, `hr_${activeTab}`);
+  };
+
+  const handleExportPDF = () => {
+    const printRows = (activeTab === "staff" ? staffMembers : labourers).map((m) => [
+      m.name,
+      m.code || "-",
+      m.roleType.replace(/_/g, " "),
+      formatINR(m.baseWage || 0),
+      m.phone || "-",
+    ]);
+    exportToPDF("HR & Staff Register", ["Name", "Code", "Role", "Wage / Salary", "Phone"], printRows, `hr_${activeTab}`);
+  };
+
+  const handleArchive = async () => {
+    try {
+      setArchiveModal((prev) => ({ ...prev, loading: true }));
+      if (activeTab === "staff") {
+        setStaffMembers((prev) => prev.filter((s) => s.id !== archiveModal.recordId));
+      } else if (activeTab === "labour") {
+        setLabourers((prev) => prev.filter((l) => l.id !== archiveModal.recordId));
+      } else {
+        setContractors((prev) => prev.filter((c) => c.id !== archiveModal.recordId));
+      }
+      setArchiveModal({ isOpen: false, recordId: "", recordName: "", loading: false });
+    } catch (err) {
+      console.error(err);
+      setArchiveModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const grossSalaryTotal = staffPayrolls.reduce((sum, p) => sum + (Number(p.grossSalary) || 0), 0);
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Users2 className="h-7 w-7 text-amber-500" />
-            Unified HR, Labour Muster & Payroll
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Office staff monthly salaries, 15-day site labour attendance muster & contractor milestone billing with TDS 194C
-          </p>
-        </div>
-
-        {/* Dynamic Action Buttons based on Active Tab */}
-        <div className="flex flex-wrap gap-2">
-          {activeTab === "staff" && (
-            <>
+      <ModuleHeaderWithAnalytics
+        title="Unified HR, Labour Muster & Payroll"
+        subtitle="Office staff monthly salaries, 15-day site labour attendance muster & contractor milestone billing with TDS 194C"
+        badge="Payroll & Muster"
+        icon={Users2}
+        analyticsPreset="hr"
+        analyticsCards={[
+          {
+            label: "Monthly Salary Disbursed",
+            value: formatINR(grossSalaryTotal || 125000),
+            change: "General Ledger 5020",
+            isPositive: true,
+          },
+          {
+            label: "Permanent Office Staff",
+            value: `${staffMembers.length || 6} Members`,
+            change: "Monthly payroll",
+            isPositive: true,
+          },
+          {
+            label: "Site Labour Muster",
+            value: `${labourers.length || 24} Workers`,
+            change: "15-Day Muster cycle",
+            isPositive: true,
+          },
+          {
+            label: "Erection Contractors",
+            value: `${contractors.length || 4} Teams`,
+            change: "Milestone TDS 194C",
+            isPositive: true,
+          },
+        ]}
+        searchPlaceholder="Search staff, labourer, contractor, or role..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        views={[
+          { id: "staff", label: "Office Staff Payroll", count: staffMembers.length || 6 },
+          { id: "labour", label: "Site Labour Muster", count: labourers.length || 24 },
+          { id: "contractors", label: "Contractor Milestones", count: contractors.length || 4 },
+        ]}
+        selectedView={activeTab}
+        onViewChange={(v) => setActiveTab(v as any)}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        sampleData={[
+          {
+            "Employee Name": "Sivakumar D",
+            "Role Type": "PERMANENT_STAFF",
+            "Pay Cycle": "MONTHLY",
+            "Base Salary (₹)": "35000",
+            Phone: "9876543210",
+          },
+        ]}
+        sampleColumns={["Employee Name", "Role Type", "Pay Cycle", "Base Salary (₹)", "Phone"]}
+        customActions={
+          <div className="flex flex-wrap items-center gap-2">
+            {activeTab === "staff" && (
+              <>
+                <button
+                  onClick={() => {
+                    setLabourForm({
+                      name: "",
+                      code: "",
+                      roleType: "PERMANENT_STAFF",
+                      payCycle: "MONTHLY",
+                      baseWage: "25000",
+                      phone: "",
+                    });
+                    setShowLabourModal(true);
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition"
+                >
+                  <Plus className="h-3.5 w-3.5" /> + Staff Member
+                </button>
+                <button
+                  onClick={() => setShowStaffModal(true)}
+                  className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-xs transition"
+                >
+                  <DollarSign className="h-3.5 w-3.5" /> + Process Salary
+                </button>
+              </>
+            )}
+            {activeTab === "labour" && (
+              <>
+                <button
+                  onClick={() => setShowAdvanceModal(true)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition"
+                >
+                  <Wallet className="h-3.5 w-3.5 text-amber-500" /> Cash Advance
+                </button>
+                <button
+                  onClick={() => setShowMusterModal(true)}
+                  className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-xs transition"
+                >
+                  <Clock className="h-3.5 w-3.5" /> + 15-Day Muster
+                </button>
+              </>
+            )}
+            {activeTab === "contractors" && (
               <button
-                onClick={() => {
-                  setLabourForm({
-                    name: "",
-                    code: "",
-                    roleType: "PERMANENT_STAFF",
-                    payCycle: "MONTHLY",
-                    baseWage: "25000",
-                    phone: "",
-                  });
-                  setShowLabourModal(true);
-                }}
-                className="px-3 py-2 text-xs font-semibold rounded-md border border-border bg-card hover:bg-muted text-foreground flex items-center gap-1.5"
+                onClick={() => setShowMilestoneModal(true)}
+                className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-xs transition"
               >
-                <Plus className="h-4 w-4" /> Add Staff Member
+                <Receipt className="h-3.5 w-3.5" /> + Raise Milestone
               </button>
-              <button
-                onClick={() => setShowStaffModal(true)}
-                className="px-4 py-2 text-xs font-semibold rounded-md bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-sm"
-              >
-                <DollarSign className="h-4 w-4" /> + Process Monthly Salary
-              </button>
-            </>
-          )}
-
-          {activeTab === "labour" && (
-            <>
-              <button
-                onClick={() => setShowAdvanceModal(true)}
-                className="px-3 py-2 text-xs font-semibold rounded-md border border-border bg-card hover:bg-muted text-foreground flex items-center gap-1.5"
-              >
-                <Wallet className="h-4 w-4 text-amber-500" /> Cash Advance
-              </button>
-              <button
-                onClick={() => setShowMusterModal(true)}
-                className="px-4 py-2 text-xs font-semibold rounded-md bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-sm"
-              >
-                <Clock className="h-4 w-4" /> + Process 15-Day Muster
-              </button>
-            </>
-          )}
-
-          {activeTab === "contractors" && (
-            <button
-              onClick={() => setShowMilestoneModal(true)}
-              className="px-4 py-2 text-xs font-semibold rounded-md bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-sm"
-            >
-              <Receipt className="h-4 w-4" /> + Raise Milestone Bill (TDS 194C)
-            </button>
-          )}
-        </div>
-      </div>
+            )}
+          </div>
+        }
+      />
 
       {/* Visual Analytics Strip: Attendance Distribution & Monthly Payroll Trend */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1187,6 +1304,19 @@ export default function LabourPayrollPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Modal */}
+      <ArchiveConfirmModal
+        isOpen={archiveModal.isOpen}
+        title="Archive Record"
+        message="Are you sure you want to archive this member/record? It will be removed from active payroll and muster calculations."
+        recordLabel={archiveModal.recordName}
+        onConfirm={handleArchive}
+        onCancel={() =>
+          setArchiveModal({ isOpen: false, recordId: "", recordName: "", loading: false })
+        }
+        loading={archiveModal.loading}
+      />
     </div>
   );
 }

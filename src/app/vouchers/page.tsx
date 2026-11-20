@@ -13,6 +13,9 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 
 interface VoucherLine {
   id?: string;
@@ -68,6 +71,76 @@ export default function VouchersPage() {
   const [reversalTarget, setReversalTarget] = useState<VoucherItem | null>(null);
   const [reversalReason, setReversalReason] = useState("");
   const [reversing, setReversing] = useState(false);
+
+  // Search & Archive Modal
+  const [searchQuery, setSearchQuery] = useState("");
+  const [archiveModal, setArchiveModal] = useState<{
+    isOpen: boolean;
+    voucherId: string;
+    entryNumber: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    voucherId: "",
+    entryNumber: "",
+    loading: false,
+  });
+
+  const handleExportExcel = () => {
+    const exportData = filteredVouchers.map((v) => ({
+      "Voucher No": v.entryNumber,
+      Date: v.date,
+      Type: v.voucherType,
+      Narration: v.narration,
+      Reference: v.referenceNumber || "-",
+      "Total Amount (₹)": v.totalDebit,
+      Status: v.status,
+    }));
+    exportToExcel(exportData, "vouchers_journals");
+  };
+
+  const handleExportPDF = () => {
+    const printRows = filteredVouchers.map((v) => [
+      v.entryNumber,
+      new Date(v.date).toLocaleDateString("en-IN"),
+      v.voucherType.replace("_", " "),
+      v.narration,
+      formatINR(v.totalDebit),
+      v.status,
+    ]);
+    exportToPDF(
+      "Vouchers & Journal Entries",
+      ["Voucher No", "Date", "Type", "Narration", "Amount (₹)", "Status"],
+      printRows,
+      "vouchers_journals"
+    );
+  };
+
+  const handleArchive = async () => {
+    try {
+      setArchiveModal((prev) => ({ ...prev, loading: true }));
+      setVouchers((prev) => prev.filter((item) => item.id !== archiveModal.voucherId));
+      setArchiveModal({ isOpen: false, voucherId: "", entryNumber: "", loading: false });
+    } catch (err) {
+      console.error(err);
+      setArchiveModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const filteredVouchers = vouchers.filter((v) => {
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      !q ||
+      v.entryNumber.toLowerCase().includes(q) ||
+      v.narration.toLowerCase().includes(q) ||
+      (v.referenceNumber && v.referenceNumber.toLowerCase().includes(q)) ||
+      v.lines.some(
+        (l) =>
+          l.account?.name.toLowerCase().includes(q) ||
+          l.account?.code.toLowerCase().includes(q)
+      );
+    return matchesSearch;
+  });
 
   const fetchVouchers = async () => {
     try {
@@ -201,42 +274,87 @@ export default function VouchersPage() {
     }
   };
 
+  const totalPostedAmount = vouchers
+    .filter((v) => v.status === "POSTED")
+    .reduce((sum, v) => sum + parseFloat(v.totalDebit || "0"), 0);
+
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <FileSpreadsheet className="text-blue-600" /> Accounting Vouchers & Journals
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Strict Double-Entry General Ledger Transactions with balanced Debit = Credit guard
-          </p>
-        </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow transition active:scale-95"
-        >
-          <Plus size={16} /> + New Journal Voucher
-        </button>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 overflow-x-auto">
-        {["ALL", "PAYMENT", "RECEIPT", "CONTRA", "JOURNAL_VOUCHER", "REVERSAL"].map((t) => (
-          <button
-            key={t}
-            onClick={() => setSelectedType(t)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-              selectedType === t
-                ? "bg-blue-600 text-white shadow-sm"
-                : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            {t.replace("_", " ")}
-          </button>
-        ))}
-      </div>
+      <ModuleHeaderWithAnalytics
+        title="Accounting Vouchers & Journals"
+        subtitle="Strict Double-Entry General Ledger Transactions with balanced Debit = Credit guard"
+        badge="General Ledger"
+        icon={FileSpreadsheet}
+        analyticsPreset="banking"
+        analyticsCards={[
+          {
+            label: "Total Posted Volume",
+            value: formatINR(totalPostedAmount),
+            change: "FY 2026-27 Double Entry",
+            isPositive: true,
+          },
+          {
+            label: "Total Vouchers",
+            value: vouchers.length.toString(),
+            change: "Journal & Contra",
+            isPositive: true,
+          },
+          {
+            label: "Active Posted",
+            value: vouchers.filter((v) => v.status === "POSTED").length.toString(),
+            change: "Balanced ledger entries",
+            isPositive: true,
+          },
+          {
+            label: "Reversals / Adjustments",
+            value: vouchers.filter((v) => v.isReversal || v.status === "REVERSED").length.toString(),
+            change: "Audited reversals",
+            isPositive: false,
+          },
+        ]}
+        searchPlaceholder="Search voucher no, narration, reference or ledger account..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        views={[
+          { id: "ALL", label: "All Vouchers", count: vouchers.length },
+          { id: "JOURNAL_VOUCHER", label: "Journal", count: vouchers.filter((v) => v.voucherType === "JOURNAL_VOUCHER").length },
+          { id: "PAYMENT", label: "Payment", count: vouchers.filter((v) => v.voucherType === "PAYMENT").length },
+          { id: "RECEIPT", label: "Receipt", count: vouchers.filter((v) => v.voucherType === "RECEIPT").length },
+          { id: "CONTRA", label: "Contra", count: vouchers.filter((v) => v.voucherType === "CONTRA").length },
+          { id: "REVERSAL", label: "Reversals", count: vouchers.filter((v) => v.isReversal || v.status === "REVERSED").length },
+        ]}
+        selectedView={selectedType}
+        onViewChange={setSelectedType}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        sampleData={[
+          {
+            "Voucher Type": "JOURNAL_VOUCHER",
+            Date: "2026-11-20",
+            "Reference Number": "REF-001",
+            Narration: "Depreciation of welding machine for the month",
+            "Debit Account Code": "5030",
+            "Debit Amount": "1500",
+            "Credit Account Code": "1040",
+            "Credit Amount": "1500",
+          },
+        ]}
+        sampleColumns={[
+          "Voucher Type",
+          "Date",
+          "Reference Number",
+          "Narration",
+          "Debit Account Code",
+          "Debit Amount",
+          "Credit Account Code",
+          "Credit Amount",
+        ]}
+        primaryAction={{
+          label: "New Journal Voucher",
+          onClick: () => setShowCreateModal(true),
+          icon: Plus,
+        }}
+      />
 
       {/* Vouchers Table */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
@@ -261,14 +379,14 @@ export default function VouchersPage() {
                     Loading vouchers...
                   </td>
                 </tr>
-              ) : vouchers.length === 0 ? (
+              ) : filteredVouchers.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-slate-400">
                     No vouchers found for this filter.
                   </td>
                 </tr>
               ) : (
-                vouchers.map((v) => (
+                filteredVouchers.map((v) => (
                   <tr
                     key={v.id}
                     className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition align-top"
@@ -329,7 +447,7 @@ export default function VouchersPage() {
                         ))}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
+                    <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
                       {formatINR(v.totalDebit)}
                     </td>
                     <td className="py-3 px-4 text-center">
@@ -344,17 +462,31 @@ export default function VouchersPage() {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      {v.status === "POSTED" && !v.isReversal ? (
+                      <div className="flex items-center justify-center gap-1.5">
+                        {v.status === "POSTED" && !v.isReversal && (
+                          <button
+                            onClick={() => setReversalTarget(v)}
+                            title="Reverse this posted transaction (Never deletes)"
+                            className="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] font-bold border border-rose-200 transition"
+                          >
+                            <RotateCcw size={12} className="inline mr-1" /> Reverse
+                          </button>
+                        )}
                         <button
-                          onClick={() => setReversalTarget(v)}
-                          title="Reverse this posted transaction (Never deletes)"
-                          className="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] font-bold border border-rose-200 transition"
+                          onClick={() =>
+                            setArchiveModal({
+                              isOpen: true,
+                              voucherId: v.id,
+                              entryNumber: v.entryNumber,
+                              loading: false,
+                            })
+                          }
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition"
+                          title="Archive Voucher"
                         >
-                          <RotateCcw size={12} className="inline mr-1" /> Reverse
+                          <Trash2 size={13} />
                         </button>
-                      ) : (
-                        <span className="text-[10px] text-slate-400">Immutable</span>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -621,6 +753,19 @@ export default function VouchersPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Modal */}
+      <ArchiveConfirmModal
+        isOpen={archiveModal.isOpen}
+        title="Archive Journal Voucher"
+        message="Are you sure you want to archive this journal voucher? It will be removed from the active register."
+        recordLabel={archiveModal.entryNumber}
+        onConfirm={handleArchive}
+        onCancel={() =>
+          setArchiveModal({ isOpen: false, voucherId: "", entryNumber: "", loading: false })
+        }
+        loading={archiveModal.loading}
+      />
     </div>
   );
 }

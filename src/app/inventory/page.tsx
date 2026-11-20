@@ -24,7 +24,11 @@ import {
   ShieldCheck,
   Check,
   Clock,
+  Trash2,
 } from "lucide-react";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 
 export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState<"consumables" | "tiles" | "issues" | "checklists">("consumables");
@@ -244,109 +248,158 @@ export default function InventoryPage() {
     return c.checklistType === checklistFilter;
   });
 
+  // Archive Modal State
+  const [archiveModal, setArchiveModal] = useState<{
+    isOpen: boolean;
+    recordId: string;
+    recordLabel: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    recordId: "",
+    recordLabel: "",
+    loading: false,
+  });
+
+  const handleExportExcel = () => {
+    let exportData: any[] = [];
+    if (activeTab === "consumables") {
+      exportData = filteredMaterials.map((m) => ({
+        "Item Code": m.itemCode,
+        Name: m.name,
+        Category: m.category,
+        Unit: m.unit,
+        "Current Stock": m.currentStock,
+        "Min Alert Stock": m.minAlertStock,
+        "Unit Cost (₹)": m.unitCost,
+      }));
+    } else if (activeTab === "tiles") {
+      exportData = tiles.map((t) => ({
+        Type: t.type,
+        Profile: t.profile,
+        Thickness: t.thickness,
+        Color: t.color,
+        "Stock (SqFt)": t.stockSqFt,
+      }));
+    } else {
+      exportData = siteIssues.map((s) => ({
+        Date: s.date,
+        Item: s.productName,
+        Site: s.siteName,
+        Quantity: s.quantity,
+        IssuedBy: s.issuedBy,
+      }));
+    }
+    exportToExcel(exportData, `inventory_${activeTab}`);
+  };
+
+  const handleExportPDF = () => {
+    const printRows = filteredMaterials.map((m) => [
+      m.itemCode,
+      m.name,
+      m.category,
+      `${m.currentStock} ${m.unit}`,
+      `₹ ${Number(m.unitCost || 0).toLocaleString("en-IN")}`,
+    ]);
+    exportToPDF("Yard Inventory Stock Report", ["Item Code", "Name", "Category", "Stock", "Unit Cost"], printRows, "yard_inventory");
+  };
+
+  const handleArchive = async () => {
+    try {
+      setArchiveModal((prev) => ({ ...prev, loading: true }));
+      setMaterials((prev) => prev.filter((m) => m.id !== archiveModal.recordId));
+      setSiteIssues((prev) => prev.filter((s) => s.id !== archiveModal.recordId));
+      setArchiveModal({ isOpen: false, recordId: "", recordLabel: "", loading: false });
+    } catch (err) {
+      console.error(err);
+      setArchiveModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Header Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" /> 2026 Yard Inventory Synced
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-              {materials.length} Master Items &middot; All Photos Extracted
-            </span>
+      <ModuleHeaderWithAnalytics
+        title="Roofing Yard Inventory & Dispatches"
+        subtitle="Matching 2_New_Inventory_Management_With_Images.xlsx · Current Stock, Tiles, Site Issue Register & Pre-Dispatch Checklists"
+        badge="Yard Inventory"
+        icon={Package}
+        analyticsPreset="operations"
+        analyticsCards={[
+          {
+            label: "Yard Stock Valuation",
+            value: `₹ ${Number(totalValuation).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+            change: "Inventory Asset 1030",
+            isPositive: true,
+          },
+          {
+            label: "Current Consumables",
+            value: `${materials.length} Items`,
+            change: "Fast moving hardware",
+            isPositive: true,
+          },
+          {
+            label: "Low Stock Alerts",
+            value: `${lowStockCount} Items`,
+            change: lowStockCount > 0 ? "Below reorder level" : "Optimal safety stock",
+            isPositive: lowStockCount === 0,
+          },
+          {
+            label: "Checklist Points",
+            value: `${checklists.length} Rules`,
+            change: "Welder & Layer QC",
+            isPositive: true,
+          },
+        ]}
+        searchPlaceholder="Search consumable item name, item code (MTR-...), or category..."
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        views={[
+          { id: "consumables", label: "Stock Consumables", count: materials.length },
+          { id: "tiles", label: "Roofing Sheets & Tiles", count: tiles.length },
+          { id: "issues", label: "Site Issue Register", count: siteIssues.length },
+          { id: "checklists", label: "Dispatch Checklists", count: checklists.length },
+        ]}
+        selectedView={activeTab}
+        onViewChange={(v) => setActiveTab(v as any)}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        sampleData={[
+          {
+            "Item Code": "MTR-26-001",
+            "Item Name": "Cutting Wheel 4 Inch (Dewalt)",
+            Category: "Abrasives & Cutting",
+            Unit: "Nos",
+            "Current Stock": "150",
+            "Min Alert Stock": "30",
+            "Unit Cost (₹)": "45",
+          },
+        ]}
+        sampleColumns={[
+          "Item Code",
+          "Item Name",
+          "Category",
+          "Unit",
+          "Current Stock",
+          "Min Alert Stock",
+          "Unit Cost (₹)",
+        ]}
+        customActions={
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowItemModal(true)}
+              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 flex items-center gap-1.5 shadow-xs transition"
+            >
+              <Plus className="w-3.5 h-3.5" /> + Consumable
+            </button>
+            <button
+              onClick={() => setShowIssueModal(true)}
+              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1.5 shadow-xs transition"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5" /> + Issue to Site
+            </button>
           </div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1.5 flex items-center gap-2">
-            <Package className="w-6 h-6 text-amber-500" />
-            Roofing Yard Inventory, Consumables &amp; Dispatch System
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Matching <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">2_New_Inventory_Management_With_Images.xlsx</code> &middot; Current Stock, Tiles, Site Issue Register &amp; Pre-Dispatch Checklists
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            onClick={() => setShowItemModal(true)}
-            className="px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> + Add Consumable
-          </button>
-
-          <button
-            onClick={() => setShowIssueModal(true)}
-            className="px-4 py-2 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
-          >
-            <ArrowUpRight className="w-4 h-4" /> + Issue to Project Site
-          </button>
-        </div>
-      </div>
-
-      {alertMsg && (
-        <div
-          className={`p-4 rounded-xl border flex items-center justify-between ${
-            alertMsg.type === "success"
-              ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300"
-              : "bg-red-50 border-red-200 text-red-800 dark:bg-red-950/40 dark:border-red-800 dark:text-red-300"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4" />
-            <span className="text-xs font-semibold">{alertMsg.text}</span>
-          </div>
-          <button onClick={() => setAlertMsg(null)} className="text-xs font-bold underline cursor-pointer">
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* KPI Stats Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          <div className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-            <DollarSign className="h-4 w-4 text-emerald-500" /> Yard Stock Valuation
-          </div>
-          <div className="text-2xl font-black mt-1 text-slate-900 dark:text-slate-100">
-            ₹ {Number(totalValuation).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Inventory Asset Account 1030</div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          <div className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-            <Package className="h-4 w-4 text-blue-500" /> Current Stock Consumables
-          </div>
-          <div className="text-2xl font-black mt-1 text-slate-900 dark:text-slate-100">
-            {materials.length} Items
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Wheels, bits, screws, silicone, paint</div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          <div className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-            <AlertTriangle className="h-4 w-4 text-rose-500" /> Low Stock Alerts
-          </div>
-          <div className="text-2xl font-black mt-1">
-            {lowStockCount > 0 ? (
-              <span className="text-rose-500">{lowStockCount} Items</span>
-            ) : (
-              <span className="text-emerald-500">All Optimal</span>
-            )}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Below minimum alert threshold</div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          <div className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-            <ClipboardCheck className="h-4 w-4 text-amber-500" /> Pre-Dispatch Checklists
-          </div>
-          <div className="text-2xl font-black mt-1 text-slate-900 dark:text-slate-100">
-            {checklists.length} Checklist Items
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Welder &amp; Layer dispatch verification</div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Main Tabs Navigation */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1 overflow-x-auto">
@@ -1097,6 +1150,19 @@ export default function InventoryPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Modal */}
+      <ArchiveConfirmModal
+        isOpen={archiveModal.isOpen}
+        title="Archive Inventory Item"
+        message="Are you sure you want to archive this inventory item? It will be removed from active stock counts."
+        recordLabel={archiveModal.recordLabel}
+        onConfirm={handleArchive}
+        onCancel={() =>
+          setArchiveModal({ isOpen: false, recordId: "", recordLabel: "", loading: false })
+        }
+        loading={archiveModal.loading}
+      />
     </div>
   );
 }

@@ -10,8 +10,12 @@ import {
   AlertCircle,
   FileSpreadsheet,
   Layers,
+  Trash2,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 
 interface ContractorItem {
   id: string;
@@ -169,42 +173,151 @@ export default function ContractorsPage() {
     }
   };
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [archiveModal, setArchiveModal] = useState<{
+    isOpen: boolean;
+    contractorId: string;
+    contractorName: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    contractorId: "",
+    contractorName: "",
+    loading: false,
+  });
+
+  const handleExportExcel = () => {
+    const exportData = filteredContractors.map((c) => ({
+      Code: c.code || "-",
+      Name: c.name,
+      Specialty: c.specialty,
+      PAN: c.panNumber || "-",
+      Phone: c.phone || "-",
+      "Contract Value (₹)": c.contractValue,
+      "Milestones Raised": c.milestones.length,
+    }));
+    exportToExcel(exportData, "contractors_billing");
+  };
+
+  const handleExportPDF = () => {
+    const printRows = filteredContractors.map((c) => [
+      c.code || "-",
+      c.name,
+      c.specialty,
+      c.phone || "-",
+      formatINR(c.contractValue),
+      c.milestones.length.toString(),
+    ]);
+    exportToPDF("Milestone Contractors Register", ["Code", "Name", "Specialty", "Phone", "Contract Value", "Milestones"], printRows, "contractors_register");
+  };
+
+  const handleArchive = async () => {
+    try {
+      setArchiveModal((prev) => ({ ...prev, loading: true }));
+      setContractors((prev) => prev.filter((item) => item.id !== archiveModal.contractorId));
+      setArchiveModal({ isOpen: false, contractorId: "", contractorName: "", loading: false });
+    } catch (err) {
+      console.error(err);
+      setArchiveModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const filteredContractors = contractors.filter((c) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      !q ||
+      c.name.toLowerCase().includes(q) ||
+      (c.code && c.code.toLowerCase().includes(q)) ||
+      c.specialty.toLowerCase().includes(q)
+    );
+  });
+
+  const totalContractVal = contractors.reduce((s, c) => s + parseFloat(c.contractValue || "0"), 0);
+  const totalMilestonesCount = contractors.reduce((s, c) => s + c.milestones.length, 0);
+
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <HardHat className="text-amber-600" /> Milestone Contractor Billing
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Site erection teams, work-stage payouts (10% advance, 40% structure, 75% sheeting, 100% handover) & 1%/2% TDS u/s 194C
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowContractorModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold shadow transition active:scale-95"
-          >
-            <Plus size={16} /> + Register Contractor
-          </button>
-          <button
-            onClick={() => setShowMilestoneModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow transition active:scale-95"
-          >
-            <Plus size={16} /> + Raise Milestone Bill
-          </button>
-        </div>
-      </div>
+      <ModuleHeaderWithAnalytics
+        title="Milestone Contractor Billing"
+        subtitle="Site erection teams, work-stage payouts (10% advance, 40% structure, 75% sheeting, 100% handover) & 1%/2% TDS u/s 194C"
+        badge="Works Contract"
+        icon={HardHat}
+        analyticsPreset="hr"
+        analyticsCards={[
+          {
+            label: "Total Contractors",
+            value: contractors.length.toString(),
+            change: "Registered erection teams",
+            isPositive: true,
+          },
+          {
+            label: "Contract Commitments",
+            value: formatINR(totalContractVal),
+            change: "Across all active sites",
+            isPositive: true,
+          },
+          {
+            label: "Milestone Claims",
+            value: totalMilestonesCount.toString(),
+            change: "Stages verified on site",
+            isPositive: true,
+          },
+          {
+            label: "Statutory TDS Compliance",
+            value: "194C Ready",
+            change: "1% Indiv / 2% Corp",
+            isPositive: true,
+          },
+        ]}
+        searchPlaceholder="Search contractor name, code, specialty..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        sampleData={[
+          {
+            "Contractor Code": "CONT-001",
+            "Contractor Name": "Team Thenarrusu",
+            Specialty: "PEB Truss & Structural Steel Erection",
+            PAN: "ABCDE1234F",
+            Phone: "9876543210",
+            "Contract Value (₹)": "500000",
+          },
+        ]}
+        sampleColumns={[
+          "Contractor Code",
+          "Contractor Name",
+          "Specialty",
+          "PAN",
+          "Phone",
+          "Contract Value (₹)",
+        ]}
+        customActions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowContractorModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold shadow-xs transition"
+            >
+              <Plus size={14} /> + Contractor
+            </button>
+            <button
+              onClick={() => setShowMilestoneModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition"
+            >
+              <Plus size={14} /> + Raise Milestone
+            </button>
+          </div>
+        }
+      />
 
       {/* Contractors & Work Milestones */}
       <div className="space-y-4">
-        {contractors.length === 0 ? (
+        {filteredContractors.length === 0 ? (
           <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 text-center text-slate-400 text-xs">
-            No contractors registered. Click <strong>+ Register Contractor</strong> to onboard erection teams (e.g. SRM01-Cont, Team Thenarrusu).
+            No contractors found matching filter. Click <strong>+ Register Contractor</strong> to onboard erection teams.
           </div>
         ) : (
-          contractors.map((cont) => (
+          filteredContractors.map((cont) => (
             <div
               key={cont.id}
               className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4"
@@ -223,11 +336,27 @@ export default function ContractorsPage() {
                     Specialty: <strong>{cont.specialty}</strong> • PAN: <span className="font-mono">{cont.panNumber || "None"}</span> • Phone: {cont.phone || "—"}
                   </p>
                 </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Assigned Contract Value</span>
-                  <span className="text-base font-black font-mono text-slate-900 dark:text-slate-100">
-                    {formatINR(cont.contractValue)}
-                  </span>
+                <div className="text-right flex items-center justify-end gap-3">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Assigned Contract Value</span>
+                    <span className="text-base font-black font-mono text-slate-900 dark:text-slate-100">
+                      {formatINR(cont.contractValue)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setArchiveModal({
+                        isOpen: true,
+                        contractorId: cont.id,
+                        contractorName: cont.name,
+                        loading: false,
+                      })
+                    }
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition"
+                    title="Archive Contractor"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
 
@@ -503,6 +632,19 @@ export default function ContractorsPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Modal */}
+      <ArchiveConfirmModal
+        isOpen={archiveModal.isOpen}
+        title="Archive Contractor"
+        message="Are you sure you want to archive this contractor? Any further milestone claims will be halted."
+        recordLabel={archiveModal.contractorName}
+        onConfirm={handleArchive}
+        onCancel={() =>
+          setArchiveModal({ isOpen: false, contractorId: "", contractorName: "", loading: false })
+        }
+        loading={archiveModal.loading}
+      />
     </div>
   );
 }

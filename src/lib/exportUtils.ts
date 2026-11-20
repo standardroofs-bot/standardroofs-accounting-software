@@ -66,8 +66,9 @@ export function downloadSampleExcel(
 
 export function exportToPDF(
   title: string,
-  columns: { header: string; dataKey: string }[],
-  data: any[]
+  columns: (string | { header: string; dataKey?: string })[],
+  data: any[],
+  filename?: string
 ) {
   if (!data || data.length === 0) {
     alert("No records to export to PDF.");
@@ -86,18 +87,39 @@ export function exportToPDF(
     year: "numeric",
   });
 
-  const tableHeaderHtml = columns
-    .map((c) => `<th style="padding: 8px 10px; border-bottom: 2px solid #334155; text-align: left; font-size: 11px; text-transform: uppercase;">${c.header}</th>`)
+  const headerTitles = columns.map((c) => (typeof c === "string" ? c : c.header));
+  const tableHeaderHtml = headerTitles
+    .map(
+      (h) =>
+        `<th style="padding: 8px 10px; border-bottom: 2px solid #334155; text-align: left; font-size: 11px; text-transform: uppercase;">${h}</th>`
+    )
     .join("");
 
   const tableRowsHtml = data
     .map(
-      (row, idx) => `
-      <tr style="background-color: ${idx % 2 === 0 ? "#ffffff" : "#f8fafc"};">
-        ${columns
-          .map((c) => `<td style="padding: 7px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-family: ui-sans-serif, system-ui;">${row[c.dataKey] ?? ""}</td>`)
-          .join("")}
-      </tr>`
+      (row, idx) => {
+        let cellsHtml = "";
+        if (Array.isArray(row)) {
+          cellsHtml = row
+            .map(
+              (val) =>
+                `<td style="padding: 7px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-family: ui-sans-serif, system-ui;">${val ?? ""}</td>`
+            )
+            .join("");
+        } else {
+          cellsHtml = columns
+            .map((c) => {
+              const key = typeof c === "string" ? c : c.dataKey;
+              const val = key ? row[key] : "";
+              return `<td style="padding: 7px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-family: ui-sans-serif, system-ui;">${val ?? ""}</td>`;
+            })
+            .join("");
+        }
+        return `
+        <tr style="background-color: ${idx % 2 === 0 ? "#ffffff" : "#f8fafc"};">
+          ${cellsHtml}
+        </tr>`;
+      }
     )
     .join("");
 

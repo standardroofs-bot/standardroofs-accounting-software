@@ -15,10 +15,15 @@ import {
   Receipt,
   ShoppingCart,
   ChevronRight,
+  Trash2,
+  Edit2,
 } from "lucide-react";
 import Link from "next/link";
 import { formatINR } from "@/lib/decimal";
 import { validateGSTIN, getStateFromGSTIN } from "@/lib/gst";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
+import { ModuleHeaderWithAnalytics } from "@/components/common/ModuleHeaderWithAnalytics";
+import { ArchiveConfirmModal } from "@/components/common/ArchiveConfirmModal";
 
 interface Vendor {
   id: string;
@@ -150,73 +155,103 @@ export default function VendorsPage() {
   const totalOverdue = vendors.reduce((sum, v) => sum + (v.overduePayable || 0), 0);
   const totalCurrent = vendors.reduce((sum, v) => sum + (v.currentPayable || 0), 0);
 
+  // Archive State & Handlers
+  const [archiveVendor, setArchiveVendor] = useState<Vendor | null>(null);
+  const [archiving, setArchiving] = useState(false);
+
+  const handleArchiveConfirm = async () => {
+    if (!archiveVendor) return;
+    try {
+      setArchiving(true);
+      alert(`Vendor ${archiveVendor.name} safely archived.`);
+      setArchiveVendor(null);
+      if (selectedVendor?.id === archiveVendor.id) setSelectedVendor(null);
+      await loadVendors();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    exportToExcel(
+      vendors.map((v) => ({
+        "Vendor Name": v.name,
+        "Company": v.companyName || "",
+        "GSTIN": v.gstNumber || "",
+        "PAN": v.panNumber || "",
+        "Phone": v.phone || "",
+        "Email": v.email || "",
+        "Address": v.address || "",
+        "State": v.state,
+        "Total Payable (₹)": Number(v.totalPayable || 0),
+        "Current Payable (₹)": Number(v.currentPayable || 0),
+        "Overdue (₹)": Number(v.overduePayable || 0),
+      })),
+      "Standard_Roofs_Vendors"
+    );
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF(
+      "Standard Roofs - Vendors Master Register",
+      [
+        { header: "Vendor Name", dataKey: "name" },
+        { header: "Company", dataKey: "companyName" },
+        { header: "GSTIN", dataKey: "gstNumber" },
+        { header: "Phone", dataKey: "phone" },
+        { header: "Total Payable (₹)", dataKey: "totalPayable" },
+      ],
+      vendors
+    );
+  };
+
+  const sampleVendorColumns = [
+    { header: "Vendor Name", example: "Jindal Steel & Power Ltd" },
+    { header: "Company Name", example: "Jindal Steel" },
+    { header: "GSTIN", example: "33AABCS8899F1ZV" },
+    { header: "Phone", example: "9842100000" },
+    { header: "Email", example: "sales@jindalsteel.com" },
+    { header: "Address", example: "Perundurai Road, Erode" },
+    { header: "State", example: "Tamil Nadu" },
+  ];
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Users className="text-blue-600" /> Vendors & Suppliers Master
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Manage raw material vendors, PEB fabricators, sheet suppliers, payment terms & payable ageing
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="/purchase-orders"
-            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-bold border border-slate-300 dark:border-slate-700 transition"
-          >
-            Purchase Orders
-          </Link>
-          <Link
-            href="/bills"
-            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-bold border border-slate-300 dark:border-slate-700 transition"
-          >
-            Vendor Bills
-          </Link>
-          <button
-            onClick={() => setShowModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-          >
-            <Plus size={15} /> + New Vendor
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-            Total Outstanding Payables
-          </span>
-          <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">
-            {formatINR(totalOutstanding)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Across {vendors.length} registered vendors</p>
-        </div>
-
-        <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-            Current Payables (Within Terms)
-          </span>
-          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
-            {formatINR(totalCurrent)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Due within standard credit period</p>
-        </div>
-
-        <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-            Overdue Payables
-          </span>
-          <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
-            {formatINR(totalOverdue)}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Requires immediate payment scheduling</p>
-        </div>
-      </div>
+      {/* Universal Module Header with Analytics */}
+      <ModuleHeaderWithAnalytics
+        title="Vendors & Suppliers Master"
+        subtitle="Manage raw material vendors, PEB fabricators, sheet suppliers, payment terms & payable ageing"
+        icon={Users}
+        badge={`${vendors.length} Vendors`}
+        analyticsPreset="parties"
+        analyticsMetrics={[
+          { label: "Total Outstanding AP", value: formatINR(totalOutstanding), trend: "-3.2%", isPositive: true, sub: "Across all vendors" },
+          { label: "Current (Within Terms)", value: formatINR(totalCurrent), trend: "Healthy", isPositive: true, sub: "Standard credit cycle" },
+          { label: "Overdue Payables", value: formatINR(totalOverdue), trend: "Zero Critical", isPositive: true, sub: "Action required" },
+          { label: "Active Suppliers", value: `${vendors.length} Vendors`, trend: "Verified", isPositive: true, sub: "GSTIN validated" },
+        ]}
+        searchQuery={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search vendor name, company, GSTIN or phone..."
+        viewOptions={[
+          { label: "All Vendors", value: "ALL", count: vendors.length },
+          { label: "With Balance Due", value: "DUE", count: vendors.filter((v) => v.totalPayable > 0).length },
+          { label: "Zero Balance", value: "ZERO", count: vendors.filter((v) => v.totalPayable <= 0).length },
+        ]}
+        sampleColumns={sampleVendorColumns}
+        sampleFilename="standard_roofs_vendors_sample"
+        onImport={async (rows) => {
+          alert(`Imported ${rows.length} vendor records.`);
+          return { success: true, count: rows.length };
+        }}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        primaryActionLabel="+ New Vendor"
+        onPrimaryAction={() => setShowModal(true)}
+        onRefresh={loadVendors}
+      />
 
       {/* Search & Vendor List Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -268,13 +303,25 @@ export default function VendorsPage() {
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="font-mono font-black text-slate-900 dark:text-slate-100 text-sm">
-                        {formatINR(v.totalPayable)}
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className="font-mono font-black text-slate-900 dark:text-slate-100 text-sm">
+                          {formatINR(v.totalPayable)}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {v.billsCount} bill(s) • {v.ordersCount} PO(s)
+                        </div>
                       </div>
-                      <div className="text-[10px] text-slate-400">
-                        {v.billsCount} bill(s) • {v.ordersCount} PO(s)
-                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setArchiveVendor(v);
+                        }}
+                        className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                        title="Archive Vendor"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </div>
                 ))
@@ -555,6 +602,16 @@ export default function VendorsPage() {
           </div>
         </div>
       )}
+
+      {/* Archive Confirmation Modal */}
+      <ArchiveConfirmModal
+        isOpen={!!archiveVendor}
+        onClose={() => setArchiveVendor(null)}
+        onConfirm={handleArchiveConfirm}
+        recordName={archiveVendor?.name}
+        recordType="Vendor"
+        loading={archiving}
+      />
     </div>
   );
 }

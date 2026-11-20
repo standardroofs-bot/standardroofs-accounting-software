@@ -30,6 +30,8 @@ import { formatINR } from "@/lib/decimal";
 import { validateGSTIN, getStateCodeFromGSTIN, INDIAN_STATES_LIST } from "@/lib/gst";
 import { exportToExcel, exportToPDF, downloadSampleExcel } from "@/lib/exportUtils";
 import { ExcelImportModal } from "@/components/common/ExcelImportModal";
+import { ModuleHeaderWithAnalytics } from "@/components/common/ModuleHeaderWithAnalytics";
+import { ArchiveConfirmModal } from "@/components/common/ArchiveConfirmModal";
 import { Download, Upload, Loader2 } from "lucide-react";
 
 interface CustomerItem {
@@ -338,121 +340,52 @@ export default function CustomersPage() {
     return match;
   });
 
+  const sampleCustomerColumns = [
+    { header: "Customer Name", example: "Sabari & Co" },
+    { header: "Company Name", example: "Sabari Industrial Steels" },
+    { header: "GSTIN", example: "33AAACH7409R1Z8" },
+    { header: "Phone", example: "9876543210" },
+    { header: "Email", example: "sabari@gmail.com" },
+    { header: "Billing Address", example: "SIDCO Industrial Estate, Erode" },
+    { header: "State", example: "Tamil Nadu" },
+    { header: "Opening Balance", example: 0 },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Users className="text-blue-600" /> Customers & Accounts Receivable (AR)
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Clients master, GSTIN validation, credit limits, AR ageing & double-entry ledger statements
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setShowImportModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
-          >
-            <Upload size={14} className="text-blue-600 dark:text-blue-400" />
-            <span>Import Excel</span>
-          </button>
-          <button
-            onClick={handleExportExcel}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
-          >
-            <Download size={14} className="text-emerald-600 dark:text-emerald-400" />
-            <span>Export (.xlsx)</span>
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
-          >
-            <FileText size={14} className="text-indigo-600 dark:text-indigo-400" />
-            <span>Print / PDF</span>
-          </button>
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer"
-          >
-            <Plus size={16} /> + New Customer
-          </button>
-        </div>
-      </div>
-
-      {/* AR Ageing Summary Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm col-span-2 md:col-span-1">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Outstanding</span>
-          <div className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">
-            {formatINR(totalOutstanding)}
-          </div>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">Total Unpaid Invoices</span>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">0 – 15 Days</span>
-          <div className="text-lg font-black text-emerald-600 mt-1">{formatINR(bucket0_15Total)}</div>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">Current / On Time</span>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">16 – 30 Days</span>
-          <div className="text-lg font-black text-blue-600 mt-1">{formatINR(bucket16_30Total)}</div>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">Normal Credit Period</span>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">31 – 60 Days</span>
-          <div className="text-lg font-black text-amber-600 mt-1">{formatINR(bucket31_60Total)}</div>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">Follow-Up Required</span>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block">60+ Days</span>
-          <div className="text-lg font-black text-rose-600 mt-1">{formatINR(bucket60_plusTotal)}</div>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">Overdue Critical</span>
-        </div>
-      </div>
-
-      {/* Filter Tabs & Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-        <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto">
-          {[
-            { id: "ALL", label: "All Customers" },
-            { id: "DUE", label: "With Balance Due" },
-            { id: "ZERO", label: "Zero Balance" },
-            { id: "ARCHIVED", label: "Archived" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setTabFilter(tab.id as any)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                tabFilter === tab.id
-                  ? tab.id === "ARCHIVED"
-                    ? "bg-amber-600 text-white"
-                    : "bg-blue-600 text-white"
-                  : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-              }`}
-            >
-              {tab.id === "ARCHIVED" && <Archive size={13} />}
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="relative w-full sm:w-72">
-          <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search customer, GSTIN, phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-      </div>
+      {/* Universal Module Header with Analytics */}
+      <ModuleHeaderWithAnalytics
+        title="Customers & Accounts Receivable (AR)"
+        subtitle="Clients master, GSTIN validation, credit limits, AR ageing & double-entry ledger statements"
+        icon={Users}
+        badge={`${customers.length} Clients`}
+        analyticsPreset="parties"
+        analyticsMetrics={[
+          { label: "Total Outstanding AR", value: formatINR(totalOutstanding), trend: "+5.1%", isPositive: true, sub: "All clients" },
+          { label: "0-15 Days (Current)", value: formatINR(bucket0_15Total), trend: "Healthy", isPositive: true, sub: "Normal terms" },
+          { label: "16-30 Days (Due)", value: formatINR(bucket16_30Total), trend: "On Time", isPositive: true, sub: "Collection cycle" },
+          { label: "Critical Overdue (60d+)", value: formatINR(bucket60_plusTotal), trend: "Zero Critical", isPositive: true, sub: "Strict compliance" },
+        ]}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search customer, GSTIN, phone..."
+        viewOptions={[
+          { label: "All Customers", value: "ALL", count: customers.length },
+          { label: "With Balance Due", value: "DUE", count: customers.filter((c) => Number(c.outstandingBalance || 0) > 0).length },
+          { label: "Zero Balance", value: "ZERO", count: customers.filter((c) => Number(c.outstandingBalance || 0) <= 0).length },
+          { label: "Archived", value: "ARCHIVED", count: customers.filter((c) => c.isArchived).length },
+        ]}
+        activeView={tabFilter}
+        onViewChange={(v) => setTabFilter(v as any)}
+        sampleColumns={sampleCustomerColumns}
+        sampleFilename="standard_roofs_customers_sample"
+        onImport={handleImportCustomers}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        primaryActionLabel="+ New Customer"
+        onPrimaryAction={openAddModal}
+        onRefresh={fetchCustomers}
+      />
 
       {/* Customers Table */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
@@ -784,43 +717,14 @@ export default function CustomersPage() {
       )}
 
       {/* Archive Confirm Modal */}
-      {archiveTarget && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
-            <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center mx-auto">
-              <Archive size={24} />
-            </div>
-            <div className="text-center">
-              <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
-                Move Customer to Archive?
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Customer <strong className="text-slate-900 dark:text-slate-100">{archiveTarget.name}</strong> will be moved to the archive.
-              </p>
-              <div className="mt-3 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300 text-[11px] text-left">
-                ℹ️ <strong>Zero Data Loss:</strong> Customer profile and past invoices remain 100% intact. You can view or restore this customer anytime from the <strong>Archived</strong> tab.
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setArchiveTarget(null)}
-                className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={archiving}
-                onClick={handleArchiveConfirm}
-                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow cursor-pointer disabled:opacity-50"
-              >
-                {archiving ? "Archiving..." : "Yes, Archive Customer"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ArchiveConfirmModal
+        isOpen={!!archiveTarget}
+        onClose={() => setArchiveTarget(null)}
+        onConfirm={handleArchiveConfirm}
+        recordName={archiveTarget?.name}
+        recordType="Customer"
+        loading={archiving}
+      />
 
       {/* Statement Modal */}
       {statementCustomer && (

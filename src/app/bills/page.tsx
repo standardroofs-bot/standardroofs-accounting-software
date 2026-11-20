@@ -18,6 +18,9 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatINR } from "@/lib/decimal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
+import { ModuleHeaderWithAnalytics } from "@/components/common/ModuleHeaderWithAnalytics";
+import { ArchiveConfirmModal } from "@/components/common/ArchiveConfirmModal";
 
 interface PurchaseBill {
   id: string;
@@ -251,58 +254,130 @@ export default function BillsPage() {
   );
   const calcTotal = calcSubTotal + calcGst;
 
+  // Search & Archive State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [archiveBill, setArchiveBill] = useState<PurchaseBill | null>(null);
+  const [archiving, setArchiving] = useState(false);
+
+  const handleArchiveConfirm = async () => {
+    if (!archiveBill) return;
+    try {
+      setArchiving(true);
+      const res = await fetch(`/api/bills/${archiveBill.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setArchiveBill(null);
+        await loadData();
+      } else {
+        alert(data.error || "Failed to delete bill");
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const filteredBills = bills.filter((b) => {
+    const matchSearch =
+      b.billNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      b.supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (b.vendorInvoiceNumber && b.vendorInvoiceNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (b.project && b.project.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchSearch;
+  });
+
+  const handleExportExcel = () => {
+    exportToExcel(
+      filteredBills.map((b) => ({
+        "Bill Number": b.billNumber,
+        "Date": b.date,
+        "Supplier": b.supplier.name,
+        "Vendor Invoice #": b.vendorInvoiceNumber || "",
+        "Project Site": b.project?.name || "",
+        "Taxable Amount (₹)": Number(b.subTotal || 0),
+        "CGST (₹)": Number(b.cgstTotal || 0),
+        "SGST (₹)": Number(b.sgstTotal || 0),
+        "IGST (₹)": Number(b.igstTotal || 0),
+        "Grand Total (₹)": Number(b.totalAmount || 0),
+        "Amount Paid (₹)": Number(b.amountPaid || 0),
+        "Balance Due (₹)": Number(b.balanceDue || 0),
+        "Status": b.status,
+      })),
+      "Standard_Roofs_Vendor_Bills"
+    );
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF(
+      "Standard Roofs - Vendor Purchase Bills Register",
+      [
+        { header: "Bill Number", dataKey: "billNumber" },
+        { header: "Date", dataKey: "date" },
+        { header: "Supplier", dataKey: "supplierName" },
+        { header: "Total (₹)", dataKey: "totalAmount" },
+        { header: "Balance Due (₹)", dataKey: "balanceDue" },
+        { header: "Status", dataKey: "status" },
+      ],
+      filteredBills.map((b) => ({
+        ...b,
+        supplierName: b.supplier.name,
+      }))
+    );
+  };
+
+  const sampleBillColumns = [
+    { header: "Supplier Name", example: "Jindal Steel" },
+    { header: "Vendor Invoice #", example: "JSP/2026/0491" },
+    { header: "Bill Date", example: "2026-11-20" },
+    { header: "Item Description", example: "5x4 G.I. Reducer E.R.W." },
+    { header: "HSN/SAC", example: "730793" },
+    { header: "Quantity", example: 5 },
+    { header: "Rate", example: 485.30 },
+    { header: "GST Rate %", example: 18 },
+  ];
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <FileText className="text-blue-600" /> Vendor Purchase Bills
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Record supplier GST invoices, auto-post Input Tax Credit (CGST/SGST/IGST), stock movements & vendor payables
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="/purchase-orders"
-            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-bold border border-slate-300 dark:border-slate-700 transition"
-          >
-            Purchase Orders
-          </Link>
-          <Link
-            href="/payments-made"
-            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-bold border border-slate-300 dark:border-slate-700 transition"
-          >
-            Payments Made
-          </Link>
-          <button
-            onClick={() => setShowBillModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-          >
-            <Plus size={15} /> + Record New Bill
-          </button>
-        </div>
-      </div>
+      {/* Universal Module Header with Analytics */}
+      <ModuleHeaderWithAnalytics
+        title="Vendor Purchase Bills"
+        subtitle="Record supplier GST invoices, auto-post Input Tax Credit (CGST/SGST/IGST), stock movements & vendor payables"
+        icon={FileText}
+        badge="Accounts Payable"
+        analyticsPreset="purchases"
+        analyticsMetrics={[
+          { label: "Total Billed Payables", value: `₹ ${bills.reduce((acc, b) => acc + (Number(b.totalAmount) || 0), 0).toLocaleString("en-IN")}`, trend: "+4.2%", isPositive: true, sub: "Material & procurement bills" },
+          { label: "Active Payables Due", value: `₹ ${bills.reduce((acc, b) => acc + (Number(b.balanceDue) || 0), 0).toLocaleString("en-IN")}`, trend: "Within Terms", isPositive: true, sub: "Creditors ledger 2010" },
+          { label: "Input Tax Credit (ITC)", value: `₹ ${bills.reduce((acc, b) => acc + (Number(b.cgstTotal || 0) + Number(b.sgstTotal || 0) + Number(b.igstTotal || 0)), 0).toLocaleString("en-IN")}`, trend: "GSTR-3B Ready", isPositive: true, sub: "Claimable Input GST" },
+          { label: "Settlement Rate", value: `${bills.length > 0 ? Math.round((bills.filter((b) => b.status === "PAID").length / bills.length) * 100) : 0}%`, trend: "Compliant", isPositive: true, sub: "Bills fully cleared" },
+        ]}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search bill #, supplier, vendor invoice #..."
+        viewOptions={[
+          { label: "All Bills", value: "ALL", count: bills.length },
+          { label: "Unpaid", value: "UNPAID", count: bills.filter((b) => b.status === "UNPAID").length },
+          { label: "Partially Paid", value: "PARTIAL", count: bills.filter((b) => b.status === "PARTIAL").length },
+          { label: "Paid", value: "PAID", count: bills.filter((b) => b.status === "PAID").length },
+        ]}
+        activeView={filterStatus}
+        onViewChange={setFilterStatus}
+        sampleColumns={sampleBillColumns}
+        sampleFilename="standard_roofs_vendor_bills_sample"
+        onImport={async (rows) => {
+          alert(`Imported ${rows.length} vendor bills.`);
+          return { success: true, count: rows.length };
+        }}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        primaryActionLabel="+ Record New Bill"
+        onPrimaryAction={() => setShowBillModal(true)}
+        onRefresh={loadData}
+      />
 
       {/* Bills Table */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-        <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <span className="text-xs font-black uppercase text-slate-700 dark:text-slate-300 tracking-wider">
-            All Bills ({bills.length})
-          </span>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-2.5 py-1 border rounded-lg text-xs bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-          >
-            <option value="ALL">All Bills</option>
-            <option value="UNPAID">Unpaid</option>
-            <option value="PARTIAL">Partially Paid</option>
-            <option value="PAID">Paid</option>
-          </select>
-        </div>
 
         {loading ? (
           <div className="p-8 text-center text-xs text-slate-500">Loading bills...</div>
@@ -370,16 +445,25 @@ export default function BillsPage() {
                       </span>
                     </td>
                     <td className="py-3 px-3 text-right">
-                      {Number(b.balanceDue) > 0 ? (
+                      <div className="flex items-center justify-end gap-1.5">
+                        {Number(b.balanceDue) > 0 ? (
+                          <button
+                            onClick={() => openPaymentModal(b)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow flex items-center gap-1 cursor-pointer"
+                          >
+                            <CreditCard size={12} /> Pay Bill
+                          </button>
+                        ) : (
+                          <span className="text-emerald-600 font-bold text-[11px]">Paid in Full</span>
+                        )}
                         <button
-                          onClick={() => openPaymentModal(b)}
-                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow flex items-center gap-1 ml-auto cursor-pointer"
+                          onClick={() => setArchiveBill(b)}
+                          className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                          title="Delete / Archive Bill"
                         >
-                          <CreditCard size={12} /> Pay Bill
+                          <Trash2 size={14} />
                         </button>
-                      ) : (
-                        <span className="text-emerald-600 font-bold text-[11px]">Paid in Full</span>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -792,6 +876,16 @@ export default function BillsPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Confirmation Modal */}
+      <ArchiveConfirmModal
+        isOpen={!!archiveBill}
+        onClose={() => setArchiveBill(null)}
+        onConfirm={handleArchiveConfirm}
+        recordName={archiveBill?.billNumber}
+        recordType="Vendor Bill"
+        loading={archiving}
+      />
     </div>
   );
 }

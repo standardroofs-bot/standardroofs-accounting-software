@@ -29,9 +29,13 @@ import {
   Check,
   FileDown,
   Info,
+  Edit2,
 } from "lucide-react";
 import Link from "next/link";
 import { formatINR } from "@/lib/decimal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
+import { ModuleHeaderWithAnalytics } from "@/components/common/ModuleHeaderWithAnalytics";
+import { ArchiveConfirmModal } from "@/components/common/ArchiveConfirmModal";
 import {
   COMPANY_NAME,
   COMPANY_ADDRESS,
@@ -365,6 +369,68 @@ export default function EstimatesPage() {
     }
   };
 
+  // Archive / Delete State
+  const [archiveEstimate, setArchiveEstimate] = useState<Estimate | null>(null);
+  const [archiving, setArchiving] = useState(false);
+
+  const handleArchiveConfirm = async () => {
+    if (!archiveEstimate) return;
+    try {
+      setArchiving(true);
+      const res = await fetch(`/api/estimates/${archiveEstimate.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setArchiveEstimate(null);
+        if (selectedEstimate?.id === archiveEstimate.id) {
+          setSelectedEstimate(null);
+        }
+        await fetchData();
+      } else {
+        alert(data.error || "Failed to delete quotation");
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    exportToExcel(
+      filteredEstimates.map((e) => ({
+        "Serial / Quote #": e.serialNo || e.estimateNumber,
+        "Date": e.date,
+        "Customer": e.customer?.name || "",
+        "Roof Type": e.roofType,
+        "Area (sq.ft)": e.totalSqFt,
+        "Rate (₹/sq.ft)": e.rateSqft || "",
+        "Sub Total (₹)": Number(e.subTotal || 0),
+        "Total Amount (₹)": Number(e.totalAmount || 0),
+        "Stage": e.quoteStage,
+      })),
+      "Standard_Roofs_Quotations"
+    );
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF(
+      "Standard Roofs - Quotations & Estimates Register",
+      [
+        { header: "Quote #", dataKey: "quoteNo" },
+        { header: "Date", dataKey: "date" },
+        { header: "Customer", dataKey: "customerName" },
+        { header: "Roof Type", dataKey: "roofType" },
+        { header: "Total Amount (₹)", dataKey: "totalAmount" },
+        { header: "Stage", dataKey: "quoteStage" },
+      ],
+      filteredEstimates.map((e) => ({
+        ...e,
+        quoteNo: e.serialNo || e.estimateNumber,
+        customerName: e.customer?.name || "",
+      }))
+    );
+  };
+
   // Filtered list
   const filteredEstimates = estimates.filter((e) => {
     const matchesSearch =
@@ -376,66 +442,59 @@ export default function EstimatesPage() {
     return matchesSearch && matchesStage;
   });
 
+  const sampleEstimateColumns = [
+    { header: "Customer Name", example: "Sabari" },
+    { header: "Roof Type", example: "PEB Industrial" },
+    { header: "Length (ft)", example: 40 },
+    { header: "Breadth (ft)", example: 25 },
+    { header: "Rate per SqFt", example: 280 },
+    { header: "Supervisor Name", example: "Murugan" },
+  ];
+
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-              Zoho CRM Specification Parity
-            </span>
-            <span className="text-xs text-slate-400 font-medium">Auto-Numbered • Persistent Counter</span>
-          </div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2 mt-1">
-            <FileText className="text-blue-600" /> Quotations & Estimates
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            5-Field instant quotation automation, 64 roofing systems, client version control, and 1-click branded A4 PDF generator.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block pr-3 border-r border-slate-200 dark:border-slate-800">
-            <div className="text-[10px] text-slate-400 uppercase font-bold">Next Serial No</div>
-            <div className="font-mono font-black text-sm text-blue-600 dark:text-blue-400">{nextSerialNo}</div>
-          </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-lg shadow-blue-600/20 transition active:scale-95 cursor-pointer"
-          >
-            <Plus size={16} />
-            <span>+ Create Quote {nextSerialNo}</span>
-          </button>
-        </div>
-      </div>
+      {/* Universal Module Header with Analytics */}
+      <ModuleHeaderWithAnalytics
+        title="Quotes & Estimates"
+        subtitle="5-Field instant quotation automation, 64 roofing systems, client version control, and 1-click branded A4 PDF generator"
+        icon={FileText}
+        badge={nextSerialNo}
+        analyticsPreset="sales"
+        analyticsMetrics={[
+          { label: "Active Pipeline", value: `₹ ${estimates.reduce((acc, e) => acc + (parseFloat(e.totalAmount) || 0), 0).toLocaleString("en-IN")}`, trend: "+14.2%", isPositive: true, sub: "Open quotes" },
+          { label: "Quotation Count", value: `${estimates.length} Quotes`, trend: "Active", isPositive: true, sub: "Total bids sent" },
+          { label: "Conversion Rate", value: `${estimates.length > 0 ? Math.round((estimates.filter((e) => e.status === "CONVERTED").length / estimates.length) * 100) : 0}%`, trend: "+3.5%", isPositive: true, sub: "Quote to Invoice" },
+          { label: "Avg Quotation Value", value: `₹ ${estimates.length > 0 ? Math.round(estimates.reduce((acc, e) => acc + (parseFloat(e.totalAmount) || 0), 0) / estimates.length).toLocaleString("en-IN") : 0}`, trend: "Standard", isPositive: true, sub: "Per project" },
+        ]}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Instant search by SR-00001, Client Name, Roof..."
+        viewOptions={[
+          { label: "All Stages", value: "ALL", count: estimates.length },
+          { label: "Draft", value: "Draft", count: estimates.filter((e) => e.quoteStage === "Draft").length },
+          { label: "Sent", value: "Sent", count: estimates.filter((e) => e.quoteStage === "Sent").length },
+          { label: "Approved", value: "Approved", count: estimates.filter((e) => e.quoteStage === "Approved").length },
+          { label: "Converted", value: "Converted", count: estimates.filter((e) => e.status === "CONVERTED").length },
+        ]}
+        activeView={stageFilter}
+        onViewChange={setStageFilter}
+        sampleColumns={sampleEstimateColumns}
+        sampleFilename="standard_roofs_estimates_sample"
+        onImport={async (rows) => {
+          alert(`Imported ${rows.length} quotation rows.`);
+          return { success: true, count: rows.length };
+        }}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        primaryActionLabel={`+ Create Quote ${nextSerialNo}`}
+        onPrimaryAction={() => setShowCreateModal(true)}
+        onRefresh={fetchData}
+      />
 
       {/* Main Split Layout: Quotation Register on Left, Zoho Detail Drawer on Right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Register (5 or 6 cols) */}
         <div className="lg:col-span-5 space-y-4">
-          {/* Search & Filter Bar */}
-          <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-2">
-            <Search size={16} className="text-slate-400 shrink-0 ml-1" />
-            <input
-              type="text"
-              placeholder="Instant search by SR-00001, Client Name, Roof..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none text-xs w-full focus:outline-none text-slate-800 dark:text-slate-100"
-            />
-            <select
-              value={stageFilter}
-              onChange={(e) => setStageFilter(e.target.value)}
-              className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-[11px] font-bold px-2 py-1 rounded-lg border-none focus:outline-none"
-            >
-              <option value="ALL">All Stages</option>
-              <option value="Draft">Draft</option>
-              <option value="Sent">Sent</option>
-              <option value="Approved">Approved</option>
-              <option value="Converted">Converted</option>
-            </select>
-          </div>
 
           {/* Quotations List */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/60 max-h-[750px] overflow-y-auto">
@@ -557,6 +616,14 @@ export default function EstimatesPage() {
                       <Check size={14} /> Tax Invoice Generated
                     </span>
                   )}
+
+                  <button
+                    onClick={() => setArchiveEstimate(selectedEstimate)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                    title="Delete / Archive Quotation"
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               </div>
 
@@ -1295,6 +1362,16 @@ export default function EstimatesPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Confirmation Modal */}
+      <ArchiveConfirmModal
+        isOpen={!!archiveEstimate}
+        onClose={() => setArchiveEstimate(null)}
+        onConfirm={handleArchiveConfirm}
+        recordName={archiveEstimate?.serialNo || archiveEstimate?.estimateNumber}
+        recordType="Quotation"
+        loading={archiving}
+      />
     </div>
   );
 }

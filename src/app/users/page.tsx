@@ -24,6 +24,9 @@ import {
   Users2,
   Layers,
 } from "lucide-react";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 
 interface UserItem {
   id: string;
@@ -323,33 +326,136 @@ export default function UsersPage() {
     }
   };
 
+  // Search & Role Filter & Archive Modal
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("ALL");
+  const [archiveModal, setArchiveModal] = useState<{
+    isOpen: boolean;
+    user: UserItem | null;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    user: null,
+    loading: false,
+  });
+
+  const handleExportExcel = () => {
+    const exportData = filteredUsers.map((u) => ({
+      Name: u.name,
+      Email: u.email,
+      Role: u.role,
+      Phone: u.phone || "-",
+      Active: u.active ? "Yes" : "No",
+      "Created At": u.createdAt,
+    }));
+    exportToExcel(exportData, "team_users_rbac");
+  };
+
+  const handleExportPDF = () => {
+    const printRows = filteredUsers.map((u) => [
+      u.name,
+      u.email,
+      u.role.replace(/_/g, " "),
+      u.active ? "Active" : "Disabled",
+      new Date(u.createdAt).toLocaleDateString("en-IN"),
+    ]);
+    exportToPDF("Team Members & RBAC Roles", ["Name", "Email", "Role", "Status", "Joined"], printRows, "team_users");
+  };
+
+  const handleArchiveConfirm = async () => {
+    if (!archiveModal.user) return;
+    try {
+      setArchiveModal((prev) => ({ ...prev, loading: true }));
+      const res = await fetch(`/api/users?id=${archiveModal.user.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        fetchUsers();
+        setArchiveModal({ isOpen: false, user: null, loading: false });
+      } else {
+        alert(data.error || "Failed to delete user");
+        setArchiveModal((prev) => ({ ...prev, loading: false }));
+      }
+    } catch (err: any) {
+      alert("Error: " + err.message);
+      setArchiveModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const filteredUsers = users.filter((u) => {
+    const matchesRole = roleFilter === "ALL" || u.role === roleFilter;
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      !q ||
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      u.role.toLowerCase().includes(q);
+    return matchesRole && matchesSearch;
+  });
+
   return (
     <div className="p-3 sm:p-6 space-y-6 max-w-7xl mx-auto select-none font-sans">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20">
-              Security & RBAC
-            </span>
-            <span className="text-xs text-slate-400 font-medium">4-Workspace Granular Access</span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight mt-1">
-            Team Accounts & Access Control
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Super Admin command center: grant or revoke access to any of the 4 workspaces or customize individual modules.
-          </p>
-        </div>
-
-        <button
-          onClick={() => setShowNewUserModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition active:scale-95 shrink-0"
-        >
-          <Plus size={16} />
-          <span>+ Add Team Member</span>
-        </button>
-      </div>
+      <ModuleHeaderWithAnalytics
+        title="Team Accounts & Access Control"
+        subtitle="Super Admin command center: grant or revoke access to any of the 4 workspaces or customize individual modules"
+        badge="Security & RBAC"
+        icon={Users}
+        analyticsPreset="parties"
+        analyticsCards={[
+          {
+            label: "Total Team Accounts",
+            value: users.length.toString(),
+            change: "Across all 4 workspaces",
+            isPositive: true,
+          },
+          {
+            label: "Active Accounts",
+            value: users.filter((u) => u.active).length.toString(),
+            change: "Live authenticated users",
+            isPositive: true,
+          },
+          {
+            label: "Super Admin",
+            value: users.filter((u) => u.role === "SUPER_ADMIN").length.toString(),
+            change: "Full root access",
+            isPositive: true,
+          },
+          {
+            label: "Workspace Security Guard",
+            value: "100%",
+            change: "Strict session anti-cache active",
+            isPositive: true,
+          },
+        ]}
+        searchPlaceholder="Search member by name, email, or role..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        views={[
+          { id: "ALL", label: "All Members", count: users.length },
+          { id: "SUPER_ADMIN", label: "Super Admin", count: users.filter((u) => u.role === "SUPER_ADMIN").length },
+          { id: "MANAGING_DIRECTOR", label: "Managing Director", count: users.filter((u) => u.role === "MANAGING_DIRECTOR").length },
+          { id: "ACCOUNTANT", label: "Accountant", count: users.filter((u) => u.role === "ACCOUNTANT").length },
+          { id: "HR_MANAGER", label: "HR Manager", count: users.filter((u) => u.role === "HR_MANAGER").length },
+          { id: "SITE_SUPERVISOR", label: "Site Supervisor", count: users.filter((u) => u.role === "SITE_SUPERVISOR").length },
+        ]}
+        selectedView={roleFilter}
+        onViewChange={setRoleFilter}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        sampleData={[
+          {
+            "Full Name": "Sivakumar D",
+            "Email Address": "sivakumar@standardroofs.in",
+            Role: "ACCOUNTANT",
+            Phone: "9876543210",
+          },
+        ]}
+        sampleColumns={["Full Name", "Email Address", "Role", "Phone"]}
+        primaryAction={{
+          label: "Add Team Member",
+          onClick: () => setShowNewUserModal(true),
+          icon: Plus,
+        }}
+      />
 
       {/* Users Table */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -377,8 +483,14 @@ export default function UsersPage() {
                     Loading team accounts...
                   </td>
                 </tr>
+              ) : filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-400">
+                    No team members found matching filter.
+                  </td>
+                </tr>
               ) : (
-                users.map((u) => {
+                filteredUsers.map((u) => {
                   const isSuperAdmin =
                     u.email === "admin@standardroofs.in" ||
                     u.email === "admin@standardroofs.com" ||
@@ -440,7 +552,13 @@ export default function UsersPage() {
                           </button>
                           {!isSuperAdmin && (
                             <button
-                              onClick={() => handleDeleteUser(u)}
+                              onClick={() =>
+                                setArchiveModal({
+                                  isOpen: true,
+                                  user: u,
+                                  loading: false,
+                                })
+                              }
                               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
                               title="Delete User Account"
                             >
@@ -720,6 +838,17 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Modal */}
+      <ArchiveConfirmModal
+        isOpen={archiveModal.isOpen}
+        title="Delete Team Member"
+        message="Are you sure you want to remove this team member? They will lose access to the portal immediately."
+        recordLabel={archiveModal.user ? `${archiveModal.user.name} (${archiveModal.user.email})` : ""}
+        onConfirm={handleArchiveConfirm}
+        onCancel={() => setArchiveModal({ isOpen: false, user: null, loading: false })}
+        loading={archiveModal.loading}
+      />
     </div>
   );
 }

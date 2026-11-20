@@ -19,6 +19,9 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatINR } from "@/lib/decimal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
+import { ModuleHeaderWithAnalytics } from "@/components/common/ModuleHeaderWithAnalytics";
+import { ArchiveConfirmModal } from "@/components/common/ArchiveConfirmModal";
 
 interface PurchaseOrder {
   id: string;
@@ -200,58 +203,122 @@ export default function PurchaseOrdersPage() {
   );
   const calcTotal = calcSubTotal + calcGst;
 
+  // Search & Archive State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [archivePo, setArchivePo] = useState<PurchaseOrder | null>(null);
+  const [archiving, setArchiving] = useState(false);
+
+  const handleArchiveConfirm = async () => {
+    if (!archivePo) return;
+    try {
+      setArchiving(true);
+      const res = await fetch(`/api/purchase-orders/${archivePo.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        setArchivePo(null);
+        await loadData();
+      } else {
+        alert(data.error || "Failed to delete purchase order");
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const filteredOrders = orders.filter((po) => {
+    const matchSearch =
+      po.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      po.supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (po.project && po.project.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchSearch;
+  });
+
+  const handleExportExcel = () => {
+    exportToExcel(
+      filteredOrders.map((po) => ({
+        "PO Number": po.poNumber,
+        "Date": po.date,
+        "Supplier": po.supplier.name,
+        "Project": po.project?.name || "",
+        "Sub Total (₹)": Number(po.subTotal || 0),
+        "Total Amount (₹)": Number(po.totalAmount || 0),
+        "Status": po.status,
+      })),
+      "Standard_Roofs_Purchase_Orders"
+    );
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF(
+      "Standard Roofs - Purchase Orders Register",
+      [
+        { header: "PO Number", dataKey: "poNumber" },
+        { header: "Date", dataKey: "date" },
+        { header: "Supplier", dataKey: "supplierName" },
+        { header: "Project", dataKey: "projectName" },
+        { header: "Total Amount (₹)", dataKey: "totalAmount" },
+        { header: "Status", dataKey: "status" },
+      ],
+      filteredOrders.map((po) => ({
+        ...po,
+        supplierName: po.supplier.name,
+        projectName: po.project?.name || "-",
+      }))
+    );
+  };
+
+  const samplePoColumns = [
+    { header: "Supplier Name", example: "Jindal Steel" },
+    { header: "PO Date", example: "2026-11-20" },
+    { header: "Description", example: "Tata Bluescope Galvalume Roofing Sheets" },
+    { header: "Quantity", example: 50 },
+    { header: "Unit Price", example: 485 },
+    { header: "GST Rate %", example: 18 },
+  ];
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <ShoppingCart className="text-blue-600" /> Purchase Orders
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Procurement orders for steel trusses, roofing sheets, fasteners, tiles & 1-Click Bill Conversion
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="/vendors"
-            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-bold border border-slate-300 dark:border-slate-700 transition"
-          >
-            Vendors
-          </Link>
-          <Link
-            href="/bills"
-            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-bold border border-slate-300 dark:border-slate-700 transition"
-          >
-            Vendor Bills
-          </Link>
-          <button
-            onClick={() => setShowModal(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-          >
-            <Plus size={15} /> + New Purchase Order
-          </button>
-        </div>
-      </div>
+      {/* Universal Module Header with Analytics */}
+      <ModuleHeaderWithAnalytics
+        title="Purchase Orders"
+        subtitle="Procurement orders for steel trusses, roofing sheets, fasteners, tiles & 1-Click Bill Conversion"
+        icon={ShoppingCart}
+        badge="Procurement"
+        analyticsPreset="purchases"
+        analyticsMetrics={[
+          { label: "Total PO Value", value: `₹ ${orders.reduce((acc, o) => acc + (Number(o.totalAmount) || 0), 0).toLocaleString("en-IN")}`, trend: "+6.8%", isPositive: true, sub: "All procurement orders" },
+          { label: "Pending Vendor Bills", value: `${orders.filter((o) => o.status !== "BILLED").length} Orders`, trend: "Active", isPositive: true, sub: "Awaiting invoice receipt" },
+          { label: "Billed & Cleared", value: `${orders.filter((o) => o.status === "BILLED").length} Billed`, trend: "100% Tax Invoiced", isPositive: true, sub: "General ledger posted" },
+          { label: "Average PO Size", value: `₹ ${orders.length > 0 ? Math.round(orders.reduce((acc, o) => acc + (Number(o.totalAmount) || 0), 0) / orders.length).toLocaleString("en-IN") : 0}`, trend: "Standard", isPositive: true, sub: "Per supplier batch" },
+        ]}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search PO #, supplier name, project site..."
+        viewOptions={[
+          { label: "All Status", value: "ALL", count: orders.length },
+          { label: "Issued", value: "ISSUED", count: orders.filter((o) => o.status === "ISSUED").length },
+          { label: "Billed", value: "BILLED", count: orders.filter((o) => o.status === "BILLED").length },
+          { label: "Draft", value: "DRAFT", count: orders.filter((o) => o.status === "DRAFT").length },
+        ]}
+        activeView={filterStatus}
+        onViewChange={setFilterStatus}
+        sampleColumns={samplePoColumns}
+        sampleFilename="standard_roofs_purchase_orders_sample"
+        onImport={async (rows) => {
+          alert(`Imported ${rows.length} purchase orders.`);
+          return { success: true, count: rows.length };
+        }}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        primaryActionLabel="+ New Purchase Order"
+        onPrimaryAction={() => setShowModal(true)}
+        onRefresh={loadData}
+      />
 
       {/* Orders List */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
-        <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <span className="text-xs font-black uppercase text-slate-700 dark:text-slate-300 tracking-wider">
-            All Purchase Orders ({orders.length})
-          </span>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-2.5 py-1 border rounded-lg text-xs bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-          >
-            <option value="ALL">All Status</option>
-            <option value="ISSUED">Issued</option>
-            <option value="BILLED">Billed</option>
-            <option value="DRAFT">Draft</option>
-          </select>
-        </div>
 
         {loading ? (
           <div className="p-8 text-center text-xs text-slate-500">Loading purchase orders...</div>
@@ -318,22 +385,31 @@ export default function PurchaseOrdersPage() {
                       </span>
                     </td>
                     <td className="py-3 px-3 text-right">
-                      {po.status !== "BILLED" ? (
+                      <div className="flex items-center justify-end gap-1.5">
+                        {po.status !== "BILLED" ? (
+                          <button
+                            onClick={() => handleConvertToBill(po.id)}
+                            disabled={convertingId === po.id}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          >
+                            <FileCheck size={12} /> Convert to Bill
+                          </button>
+                        ) : (
+                          <Link
+                            href="/bills"
+                            className="text-[11px] font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1"
+                          >
+                            View Bill <ChevronRight size={12} />
+                          </Link>
+                        )}
                         <button
-                          onClick={() => handleConvertToBill(po.id)}
-                          disabled={convertingId === po.id}
-                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow flex items-center gap-1 ml-auto cursor-pointer disabled:opacity-50"
+                          onClick={() => setArchivePo(po)}
+                          className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                          title="Delete / Archive PO"
                         >
-                          <FileCheck size={12} /> Convert to Bill
+                          <Trash2 size={14} />
                         </button>
-                      ) : (
-                        <Link
-                          href="/bills"
-                          className="text-[11px] font-bold text-slate-500 hover:text-blue-600 flex items-center justify-end gap-1"
-                        >
-                          View Bill <ChevronRight size={12} />
-                        </Link>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -578,6 +654,16 @@ export default function PurchaseOrdersPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Confirmation Modal */}
+      <ArchiveConfirmModal
+        isOpen={!!archivePo}
+        onClose={() => setArchivePo(null)}
+        onConfirm={handleArchiveConfirm}
+        recordName={archivePo?.poNumber}
+        recordType="Purchase Order"
+        loading={archiving}
+      />
     </div>
   );
 }

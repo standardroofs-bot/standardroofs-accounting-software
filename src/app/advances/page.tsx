@@ -14,7 +14,11 @@ import {
   Check,
   X,
   FileCheck,
+  Trash2,
 } from "lucide-react";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 
 interface AdvanceItem {
   id: string;
@@ -165,6 +169,70 @@ export default function AdvancesPage() {
     }
   };
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [archiveModal, setArchiveModal] = useState<{
+    isOpen: boolean;
+    advanceId: string;
+    advanceNumber: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    advanceId: "",
+    advanceNumber: "",
+    loading: false,
+  });
+
+  const handleExportExcel = () => {
+    const exportData = filteredAdvances.map((adv) => ({
+      "Advance #": adv.receiptNumber || adv.paymentNumber || "-",
+      Date: adv.date,
+      Party: activeTab === "CUSTOMER" ? adv.customer?.name || "-" : adv.supplier?.name || "-",
+      "Payment Mode": adv.paymentMode,
+      "Amount (₹)": adv.amount,
+      "Applied (₹)": adv.allocatedAmount,
+      "Remaining (₹)": adv.remainingBalance,
+      Status: adv.status,
+    }));
+    exportToExcel(exportData, `advances_${activeTab.toLowerCase()}`);
+  };
+
+  const handleExportPDF = () => {
+    const printRows = filteredAdvances.map((adv) => [
+      adv.receiptNumber || adv.paymentNumber || "-",
+      new Date(adv.date).toLocaleDateString("en-IN"),
+      activeTab === "CUSTOMER" ? adv.customer?.name || "-" : adv.supplier?.name || "-",
+      `₹ ${Number(adv.amount || 0).toLocaleString("en-IN")}`,
+      `₹ ${Number(adv.remainingBalance || 0).toLocaleString("en-IN")}`,
+      adv.status,
+    ]);
+    exportToPDF(
+      activeTab === "CUSTOMER" ? "Customer Advances Register" : "Supplier Material Advances",
+      ["Advance #", "Date", "Party", "Total (₹)", "Remaining (₹)", "Status"],
+      printRows,
+      `advances_${activeTab.toLowerCase()}`
+    );
+  };
+
+  const handleArchive = async () => {
+    try {
+      setArchiveModal((prev) => ({ ...prev, loading: true }));
+      setAdvances((prev) => prev.filter((a) => a.id !== archiveModal.advanceId));
+      setArchiveModal({ isOpen: false, advanceId: "", advanceNumber: "", loading: false });
+    } catch (err) {
+      console.error(err);
+      setArchiveModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const filteredAdvances = advances.filter((adv) => {
+    const q = searchQuery.toLowerCase();
+    const docNum = (adv.receiptNumber || adv.paymentNumber || "").toLowerCase();
+    const partyName = (
+      activeTab === "CUSTOMER" ? adv.customer?.name || "" : adv.supplier?.name || ""
+    ).toLowerCase();
+    return !q || docNum.includes(q) || partyName.includes(q);
+  });
+
   const totalPool = advances.reduce((sum, a) => sum + parseFloat(a.amount || "0"), 0);
   const remainingPool = advances.reduce((sum, a) => sum + parseFloat(a.remainingBalance || "0"), 0);
   const allocatedPool = advances.reduce((sum, a) => sum + parseFloat(a.allocatedAmount || "0"), 0);
@@ -176,85 +244,73 @@ export default function AdvancesPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500/10 text-blue-600 border border-blue-500/20">
-              Zoho Books Parity
-            </span>
-            <span className="text-xs text-slate-400 font-medium">1-Click Invoice & Bill Reconciliation</span>
-          </div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight mt-1">
-            Advances & Retainer Invoices
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Record customer advance payments and vendor material advances, and apply them against final bills with 1-click double-entry posting.
-          </p>
-        </div>
-
-        <button
-          onClick={() => setShowRecordModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition active:scale-95"
-        >
-          <Plus size={16} />
-          <span>{activeTab === "CUSTOMER" ? "+ Record Customer Advance" : "+ Record Supplier Advance"}</span>
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2">
-        <button
-          onClick={() => setActiveTab("CUSTOMER")}
-          className={`flex items-center gap-2 px-5 py-2.5 text-xs font-bold border-b-2 transition ${
-            activeTab === "CUSTOMER"
-              ? "border-blue-600 text-blue-600 bg-blue-50/50 dark:bg-blue-950/20"
-              : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
-          }`}
-        >
-          <ArrowDownLeft size={16} />
-          <span>Customer Project Advances (Liability)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("SUPPLIER")}
-          className={`flex items-center gap-2 px-5 py-2.5 text-xs font-bold border-b-2 transition ${
-            activeTab === "SUPPLIER"
-              ? "border-blue-600 text-blue-600 bg-blue-50/50 dark:bg-blue-950/20"
-              : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
-          }`}
-        >
-          <ArrowUpRight size={16} />
-          <span>Supplier Material Advances (Asset)</span>
-        </button>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-xs font-semibold text-slate-500">Total Advances Recorded</span>
-          <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1 font-mono">
-            ₹ {totalPool.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </div>
-          <span className="text-[11px] text-slate-400">Total Capital Inward / Outward</span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-xs font-semibold text-slate-500">Applied against Invoices / Bills</span>
-          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
-            ₹ {allocatedPool.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </div>
-          <span className="text-[11px] text-emerald-600 font-medium">Reconciled into AR/AP</span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-xs font-semibold text-slate-500">Unapplied Advance Balance</span>
-          <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1 font-mono">
-            ₹ {remainingPool.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </div>
-          <span className="text-[11px] text-slate-400">Available to Settle Future Invoices</span>
-        </div>
-      </div>
+      <ModuleHeaderWithAnalytics
+        title="Advances & Retainer Invoices"
+        subtitle="Record customer advance payments and vendor material advances, and apply them against final bills with 1-click double-entry posting"
+        badge="Advances Parity"
+        icon={Wallet}
+        analyticsPreset="banking"
+        analyticsCards={[
+          {
+            label: "Total Advances (FY)",
+            value: `₹ ${totalPool.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+            change: `${advances.length} total advances recorded`,
+            isPositive: true,
+          },
+          {
+            label: "Reconciled & Applied",
+            value: `₹ ${allocatedPool.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+            change: "Applied to final invoices/bills",
+            isPositive: true,
+          },
+          {
+            label: "Unapplied Pool",
+            value: `₹ ${remainingPool.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+            change: "Available to settle pending bills",
+            isPositive: false,
+          },
+          {
+            label: "Reconciliation Rate",
+            value: `${((allocatedPool / (totalPool || 1)) * 100).toFixed(1)}%`,
+            change: "Advance utilization ratio",
+            isPositive: true,
+          },
+        ]}
+        searchPlaceholder="Search advance #, customer, or supplier name..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        views={[
+          { id: "CUSTOMER", label: "Customer Project Advances", count: advances.filter((a) => a.receiptNumber).length || advances.length },
+          { id: "SUPPLIER", label: "Supplier Material Advances", count: advances.filter((a) => a.paymentNumber).length },
+        ]}
+        selectedView={activeTab}
+        onViewChange={(v) => setActiveTab(v as any)}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        sampleData={[
+          {
+            "Advance Number": "ADV-26-001",
+            Date: "2026-11-20",
+            "Party Name": "Sabari & Co",
+            "Payment Mode": "BANK",
+            "Advance Amount (₹)": "100000",
+            Notes: "Initial contract mobilization advance",
+          },
+        ]}
+        sampleColumns={[
+          "Advance Number",
+          "Date",
+          "Party Name",
+          "Payment Mode",
+          "Advance Amount (₹)",
+          "Notes",
+        ]}
+        primaryAction={{
+          label: activeTab === "CUSTOMER" ? "Record Customer Advance" : "Record Supplier Advance",
+          onClick: () => setShowRecordModal(true),
+          icon: Plus,
+        }}
+      />
 
       {/* Table */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -280,14 +336,14 @@ export default function AdvancesPage() {
                     Loading advances...
                   </td>
                 </tr>
-              ) : advances.length === 0 ? (
+              ) : filteredAdvances.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-slate-400">
-                    No advances recorded yet. Use "+ Record Advance" to add one.
+                    No advances found matching filter.
                   </td>
                 </tr>
               ) : (
-                advances.map((adv) => {
+                filteredAdvances.map((adv) => {
                   const hasRemaining = parseFloat(adv.remainingBalance) > 0;
                   return (
                     <tr key={adv.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
@@ -305,13 +361,13 @@ export default function AdvancesPage() {
                           {adv.paymentMode}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
+                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
                         ₹ {parseFloat(adv.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-emerald-600">
+                      <td className="py-3 px-4 text-right font-mono text-emerald-600 tabular-nums">
                         ₹ {parseFloat(adv.allocatedAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-amber-600">
+                      <td className="py-3 px-4 text-right font-mono font-bold text-amber-600 tabular-nums">
                         ₹ {parseFloat(adv.remainingBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 px-4 text-center">
@@ -326,20 +382,36 @@ export default function AdvancesPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        {hasRemaining ? (
+                        <div className="flex items-center justify-center gap-1.5">
+                          {hasRemaining ? (
+                            <button
+                              onClick={() => {
+                                setSelectedAdvance(adv);
+                                setShowApplyModal(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] shadow-sm transition active:scale-95"
+                            >
+                              <Sparkles size={12} />
+                              <span>Apply to Bill</span>
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-medium">Fully Settled</span>
+                          )}
                           <button
-                            onClick={() => {
-                              setSelectedAdvance(adv);
-                              setShowApplyModal(true);
-                            }}
-                            className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] shadow-sm transition active:scale-95"
+                            onClick={() =>
+                              setArchiveModal({
+                                isOpen: true,
+                                advanceId: adv.id,
+                                advanceNumber: adv.receiptNumber || adv.paymentNumber || "ADV",
+                                loading: false,
+                              })
+                            }
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition"
+                            title="Archive Advance"
                           >
-                            <Sparkles size={12} />
-                            <span>Apply to Bill</span>
+                            <Trash2 size={13} />
                           </button>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 font-medium">Fully Settled</span>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -568,6 +640,19 @@ export default function AdvancesPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Modal */}
+      <ArchiveConfirmModal
+        isOpen={archiveModal.isOpen}
+        title="Archive Advance Record"
+        message="Are you sure you want to archive this advance payment? It will be removed from active unapplied balances."
+        recordLabel={archiveModal.advanceNumber}
+        onConfirm={handleArchive}
+        onCancel={() =>
+          setArchiveModal({ isOpen: false, advanceId: "", advanceNumber: "", loading: false })
+        }
+        loading={archiveModal.loading}
+      />
     </div>
   );
 }

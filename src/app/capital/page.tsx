@@ -16,7 +16,11 @@ import {
   Percent,
   FileText,
   PieChart,
+  Trash2,
 } from "lucide-react";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 
 export default function CapitalPage() {
   const [activeTab, setActiveTab] = useState<"capital" | "loans" | "assets">("capital");
@@ -199,98 +203,203 @@ export default function CapitalPage() {
     }
   }
 
+  // Search & Archive Modal
+  const [searchQuery, setSearchQuery] = useState("");
+  const [archiveModal, setArchiveModal] = useState<{
+    isOpen: boolean;
+    recordId: string;
+    recordLabel: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    recordId: "",
+    recordLabel: "",
+    loading: false,
+  });
+
+  const handleExportExcel = () => {
+    let exportData: any[] = [];
+    if (activeTab === "capital") {
+      exportData = capitalTransactions.map((t) => ({
+        Partner: t.partnerName,
+        Type: t.transactionType,
+        "Amount (₹)": t.amount,
+        Date: t.date,
+        Mode: t.paymentMode,
+        Notes: t.notes || "-",
+      }));
+    } else if (activeTab === "loans") {
+      exportData = loans.map((l) => ({
+        "Loan Code": l.loanCode,
+        Lender: l.lenderName,
+        Type: l.loanType,
+        "Principal (₹)": l.principalAmount,
+        "Outstanding (₹)": l.outstandingBalance,
+        "Rate (%)": l.interestRate,
+        Status: l.status,
+      }));
+    } else {
+      exportData = fixedAssets.map((a) => ({
+        "Asset Code": a.assetCode,
+        Name: a.name,
+        Category: a.category,
+        "Purchase Cost (₹)": a.purchaseCost,
+        "Current Book Value (₹)": a.currentBookValue,
+        Location: a.location || "-",
+        Status: a.status,
+      }));
+    }
+    exportToExcel(exportData, `capital_${activeTab}`);
+  };
+
+  const handleExportPDF = () => {
+    if (activeTab === "capital") {
+      const rows = capitalTransactions.map((t) => [
+        t.partnerName,
+        t.transactionType.replace("_", " "),
+        `₹ ${Number(t.amount).toLocaleString("en-IN")}`,
+        new Date(t.date).toLocaleDateString("en-IN"),
+        t.paymentMode,
+      ]);
+      exportToPDF("Partner Capital & Equity", ["Partner", "Type", "Amount", "Date", "Mode"], rows, "capital_equity");
+    } else if (activeTab === "loans") {
+      const rows = loans.map((l) => [
+        l.loanCode,
+        l.lenderName,
+        l.loanType,
+        `₹ ${Number(l.principalAmount).toLocaleString("en-IN")}`,
+        `₹ ${Number(l.outstandingBalance).toLocaleString("en-IN")}`,
+        l.status,
+      ]);
+      exportToPDF("Loans & Borrowings Schedule", ["Code", "Lender", "Type", "Principal", "Outstanding", "Status"], rows, "loans_schedule");
+    } else {
+      const rows = fixedAssets.map((a) => [
+        a.assetCode,
+        a.name,
+        a.category,
+        `₹ ${Number(a.currentBookValue).toLocaleString("en-IN")}`,
+        a.status,
+      ]);
+      exportToPDF("Fixed Assets Register", ["Asset Code", "Name", "Category", "Book Value", "Status"], rows, "fixed_assets");
+    }
+  };
+
+  const handleArchive = async () => {
+    try {
+      setArchiveModal((prev) => ({ ...prev, loading: true }));
+      if (activeTab === "capital") {
+        setCapitalTransactions((prev) => prev.filter((item) => item.id !== archiveModal.recordId));
+      } else if (activeTab === "loans") {
+        setLoans((prev) => prev.filter((item) => item.id !== archiveModal.recordId));
+      } else {
+        setFixedAssets((prev) => prev.filter((item) => item.id !== archiveModal.recordId));
+      }
+      setArchiveModal({ isOpen: false, recordId: "", recordLabel: "", loading: false });
+    } catch (err) {
+      console.error(err);
+      setArchiveModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Landmark className="h-7 w-7 text-amber-500" />
-            Capital Investments, Loans & Fixed Assets
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Real money-flow accounting: Owner equity infusions, partner drawings, vehicle/business loans, 3-line EMI splits & fixed assets
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => {
-              setCapitalForm((prev) => ({ ...prev, transactionType: "CAPITAL_INFUSION" }));
-              setShowCapitalModal(true);
-            }}
-            className="px-3.5 py-2 text-xs font-bold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-sm transition-colors"
-          >
-            <Plus className="h-4 w-4" /> + Infuse Capital
-          </button>
-          <button
-            onClick={() => {
-              setCapitalForm((prev) => ({ ...prev, transactionType: "PARTNER_DRAWING" }));
-              setShowCapitalModal(true);
-            }}
-            className="px-3 py-2 text-xs font-semibold rounded-md border border-border bg-card hover:bg-muted text-foreground flex items-center gap-1.5 transition-colors"
-          >
-            <Plus className="h-4 w-4" /> Partner Drawing
-          </button>
-          <button
-            onClick={() => setShowLoanModal(true)}
-            className="px-3 py-2 text-xs font-semibold rounded-md border border-border bg-card hover:bg-muted text-foreground flex items-center gap-1.5 transition-colors"
-          >
-            <CreditCard className="h-4 w-4 text-blue-500" /> Register Loan
-          </button>
-          <button
-            onClick={() => setShowAssetModal(true)}
-            className="px-3.5 py-2 text-xs font-bold rounded-md bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-sm transition-colors"
-          >
-            <Wrench className="h-4 w-4" /> + Add Fixed Asset
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Financial Overview Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <TrendingUp className="h-4 w-4 text-emerald-500" /> Net Owner Equity
+      <ModuleHeaderWithAnalytics
+        title="Capital Investments, Loans & Fixed Assets"
+        subtitle="Real money-flow accounting: Owner equity infusions, partner drawings, vehicle/business loans & fixed assets"
+        badge="Capital & Equity"
+        icon={Landmark}
+        analyticsPreset="banking"
+        analyticsCards={[
+          {
+            label: "Net Owner Equity",
+            value: `₹ ${Number(summary.netEquityInjected || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+            change: `Infused: ₹${Number(summary.totalCapitalInfused || 0).toLocaleString()}`,
+            isPositive: true,
+          },
+          {
+            label: "Loans Outstanding",
+            value: `₹ ${Number(summary.totalLoanOutstanding || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+            change: `${loans.filter((l) => l.status === "ACTIVE").length} active loans`,
+            isPositive: false,
+          },
+          {
+            label: "Fixed Assets (Book Value)",
+            value: `₹ ${Number(summary.totalFixedAssetsValue || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+            change: `${fixedAssets.length} Plant Machinery & Fleet`,
+            isPositive: true,
+          },
+          {
+            label: "EMIs Recorded",
+            value: `${emiPayments.length} Payments`,
+            change: "Principal & Interest splits",
+            isPositive: true,
+          },
+        ]}
+        searchPlaceholder="Search partners, lenders, vehicle loans or assets..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        views={[
+          { id: "capital", label: "Partner Capital", count: capitalTransactions.length },
+          { id: "loans", label: "Loans & Borrowings", count: loans.length },
+          { id: "assets", label: "Fixed Assets", count: fixedAssets.length },
+        ]}
+        selectedView={activeTab}
+        onViewChange={(v) => setActiveTab(v as any)}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        sampleData={[
+          {
+            "Partner Name": "Managing Director",
+            "Transaction Type": "CAPITAL_INFUSION",
+            "Amount (₹)": "500000",
+            Date: "2026-11-20",
+            "Payment Mode": "BANK",
+            Notes: "Additional operating equity injection",
+          },
+        ]}
+        sampleColumns={[
+          "Partner Name",
+          "Transaction Type",
+          "Amount (₹)",
+          "Date",
+          "Payment Mode",
+          "Notes",
+        ]}
+        customActions={
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                setCapitalForm((prev) => ({ ...prev, transactionType: "CAPITAL_INFUSION" }));
+                setShowCapitalModal(true);
+              }}
+              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-xs transition"
+            >
+              <Plus className="h-3.5 w-3.5" /> + Infuse Capital
+            </button>
+            <button
+              onClick={() => {
+                setCapitalForm((prev) => ({ ...prev, transactionType: "PARTNER_DRAWING" }));
+                setShowCapitalModal(true);
+              }}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition"
+            >
+              <Plus className="h-3.5 w-3.5" /> Partner Drawing
+            </button>
+            <button
+              onClick={() => setShowLoanModal(true)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition"
+            >
+              <CreditCard className="h-3.5 w-3.5 text-blue-500" /> Register Loan
+            </button>
+            <button
+              onClick={() => setShowAssetModal(true)}
+              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-xs transition"
+            >
+              <Wrench className="h-3.5 w-3.5" /> + Add Fixed Asset
+            </button>
           </div>
-          <div className="text-2xl font-bold mt-1 text-foreground">
-            ₹ {Number(summary.netEquityInjected || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            Infused: ₹{Number(summary.totalCapitalInfused || 0).toLocaleString()} • Drawings: ₹{Number(summary.totalDrawings || 0).toLocaleString()}
-          </div>
-        </div>
-
-        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <CreditCard className="h-4 w-4 text-blue-500" /> Active Loans Outstanding
-          </div>
-          <div className="text-2xl font-bold mt-1 text-foreground">
-            ₹ {Number(summary.totalLoanOutstanding || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {loans.filter((l) => l.status === "ACTIVE").length} Loans (Vehicles & CC/OD)
-          </div>
-        </div>
-
-        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Truck className="h-4 w-4 text-amber-500" /> Fixed Assets (Book Value)
-          </div>
-          <div className="text-2xl font-bold mt-1 text-foreground">
-            ₹ {Number(summary.totalFixedAssetsValue || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </div>
-          <div className="text-xs text-muted-foreground mt-0.5">{fixedAssets.length} Plant Machinery & Fleet</div>
-        </div>
-
-        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Percent className="h-4 w-4 text-indigo-500" /> Total EMIs Paid
-          </div>
-          <div className="text-2xl font-bold mt-1 text-foreground">{emiPayments.length} EMIs</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Auto-split Principal & Interest</div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Tabs Switcher */}
       <div className="flex border-b border-border bg-card rounded-t-lg px-2 pt-2">
@@ -1185,6 +1294,19 @@ export default function CapitalPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Modal */}
+      <ArchiveConfirmModal
+        isOpen={archiveModal.isOpen}
+        title="Archive Record"
+        message="Are you sure you want to archive this financial record? It will be removed from active calculations."
+        recordLabel={archiveModal.recordLabel}
+        onConfirm={handleArchive}
+        onCancel={() =>
+          setArchiveModal({ isOpen: false, recordId: "", recordLabel: "", loading: false })
+        }
+        loading={archiveModal.loading}
+      />
     </div>
   );
 }

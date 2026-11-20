@@ -16,7 +16,11 @@ import {
   ArrowRight,
   Clock,
   CheckCircle2,
+  Trash2,
 } from "lucide-react";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 
 export default function FleetPage() {
   const [vehicles, setVehicles] = useState<any[]>([]);
@@ -207,80 +211,154 @@ export default function FleetPage() {
     }
   }
 
+  // Search & Archive State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [fleetTab, setFleetTab] = useState("ALL");
+  const [archiveModal, setArchiveModal] = useState<{
+    isOpen: boolean;
+    recordId: string;
+    recordLabel: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    recordId: "",
+    recordLabel: "",
+    loading: false,
+  });
+
+  const handleExportExcel = () => {
+    const exportData = trips.map((t) => ({
+      Date: t.date,
+      Vehicle: t.vehicle?.vehicleNumber || "-",
+      Driver: t.driver?.name || "-",
+      From: t.fromLocation,
+      To: t.toLocation,
+      "Distance (km)": (t.closingKm || 0) - (t.startKm || 0),
+      "Fuel Cost (₹)": t.fuelCost,
+      "Toll Cost (₹)": t.tollCost,
+      "Driver Bata (₹)": t.driverBata,
+    }));
+    exportToExcel(exportData, "fleet_trips");
+  };
+
+  const handleExportPDF = () => {
+    const printRows = trips.map((t) => [
+      new Date(t.date).toLocaleDateString("en-IN"),
+      t.vehicle?.vehicleNumber || "-",
+      t.driver?.name || "-",
+      `${t.fromLocation} → ${t.toLocation}`,
+      `₹ ${Number(t.fuelCost || 0).toLocaleString("en-IN")}`,
+    ]);
+    exportToPDF("Fleet & Cargo Trips", ["Date", "Vehicle", "Driver", "Route", "Fuel Cost"], printRows, "fleet_trips");
+  };
+
+  const handleArchive = async () => {
+    try {
+      setArchiveModal((prev) => ({ ...prev, loading: true }));
+      setVehicles((prev) => prev.filter((v) => v.id !== archiveModal.recordId));
+      setTrips((prev) => prev.filter((t) => t.id !== archiveModal.recordId));
+      setArchiveModal({ isOpen: false, recordId: "", recordLabel: "", loading: false });
+    } catch (err) {
+      console.error(err);
+      setArchiveModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Truck className="h-7 w-7 text-amber-500" />
-            Fleet & Cargo Vehicles
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Manage company transport vehicles, drivers, daily site dispatch trips, and automatic project fuel costing
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setShowVehicleModal(true)}
-            className="px-3 py-2 text-xs font-semibold rounded-md border border-border bg-card hover:bg-muted text-foreground flex items-center gap-1.5 transition-colors"
-          >
-            <Plus className="h-4 w-4" /> Add Vehicle
-          </button>
-          <button
-            onClick={() => setShowDriverModal(true)}
-            className="px-3 py-2 text-xs font-semibold rounded-md border border-border bg-card hover:bg-muted text-foreground flex items-center gap-1.5 transition-colors"
-          >
-            <Plus className="h-4 w-4" /> Add Driver
-          </button>
-          <button
-            onClick={() => {
-              if (vehicles.length > 0) handleVehicleSelect(vehicles[0].id);
-              setShowTripModal(true);
-            }}
-            className="px-4 py-2 text-xs font-semibold rounded-md bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-sm transition-colors"
-          >
-            <Navigation className="h-4 w-4" /> + Log Daily Site Trip
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Truck className="h-4 w-4 text-blue-500" /> Company Cargo Fleet
+      <ModuleHeaderWithAnalytics
+        title="Fleet & Cargo Vehicles"
+        subtitle="Manage company transport vehicles, drivers, daily site dispatch trips, and automatic project fuel costing"
+        badge="Fleet Logistics"
+        icon={Truck}
+        analyticsPreset="operations"
+        analyticsCards={[
+          {
+            label: "Company Cargo Fleet",
+            value: `${vehicles.length} Vehicles`,
+            change: "Bolero Pickup & Eicher 14ft",
+            isPositive: true,
+          },
+          {
+            label: "Dedicated Drivers",
+            value: `${drivers.length} Drivers`,
+            change: "Monthly Salary + Trip Bata",
+            isPositive: true,
+          },
+          {
+            label: "Total Fuel & Diesel",
+            value: `₹ ${totalFuelCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+            change: "Auto-posted to Ledger 5050",
+            isPositive: false,
+          },
+          {
+            label: "Total Distance Run",
+            value: `${totalKmRun.toLocaleString()} km`,
+            change: `${trips.length} Site Trips Logged`,
+            isPositive: true,
+          },
+        ]}
+        searchPlaceholder="Search vehicles, drivers, site routes, or trips..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        views={[
+          { id: "ALL", label: "Fleet Overview", count: vehicles.length + trips.length },
+          { id: "VEHICLES", label: "Vehicles", count: vehicles.length },
+          { id: "DRIVERS", label: "Drivers", count: drivers.length },
+          { id: "TRIPS", label: "Trips Logged", count: trips.length },
+        ]}
+        selectedView={fleetTab}
+        onViewChange={setFleetTab}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        sampleData={[
+          {
+            Date: "2026-11-20",
+            "Vehicle Number": "TN 33 BM 7711",
+            Driver: "K. Murugesan",
+            "From Location": "Erode Yard",
+            "To Location": "Namakkal Site",
+            "Start Km": "45200",
+            "Closing Km": "45285",
+            "Fuel Cost (₹)": "1800",
+          },
+        ]}
+        sampleColumns={[
+          "Date",
+          "Vehicle Number",
+          "Driver",
+          "From Location",
+          "To Location",
+          "Start Km",
+          "Closing Km",
+          "Fuel Cost (₹)",
+        ]}
+        customActions={
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowVehicleModal(true)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition"
+            >
+              <Plus className="h-3.5 w-3.5" /> + Vehicle
+            </button>
+            <button
+              onClick={() => setShowDriverModal(true)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition"
+            >
+              <Plus className="h-3.5 w-3.5" /> + Driver
+            </button>
+            <button
+              onClick={() => {
+                if (vehicles.length > 0) handleVehicleSelect(vehicles[0].id);
+                setShowTripModal(true);
+              }}
+              className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center gap-1.5 shadow-xs transition"
+            >
+              <Navigation className="h-3.5 w-3.5" /> + Log Daily Trip
+            </button>
           </div>
-          <div className="text-2xl font-bold mt-1 text-foreground">{vehicles.length} Vehicles</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Bolero Pickup & Eicher 14ft</div>
-        </div>
-
-        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <User className="h-4 w-4 text-emerald-500" /> Dedicated Drivers
-          </div>
-          <div className="text-2xl font-bold mt-1 text-foreground">{drivers.length} Drivers</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Monthly Salary + Trip Bata</div>
-        </div>
-
-        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Fuel className="h-4 w-4 text-amber-500" /> Total Fuel & Site Diesel
-          </div>
-          <div className="text-2xl font-bold mt-1 text-foreground">
-            ₹ {totalFuelCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </div>
-          <div className="text-xs text-muted-foreground mt-0.5">Auto-posted to Ledger 5050</div>
-        </div>
-
-        <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Navigation className="h-4 w-4 text-indigo-500" /> Total Distance Run
-          </div>
-          <div className="text-2xl font-bold mt-1 text-foreground">{totalKmRun.toLocaleString()} km</div>
-          <div className="text-xs text-muted-foreground mt-0.5">{trips.length} Site Trips Logged</div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Vehicles Fleet Cards */}
       <div>
@@ -838,6 +916,19 @@ export default function FleetPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Modal */}
+      <ArchiveConfirmModal
+        isOpen={archiveModal.isOpen}
+        title="Archive Fleet Record"
+        message="Are you sure you want to archive this vehicle or trip? It will be removed from active dispatch calculations."
+        recordLabel={archiveModal.recordLabel}
+        onConfirm={handleArchive}
+        onCancel={() =>
+          setArchiveModal({ isOpen: false, recordId: "", recordLabel: "", loading: false })
+        }
+        loading={archiveModal.loading}
+      />
     </div>
   );
 }

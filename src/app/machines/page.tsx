@@ -28,7 +28,11 @@ import {
   Save,
   Edit2,
   ZoomIn,
+  Trash2,
 } from "lucide-react";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
+import { exportToPDF } from "@/lib/exportUtils";
 
 export default function MachinesPage() {
   const [activeTab, setActiveTab] = useState<"matrix" | "teams" | "whohaswhat" | "consumables" | "service">("matrix");
@@ -39,6 +43,47 @@ export default function MachinesPage() {
   const [siteIssues, setSiteIssues] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Archive Modal State
+  const [archiveModal, setArchiveModal] = useState<{
+    isOpen: boolean;
+    machineId: string;
+    machineName: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    machineId: "",
+    machineName: "",
+    loading: false,
+  });
+
+  const handlePDFExport = () => {
+    const printRows = filteredMachines.map((m) => [
+      m.name,
+      m.category,
+      (m.officeCount || 0).toString(),
+      (m.totalCount || 0).toString(),
+      (m.serviceCount || 0).toString(),
+      m.notes || "-",
+    ]);
+    exportToPDF(
+      "SRM Machine & Tool Custody Register",
+      ["Machine Name", "Category", "Office", "Total", "In Service", "Notes"],
+      printRows,
+      "machines_inventory"
+    );
+  };
+
+  const handleArchive = async () => {
+    try {
+      setArchiveModal((prev) => ({ ...prev, loading: true }));
+      setMachines((prev) => prev.filter((m) => m.id !== archiveModal.machineId));
+      setArchiveModal({ isOpen: false, machineId: "", machineName: "", loading: false });
+    } catch (err) {
+      console.error(err);
+      setArchiveModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
 
   // Lightbox Zoom Modal State
   const [zoomImage, setZoomImage] = useState<string | null>(null);
@@ -365,73 +410,115 @@ export default function MachinesPage() {
     (m.notes && m.notes.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  const totalAssetsLive = machines.reduce((s, m) => s + (m.totalCount || 0), 0);
+  const totalInService = machines.reduce((s, m) => s + (m.serviceCount || 0), 0);
+  const totalInOffice = machines.reduce((s, m) => s + (m.officeCount || 0), 0);
+
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Header Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" /> 2026 Real Tracking System Synced
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-              35 Assets Live with Real Photos
-            </span>
+      <ModuleHeaderWithAnalytics
+        title="SRM Machine, Tool & Site Custody"
+        subtitle="Exact multi-sheet synchronization matching 1_SRMachines_Tracking_2026_With_Images.xlsx · Live Team Custody & Consumables"
+        badge="35 Assets Live"
+        icon={Wrench}
+        analyticsPreset="operations"
+        analyticsCards={[
+          {
+            label: "Total Machine Types",
+            value: machines.length.toString(),
+            change: "Power Tools & Equipment",
+            isPositive: true,
+          },
+          {
+            label: "Total Assets in Fleet",
+            value: totalAssetsLive.toString(),
+            change: "Across all 6 SRM teams",
+            isPositive: true,
+          },
+          {
+            label: "In Yard / Office",
+            value: totalInOffice.toString(),
+            change: "Erode central custody",
+            isPositive: true,
+          },
+          {
+            label: "Under Repair / Service",
+            value: totalInService.toString(),
+            change: "Vendor repair tracking",
+            isPositive: false,
+          },
+        ]}
+        searchPlaceholder="Search machine name, tool model, category or notes..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        views={[
+          { id: "matrix", label: "Custody Matrix", count: machines.length },
+          { id: "teams", label: "Team Breakdown", count: 6 },
+          { id: "whohaswhat", label: "Who Has What", count: 35 },
+          { id: "consumables", label: "Site Consumables", count: siteIssues.length },
+          { id: "service", label: "Service / Repairs", count: totalInService },
+        ]}
+        selectedView={activeTab}
+        onViewChange={(v) => setActiveTab(v as any)}
+        onExportExcel={handleExcelExport}
+        onExportPDF={handlePDFExport}
+        sampleData={[
+          {
+            "Machine Name": "Welding Machine 300A",
+            Category: "Power Tools",
+            "Office Count": "2",
+            "SRM01 Count": "1",
+            "SRM02 Count": "1",
+            "Total Count": "4",
+            Notes: "Single phase inverter welder",
+          },
+        ]}
+        sampleColumns={[
+          "Machine Name",
+          "Category",
+          "Office Count",
+          "SRM01 Count",
+          "SRM02 Count",
+          "Total Count",
+          "Notes",
+        ]}
+        customActions={
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowAddMachineModal(true)}
+              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 flex items-center gap-1.5 shadow-xs transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              + Add Machine
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleExcelImport}
+              accept=".xlsx"
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 flex items-center gap-1.5 transition"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Sync Excel
+            </button>
+            <button
+              onClick={() => {
+                setTransferFrom("OFFICE");
+                setTransferTo("SRM01");
+                setShowTransferModal(true);
+              }}
+              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 shadow-xs transition"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              Transfer Machine
+            </button>
           </div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1.5 flex items-center gap-2">
-            <Wrench className="w-6 h-6 text-amber-500" />
-            SRM Machine, Tool &amp; Site Material Custody System
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Exact multi-sheet synchronization matching <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">1_SRMachines_Tracking_2026_With_Images.xlsx</code> &middot; Live Team Custody &amp; Site Consumables
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            onClick={() => setShowAddMachineModal(true)}
-            className="px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 flex items-center gap-1.5 shadow-xs transition"
-          >
-            <Plus className="w-4 h-4" />
-            + Add Machine
-          </button>
-
-          <button
-            onClick={handleExcelExport}
-            className="px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 shadow-xs transition"
-          >
-            <Download className="w-4 h-4" />
-            Export Excel
-          </button>
-
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleExcelImport}
-            accept=".xlsx"
-            className="hidden"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 flex items-center gap-1.5 transition"
-          >
-            <Upload className="w-4 h-4" />
-            Import / Sync Excel
-          </button>
-
-          <button
-            onClick={() => {
-              setTransferFrom("OFFICE");
-              setTransferTo("SRM01");
-              setShowTransferModal(true);
-            }}
-            className="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 shadow-xs transition"
-          >
-            <ArrowRightLeft className="w-4 h-4" />
-            Transfer Machine
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {alertMsg && (
         <div
@@ -1694,6 +1781,19 @@ export default function MachinesPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Modal */}
+      <ArchiveConfirmModal
+        isOpen={archiveModal.isOpen}
+        title="Archive Machine / Equipment"
+        message="Are you sure you want to archive this machine? It will be removed from active team custody tracking."
+        recordLabel={archiveModal.machineName}
+        onConfirm={handleArchive}
+        onCancel={() =>
+          setArchiveModal({ isOpen: false, machineId: "", machineName: "", loading: false })
+        }
+        loading={archiveModal.loading}
+      />
     </div>
   );
 }

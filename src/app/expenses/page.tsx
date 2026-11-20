@@ -14,8 +14,12 @@ import {
   Building2,
   Briefcase,
   Users,
+  Trash2,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
+import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
+import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
+import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 
 interface ExpenseItem {
   id: string;
@@ -153,95 +157,151 @@ export default function ExpensesPage() {
     }
   };
 
-  const filteredExpenses = expenses.filter((e) => {
-    if (filterTab === "SITE") return !e.isOfficeExpense;
-    if (filterTab === "OFFICE") return e.isOfficeExpense;
-    return true;
+  // Search & Archive Modal
+  const [searchQuery, setSearchQuery] = useState("");
+  const [archiveModal, setArchiveModal] = useState<{
+    isOpen: boolean;
+    expenseId: string;
+    voucherNumber: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    expenseId: "",
+    voucherNumber: "",
+    loading: false,
   });
 
-  const totalFilteredAmount = filteredExpenses.reduce((s, e) => s + Number(e.amount), 0);
+  const handleExportExcel = () => {
+    const exportData = filteredExpenses.map((e) => ({
+      "Voucher #": e.voucherNumber,
+      Date: e.date,
+      Classification: e.isOfficeExpense ? "Office Overhead" : "Site Direct",
+      Project: e.project?.name || "General Site",
+      Team: e.teamName || "-",
+      "Expense Head": `${e.account.code} - ${e.account.name}`,
+      Particulars: e.purpose,
+      "Payment Mode": e.paymentMode,
+      "Amount (₹)": e.amount,
+    }));
+    exportToExcel(exportData, "site_office_expenses");
+  };
+
+  const handleExportPDF = () => {
+    const printRows = filteredExpenses.map((e) => [
+      e.voucherNumber,
+      new Date(e.date).toLocaleDateString("en-IN"),
+      e.isOfficeExpense ? "Office" : "Site",
+      e.project?.name || "General",
+      e.purpose,
+      formatINR(e.amount),
+    ]);
+    exportToPDF("Expenses & Overheads Register", ["Voucher #", "Date", "Class", "Project", "Particulars", "Amount (₹)"], printRows, "expenses_register");
+  };
+
+  const handleArchive = async () => {
+    try {
+      setArchiveModal((prev) => ({ ...prev, loading: true }));
+      setExpenses((prev) => prev.filter((item) => item.id !== archiveModal.expenseId));
+      setArchiveModal({ isOpen: false, expenseId: "", voucherNumber: "", loading: false });
+    } catch (err) {
+      console.error(err);
+      setArchiveModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const filteredExpenses = expenses.filter((e) => {
+    if (filterTab === "SITE" && e.isOfficeExpense) return false;
+    if (filterTab === "OFFICE" && !e.isOfficeExpense) return false;
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      !q ||
+      e.voucherNumber.toLowerCase().includes(q) ||
+      e.purpose.toLowerCase().includes(q) ||
+      (e.project?.name && e.project.name.toLowerCase().includes(q)) ||
+      (e.teamName && e.teamName.toLowerCase().includes(q)) ||
+      e.account.name.toLowerCase().includes(q);
+    return matchesSearch;
+  });
+
   const siteExpensesTotal = expenses.filter((e) => !e.isOfficeExpense).reduce((s, e) => s + Number(e.amount), 0);
   const officeOverheadsTotal = expenses.filter((e) => e.isOfficeExpense).reduce((s, e) => s + Number(e.amount), 0);
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <ReceiptIndianRupee className="text-blue-600" size={26} />
-            Site Expenses & General Office Overheads
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Clear separation: tag direct expenses to specific project sites and teams, or log general Erode office overheads without penalizing site profitability.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition"
-          >
-            <Plus size={16} /> Record Expense Voucher
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
-          <span className="text-[10px] font-bold text-slate-500 uppercase">Total Expenses Recorded</span>
-          <div className="text-xl font-black text-slate-900 font-mono mt-1">
-            {formatINR(siteExpensesTotal + officeOverheadsTotal)}
-          </div>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">{expenses.length} Vouchers</span>
-        </div>
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl shadow-xs">
-          <span className="text-[10px] font-bold text-blue-700 uppercase flex items-center gap-1">
-            <Briefcase size={12} /> Direct Site Project Expenses
-          </span>
-          <div className="text-xl font-black text-blue-900 font-mono mt-1">
-            {formatINR(siteExpensesTotal)}
-          </div>
-          <span className="text-[10px] text-blue-600 mt-0.5 block">Allocated to Project Costing</span>
-        </div>
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl shadow-xs">
-          <span className="text-[10px] font-bold text-amber-700 uppercase flex items-center gap-1">
-            <Building2 size={12} /> General Office Overheads
-          </span>
-          <div className="text-xl font-black text-amber-900 font-mono mt-1">
-            {formatINR(officeOverheadsTotal)}
-          </div>
-          <span className="text-[10px] text-amber-600 mt-0.5 block">Rent, EB, Staff, Stationery (Company P&L)</span>
-        </div>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex gap-2 border-b border-slate-200">
-        <button
-          onClick={() => setFilterTab("ALL")}
-          className={`pb-2.5 px-3 text-xs font-bold transition border-b-2 ${
-            filterTab === "ALL" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          All Expenses ({expenses.length})
-        </button>
-        <button
-          onClick={() => setFilterTab("SITE")}
-          className={`pb-2.5 px-3 text-xs font-bold transition border-b-2 ${
-            filterTab === "SITE" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          Direct Site Expenses ({expenses.filter((e) => !e.isOfficeExpense).length})
-        </button>
-        <button
-          onClick={() => setFilterTab("OFFICE")}
-          className={`pb-2.5 px-3 text-xs font-bold transition border-b-2 ${
-            filterTab === "OFFICE" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          General Office Overheads ({expenses.filter((e) => e.isOfficeExpense).length})
-        </button>
-      </div>
+      <ModuleHeaderWithAnalytics
+        title="Site Expenses & Office Overheads"
+        subtitle="Clear separation: tag direct expenses to specific project sites and teams, or log general Erode office overheads"
+        badge="Operating Expenses"
+        icon={ReceiptIndianRupee}
+        analyticsPreset="operations"
+        analyticsCards={[
+          {
+            label: "Total Expenses (FY)",
+            value: formatINR(siteExpensesTotal + officeOverheadsTotal),
+            change: `${expenses.length} Vouchers posted`,
+            isPositive: false,
+          },
+          {
+            label: "Direct Site Expenses",
+            value: formatINR(siteExpensesTotal),
+            change: "Allocated to projects",
+            isPositive: false,
+          },
+          {
+            label: "General Office Overheads",
+            value: formatINR(officeOverheadsTotal),
+            change: "Rent, EB, staff & admin",
+            isPositive: false,
+          },
+          {
+            label: "Site Allocation %",
+            value: `${((siteExpensesTotal / (siteExpensesTotal + officeOverheadsTotal || 1)) * 100).toFixed(1)}%`,
+            change: "Direct job costing ratio",
+            isPositive: true,
+          },
+        ]}
+        searchPlaceholder="Search voucher #, purpose, project site, team or ledger..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        views={[
+          { id: "ALL", label: "All Expenses", count: expenses.length },
+          { id: "SITE", label: "Direct Site Expenses", count: expenses.filter((e) => !e.isOfficeExpense).length },
+          { id: "OFFICE", label: "Office Overheads", count: expenses.filter((e) => e.isOfficeExpense).length },
+        ]}
+        selectedView={filterTab}
+        onViewChange={(v) => setFilterTab(v as any)}
+        onExportExcel={handleExportExcel}
+        onExportPDF={handleExportPDF}
+        sampleData={[
+          {
+            "Voucher #": "EXP-26-001",
+            Date: "2026-11-20",
+            Classification: "Site Direct",
+            "Project Code": "SR-PRJ-2026-001",
+            Team: "SRM01",
+            "Expense Account Code": "5050",
+            "Purpose / Particulars": "Generator diesel refill on site",
+            "Payment Mode": "CASH",
+            "Amount (₹)": "3500",
+          },
+        ]}
+        sampleColumns={[
+          "Voucher #",
+          "Date",
+          "Classification",
+          "Project Code",
+          "Team",
+          "Expense Account Code",
+          "Purpose / Particulars",
+          "Payment Mode",
+          "Amount (₹)",
+        ]}
+        primaryAction={{
+          label: "Record Expense Voucher",
+          onClick: () => setShowAddModal(true),
+          icon: Plus,
+        }}
+      />
 
       {/* Expenses Table */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -258,16 +318,17 @@ export default function ExpensesPage() {
                 <th className="px-4 py-3">Purpose / Particulars</th>
                 <th className="px-4 py-3">Payment Mode</th>
                 <th className="px-4 py-3 text-right">Amount (₹)</th>
+                <th className="px-4 py-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">Loading expenses...</td>
+                  <td colSpan={10} className="px-4 py-8 text-center text-slate-400">Loading expenses...</td>
                 </tr>
               ) : filteredExpenses.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={10} className="px-4 py-8 text-center text-slate-400">
                     No expense vouchers found in this category.
                   </td>
                 </tr>
@@ -310,8 +371,24 @@ export default function ExpensesPage() {
                       <span className="font-bold">{exp.paymentMode}</span>
                       {exp.bankAccount && <span className="text-[10px] text-slate-400 block">{exp.bankAccount.bankName}</span>}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-bold text-rose-600">
+                    <td className="px-4 py-3 text-right font-mono font-bold text-rose-600 tabular-nums">
                       {formatINR(exp.amount)}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() =>
+                          setArchiveModal({
+                            isOpen: true,
+                            expenseId: exp.id,
+                            voucherNumber: exp.voucherNumber,
+                            loading: false,
+                          })
+                        }
+                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                        title="Archive Expense"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -507,6 +584,19 @@ export default function ExpensesPage() {
           </div>
         </div>
       )}
+
+      {/* Archive / Delete Modal */}
+      <ArchiveConfirmModal
+        isOpen={archiveModal.isOpen}
+        title="Archive Expense Voucher"
+        message="Are you sure you want to archive this expense voucher? It will be soft-deleted from active registers."
+        recordLabel={archiveModal.voucherNumber}
+        onConfirm={handleArchive}
+        onCancel={() =>
+          setArchiveModal({ isOpen: false, expenseId: "", voucherNumber: "", loading: false })
+        }
+        loading={archiveModal.loading}
+      />
     </div>
   );
 }
