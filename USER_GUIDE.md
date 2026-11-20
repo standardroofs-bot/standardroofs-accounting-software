@@ -1,15 +1,18 @@
-# Standard Roofs Books (SR-Books) — Comprehensive Operations Manual & A-to-Z User Guide 📘
+# SR-Books ERP — Comprehensive Operations Manual & A-to-Z User Guide 📘
 
-**System Name:** Standard Roofs Books (SR-Books)  
-**Enterprise Entity:** Standard Roofs  
-**Headquarters:** 144/A, Vellakkal Medu, Villarasampatti, Nasiyanur (Post), Erode, Tamil Nadu – 638107  
-**GSTIN / UIN:** `33AEWFS5187G1ZD` | **State Code:** `33 (Tamil Nadu)`  
-**Primary Bank:** ICICI Bank (A/C: `155205003161`, IFSC: `ICIC0001552`, Branch: Kagam, Erode)  
+**System Name:** SR-Books ERP (Enterprise Edition)  
+**Project Owner & Lead Architect:** **Srimanikandan K** ([@Srimani26](https://github.com/Srimani26))  
+**Commercial Licensee:** Licensed for commercial operations to **Standard Roofs**  
 **Active Financial Year:** FY 2026-27 (01-Apr-2026 to 31-Mar-2027)  
-**Calculation Precision:** `Decimal.js` Fixed-Point Arithmetic (Zero Float Discrepancy)  
+**Persistence Architecture:** Cloud Database (Neon Cloud PostgreSQL) + Local Storage & Hybrid Session Cache  
+**Calculation Precision:** `Decimal.js` Arbitrary Fixed-Point Arithmetic (Zero Float Discrepancy)  
 **Document Edition:** Master Enterprise Release 2.0  
 
 ---
+
+> **Ownership & License Notice:**  
+> This software product, its codebase, architecture, and documentation are designed, authored, and owned by **Srimanikandan K**.  
+> The software is licensed for operational and commercial deployment to **Standard Roofs** (Erode, Tamil Nadu). All intellectual property rights belong to the author.
 
 ## 📑 Table of Contents
 
@@ -98,7 +101,7 @@ The home dashboard is an executive-grade financial command cockpit:
 
 ### 2.1 The 4 Primary Fintech KPI Cards
 1. **Total Receivables (AR):** Total outstanding billings (e.g. Sabari Invoices `#33` and `#34`). Features an inline SVG upward trajectory sparkline, `+12.4%` cycle growth pill, and a dual-tone progress track (35% Current, 65% 16–30 Days).
-2. **Cash & Bank Liquidity:** Live verified liquidity across all accounts (ICICI Bank A/C `155205003161` balance of ₹ 24,03,272.00). Displays a reservoir sparkline and safe operational runway badge (`18.4 Mo Runway`).
+2. **Cash & Bank Liquidity:** Live verified liquidity across all accounts (ICICI Bank A/C ...3161 balance of ₹ 24,03,272.00). Displays a reservoir sparkline and safe operational runway badge (`18.4 Mo Runway`).
 3. **Works Turnover (FYTD):** Fiscal year-to-date invoiced contract collections.
 4. **Net Operating Profit:** Net earnings after direct material purchases, equipment diesel, heavy crane logistics, and labour wages.
 
@@ -193,7 +196,7 @@ Switch between **Visual View** and **Summary Table** to inspect an audit-ready 1
 * Match payments against open bills with partial allocation support.
 
 ### 3.12 Banking, Contra & ICICI Treasury (`/banking`)
-* **Treasury Account:** ICICI Bank A/C `155205003161` (Kagam Branch, Erode).
+* **Treasury Account:** ICICI Bank A/C ...3161 (Kagam Branch, Erode).
 * **Contra Vouchers:**
   * **Cash Deposit:** Dr ICICI Bank (`1020`) | Cr Cash in Hand (`1010`)
   * **Cash Withdrawal:** Dr Cash in Hand (`1010`) | Cr ICICI Bank (`1020`)

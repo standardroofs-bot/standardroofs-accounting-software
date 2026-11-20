@@ -1,14 +1,17 @@
-# Standard Roofs Books (SR-Books) — Master Technical Architecture & Project Documentation 🏛️⚙️
+# SR-Books ERP — Master Technical Architecture & Project Documentation 🏛️⚙️
 
-**System Identification:** Standard Roofs Books (SR-Books)  
-**Enterprise Code:** `SR-BOOKS-ERP`  
-**Target Enterprise:** Standard Roofs, Erode, Tamil Nadu  
-**GSTIN:** `33AEWFS5187G1ZD` | **State Code:** `33 (Tamil Nadu)`  
+**System Identification:** SR-Books ERP  
+**Project Owner & Lead Architect:** **Srimanikandan K** ([@Srimani26](https://github.com/Srimani26))  
+**Commercial Licensee:** Licensed for commercial operations to **Standard Roofs**  
 **Architecture Classification:** Enterprise Cloud ERP & Double-Entry Accounting System  
-**Engine Specification:** Fixed-Point Precision (`Decimal.js`), Next.js 15.5, React 19, Prisma 6.5, Neon PostgreSQL  
+**Engine Specification:** Fixed-Point Precision (`Decimal.js`), Next.js 15.5, React 19, Prisma 6.5, Neon Cloud PostgreSQL, Local Storage  
 **Document Version:** 2.0 (Complete Technical Specification)  
 
 ---
+
+> **Ownership & License Notice:**  
+> This software product, its codebase, architecture, and documentation are designed, authored, and owned by **Srimanikandan K**.  
+> The software is licensed for operational and commercial deployment to **Standard Roofs** (Erode, Tamil Nadu). All intellectual property rights belong to the author.
 
 ## 📑 Table of Contents
 
@@ -26,12 +29,13 @@
 
 ## 1. Architectural Overview & System Design
 
-Standard Roofs Books (SR-Books) is an in-house enterprise Resource Planning (ERP) and double-entry accounting platform engineered for **Standard Roofs**, an industrial roofing and pre-engineered steel building (PEB) contractor in Erode, Tamil Nadu.
+SR-Books ERP is a proprietary enterprise Resource Planning (ERP) and double-entry accounting software designed, architected, and owned by **Srimanikandan K** ([@Srimani26](https://github.com/Srimani26)) and licensed for commercial operations to **Standard Roofs**, an industrial roofing and pre-engineered steel building (PEB) contractor in Erode, Tamil Nadu.
 
 ### 1.1 Core Engineering Principles
 * **Mathematical Exactness:** Floating-point rounding anomalies common in standard JavaScript (`0.1 + 0.2 !== 0.3`) are strictly prohibited in the financial ledger. All currency computations use `Decimal.js` fixed-point arithmetic (`db.Decimal(15, 2)`).
 * **Double-Entry Equilibrium:** No isolated numbers can exist in the ledger. Every financial transaction generates a minimum of one debit leg and one credit leg satisfying:
   $$\sum \text{Debits} = \sum \text{Credits}$$
+* **Cloud DB & Hybrid Local Storage Persistence:** The application couples high-availability serverless **Neon Cloud PostgreSQL** for ACID-compliant relational data with client-side **Local Storage & Session Caches** for instant UI responsiveness and session recovery.
 * **Non-Destructive Data Retention:** Records are never hard-deleted via normal operations. The system enforces soft-delete flags (`isArchived = true`) to preserve immutable audit trails and tax records.
 * **Ergonomic Zoho Design System:** Layouts, color palettes, and data density mirror Zoho Books and Stripe enterprise software, prioritizing speed, responsive tabular numbers (`tabular-nums`), and clean typography.
 
@@ -103,7 +107,7 @@ erDiagram
 | **`InvoiceItem`** | `InvoiceItem` | Invoice line items | `description`, `hsnCode`, `quantity`, `unitRate`, `cgstRate`, `sgstRate`, `totalAmount` |
 | **`Supplier`** | `Supplier` | Creditors & material vendors | `name`, `gstin`, `pan`, `bankName`, `accountNumber`, `ifsc` |
 | **`PurchaseBill`** | `PurchaseBill` | Vendor accounts payable bills | `billNumber`, `supplierId`, `billDate`, `dueDate`, `totalAmount`, `balanceDue` |
-| **`BankAccount`** | `BankAccount` | Bank accounts & treasury | `bankName` ("ICICI Bank"), `accountNumber` ("155205003161"), `ifsc`, `currentBalance` |
+| **`BankAccount`** | `BankAccount` | Bank accounts & treasury | `bankName` ("ICICI Bank"), `accountNumber` ("...3161"), `ifsc`, `currentBalance` |
 | **`BankTransaction`**| `BankTransaction`| Bank deposit/withdrawal ledger | `voucherNumber`, `type`, `amount`, `payeeOrPayer`, `isReconciled` |
 | **`CashBookEntry`**| `CashBookEntry`| Petty cash daily transactions | `entryType` (`INFLOW`/`OUTFLOW`), `amount`, `partyName`, `runningBalance` |
 | **`DailyCashClosing`**| `DailyCashClosing`| Cash verification with denominations | `date`, `bookBalance`, `physicalBalance`, `discrepancy`, `denominations` |

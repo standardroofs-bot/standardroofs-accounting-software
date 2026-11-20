@@ -1,8 +1,9 @@
 {
-  "name": "standard-roofs-books",
+  "name": "sr-books-erp",
   "version": "1.0.0",
   "private": true,
-  "description": "Standard Roofs Books (SR-Books) — In-house Zoho Books & Roofing ERP Web Application for Standard Roofs (Erode, TN)",
+  "description": "SR-Books ERP — Enterprise Cloud Accounting & Management System architected by Srimanikandan K, licensed for Standard Roofs",
+  "author": "Srimanikandan K (https://github.com/Srimani26)",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
