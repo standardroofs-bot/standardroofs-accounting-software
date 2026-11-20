@@ -24,14 +24,17 @@ import {
   ShieldCheck,
   CheckCircle2,
   LogOut,
+  Menu,
 } from "lucide-react";
 import Link from "next/link";
+import { useSidebar } from "./AppShell";
 
 interface HeaderProps {
   onQuickCreate?: (type: "inflow" | "outflow" | "transfer" | "journal") => void;
 }
 
 export function Header({ onQuickCreate }: HeaderProps) {
+  const { toggleMobileSidebar } = useSidebar();
   const [isDark, setIsDark] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -39,7 +42,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    fetch("/api/auth/me")
+    fetch("/api/auth/me", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) setCurrentUser(data.user);
@@ -53,9 +56,16 @@ export function Header({ onQuickCreate }: HeaderProps) {
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
-      window.location.href = "/login";
     } catch (err) {
-      console.error(err);
+      console.error("Logout error", err);
+    } finally {
+      // Clear client storage
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch (e) {}
+      // Replace history to prevent browser back-button navigation
+      window.location.replace("/login");
     }
   };
 
@@ -98,29 +108,55 @@ export function Header({ onQuickCreate }: HeaderProps) {
     }
   };
 
+  const displayName =
+    currentUser?.email === "admin@standardroofs.in" || currentUser?.role === "SUPER_ADMIN"
+      ? "Prabhakaran T"
+      : currentUser?.name || "Managing Director";
+
+  const displayRole =
+    currentUser?.role === "SUPER_ADMIN" ? "Super Admin" : currentUser?.role?.replace(/_/g, " ") || "Administrator";
+
+  const initials =
+    displayName
+      .split(" ")
+      .map((w: string) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "PT";
+
   return (
-    <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 sticky top-0 z-30 transition-colors">
-      {/* Left: Organization context & Search */}
-      <div className="flex items-center gap-4">
+    <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 sm:px-5 lg:px-6 sticky top-0 z-30 transition-colors whitespace-nowrap select-none">
+      {/* Left: Hamburger (mobile) + Organization context + Search */}
+      <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+        {/* Mobile Hamburger Drawer Button */}
+        <button
+          onClick={toggleMobileSidebar}
+          className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden transition"
+          title="Open Navigation Menu"
+          aria-label="Open Navigation Menu"
+        >
+          <Menu size={20} />
+        </button>
+
         <Link
           href="/"
           className="flex items-center gap-2 hover:opacity-85 transition group cursor-pointer"
-          title="Return to Dashboard Home"
+          title="Return to Home"
         >
-          <Building className="text-blue-600 dark:text-blue-400 group-hover:scale-105 transition" size={20} />
+          <Building className="text-blue-600 dark:text-blue-400 group-hover:scale-105 transition shrink-0" size={18} />
           <div className="flex flex-col">
-            <span className="font-bold text-sm text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
+            <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition leading-none">
               Standard Roofs
             </span>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+            <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-none mt-0.5 hidden xs:inline">
               Books & Roofing ERP
             </span>
           </div>
         </Link>
 
         {/* Financial Year Selector */}
-        <div className="flex items-center gap-1.5 ml-4 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200">
-          <Calendar size={14} className="text-blue-600 dark:text-blue-400" />
+        <div className="hidden sm:flex items-center gap-1.5 ml-2 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200">
+          <Calendar size={13} className="text-blue-600 dark:text-blue-400 shrink-0" />
           <span>FY:</span>
           <select
             value={selectedFY}
@@ -132,27 +168,29 @@ export function Header({ onQuickCreate }: HeaderProps) {
           </select>
         </div>
 
-        {/* Global Search */}
+        {/* Global Search (Tablet and Desktop) */}
         <div className="hidden md:flex items-center relative ml-2">
-          <Search size={16} className="absolute left-3 text-slate-400" />
+          <Search size={15} className="absolute left-3 text-slate-400" />
           <input
             type="text"
             placeholder="Search accounts, invoices, materials, fleet..."
-            className="pl-9 pr-4 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs w-64 focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-slate-200"
+            className="pl-8 pr-4 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs w-48 lg:w-64 focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-slate-200"
           />
         </div>
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         {/* + Quick Create Button */}
         <div className="relative">
           <button
             onClick={() => setShowQuickMenu(!showQuickMenu)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold shadow-sm transition active:scale-95"
+            className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold shadow-sm transition active:scale-95"
+            title="Create New Transaction"
           >
-            <Plus size={16} />
-            <span>+ Quick Create</span>
+            <Plus size={15} />
+            <span className="hidden xs:inline">+ Quick Create</span>
+            <span className="xs:hidden">Create</span>
           </button>
 
           {showQuickMenu && (
@@ -237,12 +275,12 @@ export function Header({ onQuickCreate }: HeaderProps) {
             className="p-2 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition relative"
             title="Smart Alerts & Reminders"
           >
-            <Bell size={18} />
+            <Bell size={17} />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl py-3 z-50 text-xs animate-in fade-in zoom-in-95">
+            <div className="absolute right-0 mt-2 w-72 sm:w-80 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl py-3 z-50 text-xs animate-in fade-in zoom-in-95">
               <div className="px-4 pb-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <span className="font-bold text-slate-800 dark:text-slate-200">
                   Smart Alerts & Reminders
@@ -258,7 +296,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
                     key={al.id}
                     href={al.href}
                     onClick={() => setShowNotifications(false)}
-                    className="block p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"
+                    className="block p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition whitespace-normal"
                   >
                     <div className="flex items-start gap-2.5">
                       {al.type === "warning" ? (
@@ -290,7 +328,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
                   onClick={() => setShowNotifications(false)}
                   className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline"
                 >
-                  View All Financial Health Indicators →
+                  View All Financial Indicators →
                 </Link>
               </div>
             </div>
@@ -303,21 +341,21 @@ export function Header({ onQuickCreate }: HeaderProps) {
           className="p-2 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
           title="Toggle Light/Dark Theme"
         >
-          {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          {isDark ? <Sun size={17} /> : <Moon size={17} />}
         </button>
 
         {/* User Badge & Logout */}
-        <div className="flex items-center gap-3 pl-3 border-l border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-3 border-l border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 flex items-center justify-center font-black text-xs">
-              {currentUser?.name ? currentUser.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2) : "SR"}
+            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 flex items-center justify-center font-black text-xs shrink-0">
+              {initials}
             </div>
-            <div className="hidden sm:flex flex-col text-left">
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-none">
-                {currentUser?.name || "Managing Director"}
+            <div className="hidden sm:flex flex-col text-left truncate max-w-[140px]">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-none truncate">
+                {displayName}
               </span>
-              <span className="text-[10px] text-slate-400 leading-none mt-0.5">
-                {currentUser?.role ? currentUser.role.replace("_", " ") : "Super Admin"}
+              <span className="text-[10px] text-slate-400 leading-none mt-1 truncate">
+                {displayRole}
               </span>
             </div>
           </div>
@@ -325,7 +363,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
           <button
             onClick={handleLogout}
             className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
-            title="Log Out of SR-Books"
+            title="Log Out of SR-Books (Strict Session End)"
           >
             <LogOut size={16} />
           </button>
