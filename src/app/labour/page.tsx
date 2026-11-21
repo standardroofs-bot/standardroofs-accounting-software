@@ -300,10 +300,12 @@ export default function WorkforceKYCDirectoryPage() {
         primaryAction={{
           label: `+ Add ${
             activeCategory === "OFFICE_STAFF"
-              ? "Office Staff"
+              ? "Office Employee"
               : activeCategory === "CONTRACTOR_TEAM"
               ? "Contractor"
-              : "Site Worker"
+              : activeCategory === "HINDI_LABOUR"
+              ? "Hindi Labourer"
+              : "Tamil Labourer"
           }`,
           onClick: handleOpenAdd,
         }}
@@ -350,7 +352,7 @@ export default function WorkforceKYCDirectoryPage() {
               }`}
             >
               <Building size={15} />
-              <span>Office Staff (13)</span>
+              <span>Office Employees (13)</span>
             </button>
 
             <button
@@ -362,7 +364,7 @@ export default function WorkforceKYCDirectoryPage() {
               }`}
             >
               <HardHat size={15} />
-              <span>Tamil Site Labours (64)</span>
+              <span>Tamil Labours (71)</span>
             </button>
 
             <button
@@ -374,7 +376,7 @@ export default function WorkforceKYCDirectoryPage() {
               }`}
             >
               <Truck size={15} />
-              <span>Hindi Crew (5)</span>
+              <span>Hindi Labours (5)</span>
             </button>
 
             <button

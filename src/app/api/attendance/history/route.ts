@@ -130,18 +130,17 @@ export async function GET(request: Request) {
       yData.totals.payableDays =
         yData.totals.present +
         yData.totals.permission +
-        yData.totals.halfDay * 0.5 +
-        yData.totals.leave;
+        yData.totals.halfDay * 0.5;
 
       yData.months = yData.months.map((m: any) => ({
         ...m,
-        payableDays: m.present + m.permission + m.halfDay * 0.5 + m.leave,
+        payableDays: m.present + m.permission + m.halfDay * 0.5,
         sites: Array.from(m.sites || []),
       }));
     });
 
     const lifetimePayableDays =
-      lifetimePresent + lifetimePermission + lifetimeHalfDay * 0.5 + lifetimeLeave;
+      lifetimePresent + lifetimePermission + lifetimeHalfDay * 0.5;
 
     return NextResponse.json({
       success: true,

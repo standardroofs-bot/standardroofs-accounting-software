@@ -99,15 +99,22 @@ interface HolidayItem {
 const COMMON_SITES = [
   "SSM School",
   "Kalloviyam Gokul",
-  "Arunprasad Uthukuli",
-  "Venkatesh Salem",
   "Ananthi Thindal",
+  "Saravanan Chennai",
+  "Saravanan Perambalur",
   "Ravichandran Chennai",
-  "Office Maintenance",
+  "Vishnu Nalliyampalayam",
+  "Venkatesh Salem",
+  "Arunprasad Uthukuli",
+  "Gobichettipalayam",
+  "Lotus Hospital board Work",
+  "Vel Murugan_Site",
+  "Pradeep Perambalur",
+  "Amarnath site",
+  "Office",
   "Yard Unloading",
+  "Office Maintenance",
   "SIPCOT Heavy PEB Shed",
-  "Namakkal Cold Storage",
-  "Tirupur Spinning Mill",
 ];
 
 const YEARS = [2024, 2025, 2026, 2027, 2028];
@@ -128,7 +135,8 @@ const MONTHS = [
 
 export default function AttendancePage() {
   const [activeTab, setActiveTab] = useState<"office" | "tamil" | "hindi" | "contractor">("office");
-  const [viewMode, setViewMode] = useState<"daily" | "monthly">("daily");
+  const [viewMode, setViewMode] = useState<"monthly" | "daily">("monthly");
+  const [showTodayRollCall, setShowTodayRollCall] = useState<boolean>(false);
 
   // Multi-Year & Multi-Month persistent navigation
   const [selectedYear, setSelectedYear] = useState<number>(2026);
@@ -259,9 +267,37 @@ export default function AttendancePage() {
     return days;
   }, [selectedYear, selectedMonthNum, holidays]);
 
-  const totalWorkingDaysInMonth = useMemo(() => {
-    return daysInMonth.filter((d) => d.isWorkingDay).length;
+  const totalSundaysInMonth = useMemo(() => {
+    return daysInMonth.filter((d) => d.isSunday).length;
   }, [daysInMonth]);
+
+  const totalHolidaysInMonth = useMemo(() => {
+    return daysInMonth.filter((d) => d.isHoliday && !d.isSunday).length;
+  }, [daysInMonth]);
+
+  const totalWorkingDaysInMonth = useMemo(() => {
+    return Math.max(0, daysInMonth.length - totalSundaysInMonth - totalHolidaysInMonth);
+  }, [daysInMonth, totalSundaysInMonth, totalHolidaysInMonth]);
+
+  const handlePrevMonth = () => {
+    let m = parseInt(selectedMonthNum, 10) - 1;
+    let y = selectedYear;
+    if (m < 1) {
+      m = 12;
+      y -= 1;
+    }
+    handleYearMonthChange(y, String(m).padStart(2, "0"));
+  };
+
+  const handleNextMonth = () => {
+    let m = parseInt(selectedMonthNum, 10) + 1;
+    let y = selectedYear;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+    handleYearMonthChange(y, String(m).padStart(2, "0"));
+  };
 
   // Filtered employees for current tab
   const tabEmployees = useMemo(() => {
@@ -642,7 +678,7 @@ export default function AttendancePage() {
       base["1-Hr Perm (1H)"] = p1h;
       base["Absent (A)"] = a;
       base["Leaves/Sun (L)"] = l;
-      base["Net Payable Days"] = p + p1h + h * 0.5 + l;
+      base["Net Payable Days"] = p + p1h + h * 0.5;
 
       return base;
     });
@@ -834,6 +870,7 @@ export default function AttendancePage() {
 
       {/* 3. DEDICATED 4-SUBTAB NAVIGATION & CONTROL STRIP */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 shadow-xs space-y-4">
+        {/* Top Controls Bar */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-3">
           {/* 4 Main Tabs */}
           <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl">
@@ -846,7 +883,7 @@ export default function AttendancePage() {
               }`}
             >
               <Building size={15} />
-              <span>Office Staff ({employees.filter((e) => e.category === "OFFICE_STAFF").length || 13})</span>
+              <span>Office Employees ({employees.filter((e) => e.category === "OFFICE_STAFF").length || 13})</span>
             </button>
 
             <button
@@ -858,7 +895,7 @@ export default function AttendancePage() {
               }`}
             >
               <HardHat size={15} />
-              <span>Tamil Site Labours ({employees.filter((e) => e.category === "TAMIL_LABOUR").length || 64})</span>
+              <span>Tamil Site Labours ({employees.filter((e) => e.category === "TAMIL_LABOUR").length || 71})</span>
             </button>
 
             <button
@@ -870,7 +907,7 @@ export default function AttendancePage() {
               }`}
             >
               <Truck size={15} />
-              <span>Hindi Crew ({employees.filter((e) => e.category === "HINDI_LABOUR").length || 5})</span>
+              <span>Hindi Labours ({employees.filter((e) => e.category === "HINDI_LABOUR").length || 5})</span>
             </button>
 
             <button
@@ -886,107 +923,122 @@ export default function AttendancePage() {
             </button>
           </div>
 
-          {/* Persistent Year & Month Selector + Daily / Monthly View Toggle */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* View Mode Toggle */}
+          {/* Persistent Year & Month Selector with Prev/Next Month Arrows */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-900 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                title="Previous Month"
+              >
+                <ChevronLeft size={15} />
+              </button>
+
+              <div className="flex items-center gap-1.5 px-2">
+                {/* Year Dropdown */}
+                <select
+                  value={selectedYear}
+                  onChange={(e) => handleYearMonthChange(Number(e.target.value), selectedMonthNum)}
+                  className="bg-transparent text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-hidden cursor-pointer"
+                >
+                  {YEARS.map((y) => (
+                    <option key={y} value={y} className="bg-white dark:bg-slate-900">
+                      FY {y}
+                    </option>
+                  ))}
+                </select>
+
+                <span className="text-slate-400">×</span>
+
+                {/* Month Dropdown */}
+                <select
+                  value={selectedMonthNum}
+                  onChange={(e) => handleYearMonthChange(selectedYear, e.target.value)}
+                  className="bg-transparent text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-hidden cursor-pointer"
+                >
+                  {MONTHS.map((m) => (
+                    <option key={m.value} value={m.value} className="bg-white dark:bg-slate-900">
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-900 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                title="Next Month"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+
+            {/* Quick Action: Toggle Today Roll-Call */}
+            {activeTab !== "contractor" && (
+              <button
+                type="button"
+                onClick={() => setShowTodayRollCall(!showTodayRollCall)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer shadow-xs ${
+                  showTodayRollCall
+                    ? "bg-blue-600 text-white shadow-blue-500/20"
+                    : "bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                }`}
+                title="Open fast daily roll-call sheet"
+              >
+                <Clock size={13} />
+                <span>{showTodayRollCall ? "Hide Roll-Call" : "+ Mark Today's Attendance"}</span>
+              </button>
+            )}
+
+            {/* View Mode Switcher */}
             {activeTab !== "contractor" && (
               <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
                 <button
                   type="button"
+                  onClick={() => setViewMode("monthly")}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                    viewMode === "monthly" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs" : "text-slate-500"
+                  }`}
+                >
+                  <CalendarDays size={13} />
+                  <span>Month Matrix</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setViewMode("daily")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition cursor-pointer ${
                     viewMode === "daily" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs" : "text-slate-500"
                   }`}
                 >
                   <Clock size={13} />
                   <span>Daily Sheet</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("monthly")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                    viewMode === "monthly" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs" : "text-slate-500"
-                  }`}
-                >
-                  <CalendarDays size={13} />
-                  <span>Monthly Matrix</span>
-                </button>
               </div>
             )}
-
-            {/* Persistent Year Dropdown */}
-            <select
-              value={selectedYear}
-              onChange={(e) => handleYearMonthChange(Number(e.target.value), selectedMonthNum)}
-              className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-hidden focus:border-blue-500"
-            >
-              {YEARS.map((y) => (
-                <option key={y} value={y}>
-                  FY {y}
-                </option>
-              ))}
-            </select>
-
-            {/* Persistent Month Dropdown */}
-            <select
-              value={selectedMonthNum}
-              onChange={(e) => handleYearMonthChange(selectedYear, e.target.value)}
-              className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-hidden focus:border-blue-500"
-            >
-              {MONTHS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-
-            {/* Date Picker (with Day Nav) */}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  const d = new Date(selectedDate);
-                  d.setDate(d.getDate() - 1);
-                  setSelectedDate(d.toISOString().split("T")[0]);
-                }}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 transition"
-                title="Previous Day"
-              >
-                <ChevronLeft size={14} />
-              </button>
-
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  const [y, m] = e.target.value.split("-");
-                  if (y && m) {
-                    setSelectedYear(Number(y));
-                    setSelectedMonthNum(m);
-                  }
-                }}
-                className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-bold focus:outline-hidden text-xs"
-              />
-
-              <button
-                type="button"
-                onClick={() => {
-                  const d = new Date(selectedDate);
-                  d.setDate(d.getDate() + 1);
-                  setSelectedDate(d.toISOString().split("T")[0]);
-                }}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 transition"
-                title="Next Day"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
           </div>
         </div>
 
-        {/* Sub-Filters & Quick Bulk Buttons */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        {/* Clean Summary Strip & Filter Toolbar */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 text-xs">
+          {/* Summary Strip (Scheduled Working Days, Sundays, Holidays) */}
+          <div className="flex flex-wrap items-center gap-2 font-mono">
+            <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold">
+              Total Days: <strong className="text-slate-900 dark:text-slate-100">{daysInMonth.length}</strong>
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold">
+              Sundays (Unpaid L): <strong className="text-slate-700 dark:text-slate-300">{totalSundaysInMonth}</strong>
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold">
+              Holidays (Unpaid L): <strong className="text-slate-700 dark:text-slate-300">{totalHolidaysInMonth}</strong>
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-extrabold border border-blue-200 dark:border-blue-800">
+              Scheduled Working Days: <strong className="text-blue-800 dark:text-blue-200">{totalWorkingDaysInMonth}</strong>
+            </span>
+          </div>
+
+          {/* Sub-Filters & Quick Actions */}
           <div className="flex flex-wrap items-center gap-2">
             {activeTab === "office" && (
               <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
@@ -1020,64 +1072,35 @@ export default function AttendancePage() {
               </div>
             )}
 
-            {/* Search Input */}
+            {/* Instant Search */}
             <div className="relative min-w-[200px]">
               <Search className="absolute left-2.5 top-2 text-slate-400" size={13} />
               <input
                 type="text"
-                placeholder="Search staff, labourer ID, role..."
+                placeholder="Search name, ID, role..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-8 pr-3 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs focus:outline-hidden focus:border-blue-500"
               />
             </div>
-          </div>
 
-          {/* Quick Actions */}
-          <div className="flex flex-wrap items-center gap-2">
-            {activeTab !== "contractor" && (
-              <>
-                <button
-                  type="button"
-                  onClick={handleMarkAllPresent}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 transition"
-                  title="Mark all staff in this view as [P] Present today"
-                >
-                  <Check size={13} />
-                  <span>Mark All Present [P]</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleAutoFillSundays}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-700 transition"
-                  title="Automatically flag all Sundays in this month as Weekly Off [L]"
-                >
-                  <CalendarOff size={13} />
-                  <span>Auto-Sundays [L]</span>
-                </button>
-              </>
-            )}
-
-            {activeTab === "tamil" && (
-              <button
-                type="button"
-                onClick={handleCopyYesterdaySites}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800 transition"
-                title="Copy all site locations from yesterday"
-              >
-                <Copy size={13} />
-                <span>Copy Yesterday's Sites</span>
-              </button>
-            )}
-
-            <Link
-              href="/labour"
-              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+            <button
+              type="button"
+              onClick={() => setShowHolidayModal(true)}
+              className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold rounded-lg border border-amber-200 dark:border-amber-800 transition cursor-pointer"
             >
-              <span>Workforce KYC Directory</span>
-              <ExternalLink size={12} />
-            </Link>
+              <Palmtree size={12} className="text-amber-600" />
+              <span>+ Add Company Holiday (L)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportMusterExcel}
+              className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold rounded-lg border border-emerald-200 dark:border-emerald-800 transition cursor-pointer"
+            >
+              <FileSpreadsheet size={12} className="text-emerald-600" />
+              <span>Export Month (.xlsx)</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1499,22 +1522,216 @@ export default function AttendancePage() {
         </div>
       ) : (
         /* ================= MONTHLY MATRIX GRID (1..31 DAYS WITH CLICKABLE CELLS & SUMMARY) ================= */
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <CalendarDays className="text-blue-600" size={16} />
-                  Monthly Attendance & Muster Grid ({selectedMonth})
-                </h3>
-                <span className="text-[10.5px] px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold">
-                  {totalWorkingDaysInMonth} Working Days
-                </span>
+        <div className="space-y-4">
+          {/* Quick Today's Roll-Call Panel (When toggled open) */}
+          {showTodayRollCall && (
+            <div className="bg-blue-50/70 dark:bg-blue-950/40 rounded-2xl border-2 border-blue-400 dark:border-blue-700 p-4 shadow-md space-y-3 animate-in fade-in slide-in-from-top-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-200 dark:border-blue-800 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold">
+                    <Clock size={16} />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <span>Today's Live Roll-Call & Site Muster</span>
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        {selectedDate}
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Marking a person here immediately updates both Today and the Month Matrix grid below in real time.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleMarkAllPresent}
+                    className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+                  >
+                    <Check size={13} />
+                    <span>Mark All Present</span>
+                  </button>
+                  {activeTab === "tamil" && (
+                    <button
+                      type="button"
+                      onClick={handleCopyYesterdaySites}
+                      className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 font-bold text-xs rounded-xl border border-blue-200 dark:border-blue-700 hover:bg-blue-50 transition cursor-pointer"
+                    >
+                      <Copy size={13} />
+                      <span>Copy Yesterday's Sites</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowTodayRollCall(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    title="Close Roll-Call Panel"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Click any cell to edit status: <strong className="text-emerald-600">P (1.0)</strong>, <strong className="text-amber-500">H (0.5)</strong>, <strong className="text-cyan-600">1H (1.0)</strong>, <strong className="text-rose-600">A (0.0)</strong>, <strong className="text-slate-600">L (Weekly Off)</strong>
-              </p>
+
+              {/* Fast Roll-Call Table */}
+              <div className="overflow-x-auto max-h-[340px] overflow-y-auto">
+                <table className="w-full text-left text-xs whitespace-nowrap">
+                  <thead>
+                    <tr className="text-[10px] uppercase font-bold text-slate-400 border-b border-blue-100 dark:border-blue-900">
+                      <th className="py-2 px-3">Personnel</th>
+                      <th className="py-2 px-3">Role</th>
+                      {activeTab !== "office" && <th className="py-2 px-3">Site Location</th>}
+                      {activeTab !== "office" && <th className="py-2 px-3 text-right">Advance (₹)</th>}
+                      {activeTab === "office" && <th className="py-2 px-3 text-center">In Time</th>}
+                      {activeTab === "office" && <th className="py-2 px-3 text-center">Out Time</th>}
+                      <th className="py-2 px-3 text-center">Quick Mark Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-blue-100/50 dark:divide-blue-900/30">
+                    {tabEmployees.map((emp) => {
+                      const key = `${emp.id}_${selectedDate}`;
+                      const draft = attendanceDrafts[key];
+                      const dbAtt = emp.attendances.find((a) => a.date.split("T")[0] === selectedDate);
+                      const currentStatus = draft?.status || (dbAtt ? dbAtt.status : null);
+                      const siteVal = draft?.siteName || (dbAtt?.siteName) || (emp.category === "OFFICE_STAFF" ? "Headquarters Office" : "SSM School");
+                      const advanceVal = draft?.dailyAdvance !== undefined ? draft.dailyAdvance : (dbAtt?.dailyAdvance ? Number(dbAtt.dailyAdvance) : 0);
+                      const inVal = draft?.inTime || (dbAtt?.inTime) || "09:00 AM";
+                      const outVal = draft?.outTime || (dbAtt?.outTime) || "07:00 PM";
+
+                      return (
+                        <tr key={`rc_${emp.id}`} className="hover:bg-white/60 dark:hover:bg-slate-800/40">
+                          <td className="py-2 px-3 font-bold text-slate-900 dark:text-slate-100">
+                            <span>{emp.name}</span>
+                            <span className="text-[10px] text-slate-400 font-mono ml-2">({emp.employeeCode})</span>
+                          </td>
+                          <td className="py-2 px-3 text-slate-600 dark:text-slate-300">
+                            {emp.designation || emp.role || "Worker"}
+                          </td>
+                          {activeTab !== "office" && (
+                            <td className="py-2 px-3">
+                              <select
+                                value={siteVal}
+                                onChange={(e) => handleSiteChange(emp.id, e.target.value)}
+                                className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold focus:outline-hidden"
+                              >
+                                {COMMON_SITES.map((st) => (
+                                  <option key={st} value={st}>
+                                    {st}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                          )}
+                          {activeTab !== "office" && (
+                            <td className="py-2 px-3 text-right">
+                              <input
+                                type="number"
+                                value={advanceVal || ""}
+                                placeholder="0"
+                                onChange={(e) => handleAdvanceChange(emp.id, Number(e.target.value) || 0)}
+                                className="w-16 px-1.5 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-right font-mono text-xs focus:outline-hidden"
+                              />
+                            </td>
+                          )}
+                          {activeTab === "office" && (
+                            <td className="py-2 px-3 text-center">
+                              <input
+                                type="text"
+                                value={inVal}
+                                onChange={(e) => handleTimeChange(emp.id, "inTime", e.target.value)}
+                                className="w-20 px-1 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-center font-mono text-xs focus:outline-hidden"
+                              />
+                            </td>
+                          )}
+                          {activeTab === "office" && (
+                            <td className="py-2 px-3 text-center">
+                              <input
+                                type="text"
+                                value={outVal}
+                                onChange={(e) => handleTimeChange(emp.id, "outTime", e.target.value)}
+                                className="w-20 px-1 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-center font-mono text-xs focus:outline-hidden"
+                              />
+                            </td>
+                          )}
+                          <td className="py-2 px-3 text-center">
+                            <div className="inline-flex items-center gap-1 p-0.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
+                              <button
+                                type="button"
+                                onClick={() => handleMarkStatus(emp.id, "P", siteVal)}
+                                className={`px-2 py-0.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                                  currentStatus === "P" ? "bg-emerald-600 text-white scale-105" : "text-slate-600 hover:text-emerald-600"
+                                }`}
+                              >
+                                P
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMarkStatus(emp.id, "H", siteVal)}
+                                className={`px-2 py-0.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                                  currentStatus === "H" ? "bg-amber-500 text-white scale-105" : "text-slate-600 hover:text-amber-500"
+                                }`}
+                              >
+                                H
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPermPromptTarget({ employeeId: emp.id, siteName: siteVal });
+                                  setPermissionInput("1-Hour Permission");
+                                }}
+                                className={`px-2 py-0.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                                  currentStatus === "1H" ? "bg-cyan-600 text-white scale-105" : "text-slate-600 hover:text-cyan-600"
+                                }`}
+                              >
+                                1H
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMarkStatus(emp.id, "A", siteVal)}
+                                className={`px-2 py-0.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                                  currentStatus === "A" ? "bg-rose-600 text-white scale-105" : "text-slate-600 hover:text-rose-600"
+                                }`}
+                              >
+                                A
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMarkStatus(emp.id, "L", siteVal)}
+                                className={`px-2 py-0.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                                  currentStatus === "L" ? "bg-slate-700 text-white scale-105" : "text-slate-600 hover:text-slate-800"
+                                }`}
+                              >
+                                L
+                              </button>
+                              {currentStatus === null && <span className="text-[10px] text-slate-400 px-1">—</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
+          )}
+
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <CalendarDays className="text-blue-600" size={16} />
+                    Monthly Attendance & Muster Grid ({selectedMonth})
+                  </h3>
+                  <span className="text-[10.5px] px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold">
+                    {totalWorkingDaysInMonth} Scheduled Working Days
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Click any cell to edit status: <strong className="text-emerald-600">P (1.0)</strong>, <strong className="text-amber-500">H (0.5)</strong>, <strong className="text-cyan-600">1H (1.0)</strong>, <strong className="text-rose-600">A (0.0)</strong>, <strong className="text-slate-600">L (Weekly Off — Non-Payable)</strong>
+                </p>
+              </div>
 
             <div className="flex items-center gap-3">
               <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
@@ -1614,7 +1831,7 @@ export default function AttendancePage() {
                     else if (status === "L") lTotal++;
                   });
 
-                  const netPayableDays = pTotal + p1hTotal + hTotal * 0.5 + lTotal;
+                  const netPayableDays = pTotal + p1hTotal + hTotal * 0.5;
 
                   return (
                     <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
@@ -1711,6 +1928,7 @@ export default function AttendancePage() {
             </table>
           </div>
         </div>
+      </div>
       )}
 
       {/* 5. MODAL: CELL EDIT POPOVER (FOR MONTHLY MATRIX) */}
@@ -1771,6 +1989,22 @@ export default function AttendancePage() {
               {cellEditTarget.employee.category !== "OFFICE_STAFF" && (
                 <div className="pt-2">
                   <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Site Location</label>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {["SSM School", "Kalloviyam Gokul", "Ananthi Thindal", "Saravanan Chennai", "Office", "Yard Unloading"].map((st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => setSiteInput(st)}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
+                          siteInput === st
+                            ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                            : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    ))}
+                  </div>
                   <select
                     value={siteInput}
                     onChange={(e) => setSiteInput(e.target.value)}

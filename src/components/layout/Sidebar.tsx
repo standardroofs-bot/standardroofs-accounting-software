@@ -142,8 +142,8 @@ const WORKSPACES: WorkspaceConfig[] = [
         id: "workforce",
         title: "Workforce Management",
         items: [
-          { name: "Attendance Command Center", href: "/attendance", icon: Clock, badge: "Nov Live", moduleKey: "attendance" },
-          { name: "Workforce & KYC Directory", href: "/labour", icon: Users2, badge: "88 Master", moduleKey: "labour" },
+          { name: "Attendance Tracker", href: "/attendance", icon: Clock, badge: "Live", moduleKey: "attendance" },
+          { name: "Employees, Labours & Contractors", href: "/labour", icon: Users2, badge: "Directory", moduleKey: "labour" },
           { name: "Salary & Wage Payroll", href: "/payroll", icon: Coins, moduleKey: "payroll" },
         ],
       },
