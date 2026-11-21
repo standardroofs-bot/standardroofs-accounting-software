@@ -7,10 +7,94 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get("employeeId");
-    const requestedYear = searchParams.get("year"); // optional filter by year
+    const contractorTeamName = searchParams.get("contractorTeamName");
+    const requestedYear = searchParams.get("year");
 
+    // Case 1: Contractor Team History
+    if (contractorTeamName) {
+      const logs = await prisma.contractorDailyLog.findMany({
+        where: { contractorTeamName },
+        orderBy: { date: "asc" },
+      });
+
+      const yearlyMap: Record<string, any> = {};
+      const sitesWorkedSet = new Set<string>();
+      let lifetimeHeadcount = 0;
+      let totalLogs = logs.length;
+
+      logs.forEach((log) => {
+        const d = new Date(log.date);
+        const year = d.getUTCFullYear().toString();
+        const month = d.getUTCMonth();
+
+        if (log.siteName) sitesWorkedSet.add(log.siteName.trim());
+        lifetimeHeadcount += log.headcount;
+
+        if (!yearlyMap[year]) {
+          yearlyMap[year] = {
+            year,
+            totals: { headcount: 0, logsCount: 0, sites: [] },
+            months: Array.from({ length: 12 }, (_, i) => ({
+              monthIndex: i,
+              monthName: new Date(2026, i, 1).toLocaleString("en-US", { month: "short" }),
+              headcount: 0,
+              logsCount: 0,
+              sites: new Set<string>(),
+              records: [] as any[],
+            })),
+          };
+        }
+
+        const yData = yearlyMap[year];
+        const mData = yData.months[month];
+        yData.totals.headcount += log.headcount;
+        yData.totals.logsCount++;
+        mData.headcount += log.headcount;
+        mData.logsCount++;
+        if (log.siteName) mData.sites.add(log.siteName.trim());
+        mData.records.push(log);
+      });
+
+      const yearsList = ["2025", "2026", "2027", "2028", "2029", "2030"];
+      yearsList.forEach((y) => {
+        if (!yearlyMap[y]) {
+          yearlyMap[y] = {
+            year: y,
+            totals: { headcount: 0, logsCount: 0, sites: [] },
+            months: Array.from({ length: 12 }, (_, i) => ({
+              monthIndex: i,
+              monthName: new Date(2026, i, 1).toLocaleString("en-US", { month: "short" }),
+              headcount: 0,
+              logsCount: 0,
+              sites: [],
+              records: [],
+            })),
+          };
+        } else {
+          yearlyMap[y].months = yearlyMap[y].months.map((m: any) => ({
+            ...m,
+            sites: Array.from(m.sites || []),
+          }));
+        }
+      });
+
+      return NextResponse.json({
+        success: true,
+        isContractor: true,
+        contractorTeamName,
+        yearsList,
+        yearlyData: yearlyMap,
+        lifetimeSummary: {
+          totalLogs,
+          lifetimeHeadcount,
+          sitesWorked: Array.from(sitesWorkedSet),
+        },
+      });
+    }
+
+    // Case 2: Employee History
     if (!employeeId) {
-      return NextResponse.json({ success: false, error: "Employee ID is required." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Employee ID or contractorTeamName required." }, { status: 400 });
     }
 
     const employee = await prisma.employeeOrLabour.findUnique({
@@ -26,21 +110,60 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: "Employee not found." }, { status: 404 });
     }
 
-    // Process all records by Year and Month
+    const isOffice = employee.category === "OFFICE_STAFF";
     const yearlyMap: Record<string, any> = {};
     const sitesWorkedSet = new Set<string>();
 
     let lifetimePresent = 0;
     let lifetimeHalfDay = 0;
     let lifetimePermission = 0;
+    let lifetimePaidLeave = 0;
+    let lifetimeHalfPaidHoliday = 0;
+    let lifetimeUnpaidLeave = 0;
     let lifetimeAbsent = 0;
     let lifetimeLeave = 0;
     let lifetimeAdvance = 0;
+    const permissionsLog: any[] = [];
+
+    const supportedYears = ["2025", "2026", "2027", "2028", "2029", "2030"];
+    supportedYears.forEach((y) => {
+      yearlyMap[y] = {
+        year: y,
+        totals: {
+          present: 0,
+          halfDay: 0,
+          permission: 0,
+          paidLeave: 0,
+          halfPaidHoliday: 0,
+          unpaidLeave: 0,
+          absent: 0,
+          leave: 0,
+          payableDays: 0,
+          advances: 0,
+        },
+        months: Array.from({ length: 12 }, (_, i) => ({
+          monthIndex: i,
+          monthName: new Date(2026, i, 1).toLocaleString("en-US", { month: "short" }),
+          present: 0,
+          halfDay: 0,
+          permission: 0,
+          paidLeave: 0,
+          halfPaidHoliday: 0,
+          unpaidLeave: 0,
+          absent: 0,
+          leave: 0,
+          payableDays: 0,
+          advances: 0,
+          sites: new Set<string>(),
+          dailyRecords: [] as any[],
+        })),
+      };
+    });
 
     employee.attendances.forEach((att) => {
       const d = new Date(att.date);
       const year = d.getUTCFullYear().toString();
-      const month = d.getUTCMonth(); // 0 to 11
+      const month = d.getUTCMonth();
 
       if (att.siteName) {
         sitesWorkedSet.add(att.siteName.trim());
@@ -53,6 +176,9 @@ export async function GET(request: Request) {
             present: 0,
             halfDay: 0,
             permission: 0,
+            paidLeave: 0,
+            halfPaidHoliday: 0,
+            unpaidLeave: 0,
             absent: 0,
             leave: 0,
             payableDays: 0,
@@ -64,11 +190,15 @@ export async function GET(request: Request) {
             present: 0,
             halfDay: 0,
             permission: 0,
+            paidLeave: 0,
+            halfPaidHoliday: 0,
+            unpaidLeave: 0,
             absent: 0,
             leave: 0,
             payableDays: 0,
             advances: 0,
             sites: new Set<string>(),
+            dailyRecords: [] as any[],
           })),
         };
       }
@@ -85,6 +215,18 @@ export async function GET(request: Request) {
         mData.sites.add(att.siteName.trim());
       }
 
+      const dateStr = att.date.toISOString().split("T")[0];
+      mData.dailyRecords.push({
+        date: dateStr,
+        status: att.status,
+        inTime: att.inTime,
+        outTime: att.outTime,
+        siteName: att.siteName,
+        dailyAdvance: advance,
+        permissionNote: att.permissionNote,
+        workNotes: att.workNotes,
+      });
+
       if (att.status === "P") {
         lifetimePresent++;
         yData.totals.present++;
@@ -97,6 +239,27 @@ export async function GET(request: Request) {
         lifetimePermission++;
         yData.totals.permission++;
         mData.permission++;
+        permissionsLog.push({
+          date: dateStr,
+          inTime: att.inTime,
+          outTime: att.outTime,
+          note: att.permissionNote || att.workNotes || "1-Hour Permission",
+        });
+      } else if (att.status === "PL") {
+        const isHalfPaid = Number(att.permissionHours) === 0.5 || (att.workNotes && att.workNotes.includes("HALF_PAID"));
+        if (isHalfPaid) {
+          lifetimeHalfPaidHoliday++;
+          yData.totals.halfPaidHoliday++;
+          mData.halfPaidHoliday++;
+        } else {
+          lifetimePaidLeave++;
+          yData.totals.paidLeave++;
+          mData.paidLeave++;
+        }
+      } else if (att.status === "UP") {
+        lifetimeUnpaidLeave++;
+        yData.totals.unpaidLeave++;
+        mData.unpaidLeave++;
       } else if (att.status === "A") {
         lifetimeAbsent++;
         yData.totals.absent++;
@@ -108,39 +271,50 @@ export async function GET(request: Request) {
       }
     });
 
-    // Calculate payable days and attendance rates
-    const yearsList = Object.keys(yearlyMap).sort((a, b) => Number(b) - Number(a));
-    
-    // Ensure default years exist if empty
-    if (yearsList.length === 0) {
-      yearsList.push("2026", "2025");
-      yearlyMap["2026"] = {
-        year: "2026",
-        totals: { present: 0, halfDay: 0, permission: 0, absent: 0, leave: 0, payableDays: 0, advances: 0 },
-        months: Array.from({ length: 12 }, (_, i) => ({
-          monthIndex: i,
-          monthName: new Date(2026, i, 1).toLocaleString("en-US", { month: "short" }),
-          present: 0, halfDay: 0, permission: 0, absent: 0, leave: 0, payableDays: 0, advances: 0, sites: [],
-        })),
-      };
-    }
-
-    yearsList.forEach((y) => {
+    // Compute Net Payable Days per exact accounting rules
+    supportedYears.forEach((y) => {
       const yData = yearlyMap[y];
-      yData.totals.payableDays =
-        yData.totals.present +
-        yData.totals.permission +
-        yData.totals.halfDay * 0.5;
+      if (isOffice) {
+        // Office Net Payable Days = P(1.0) + 1H(1.0) + PL(1.0) + (H * 0.5) + (Half-Day Paid Holiday * 0.5)
+        yData.totals.payableDays =
+          yData.totals.present +
+          yData.totals.permission +
+          yData.totals.paidLeave +
+          yData.totals.halfDay * 0.5 +
+          yData.totals.halfPaidHoliday * 0.5;
 
-      yData.months = yData.months.map((m: any) => ({
-        ...m,
-        payableDays: m.present + m.permission + m.halfDay * 0.5,
-        sites: Array.from(m.sites || []),
-      }));
+        yData.months = yData.months.map((m: any) => ({
+          ...m,
+          payableDays:
+            m.present +
+            m.permission +
+            m.paidLeave +
+            m.halfDay * 0.5 +
+            m.halfPaidHoliday * 0.5,
+          sites: Array.from(m.sites || []),
+        }));
+      } else {
+        // Labour Net Payable Days = P(1.0) + 1H(1.0) + (H * 0.5) (Work = Paid, No work = No pay)
+        yData.totals.payableDays =
+          yData.totals.present +
+          yData.totals.permission +
+          yData.totals.halfDay * 0.5;
+
+        yData.months = yData.months.map((m: any) => ({
+          ...m,
+          payableDays: m.present + m.permission + m.halfDay * 0.5,
+          sites: Array.from(m.sites || []),
+        }));
+      }
     });
 
-    const lifetimePayableDays =
-      lifetimePresent + lifetimePermission + lifetimeHalfDay * 0.5;
+    const lifetimePayableDays = isOffice
+      ? lifetimePresent +
+        lifetimePermission +
+        lifetimePaidLeave +
+        lifetimeHalfDay * 0.5 +
+        lifetimeHalfPaidHoliday * 0.5
+      : lifetimePresent + lifetimePermission + lifetimeHalfDay * 0.5;
 
     return NextResponse.json({
       success: true,
@@ -166,20 +340,23 @@ export async function GET(request: Request) {
         monthlySalary: employee.monthlySalary ? Number(employee.monthlySalary) : null,
         status: employee.status,
       },
-      yearsList,
+      yearsList: supportedYears,
       yearlyData: yearlyMap,
+      permissionsLog,
       lifetimeSummary: {
         totalRecords: employee.attendances.length,
         present: lifetimePresent,
         halfDay: lifetimeHalfDay,
         permission: lifetimePermission,
+        paidLeave: lifetimePaidLeave,
+        halfPaidHoliday: lifetimeHalfPaidHoliday,
+        unpaidLeave: lifetimeUnpaidLeave,
         absent: lifetimeAbsent,
         leave: lifetimeLeave,
         payableDays: lifetimePayableDays,
         advances: lifetimeAdvance,
         sitesWorked: Array.from(sitesWorkedSet),
       },
-      rawRecords: employee.attendances,
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

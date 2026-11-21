@@ -39,9 +39,12 @@ import {
   History,
   Timer,
   Info,
+  Settings,
 } from "lucide-react";
 import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
 import ExcelImportModal from "@/components/common/ExcelImportModal";
+import EmployeeMultiYearDossierModal from "@/components/attendance/EmployeeMultiYearDossierModal";
+import AttendanceSettingsModal from "@/components/attendance/AttendanceSettingsModal";
 import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 import { formatINR } from "@/lib/decimal";
 
@@ -49,7 +52,7 @@ interface AttendanceRecordItem {
   id: string;
   employeeId: string;
   date: string;
-  status: "P" | "H" | "1H" | "A" | "L";
+  status: "P" | "1H" | "H" | "PL" | "UP" | "A" | "L";
   inTime?: string | null;
   outTime?: string | null;
   siteName?: string | null;
@@ -93,6 +96,7 @@ interface HolidayItem {
   date: string;
   name: string;
   year: number;
+  holidayType?: string;
   description?: string | null;
 }
 
@@ -117,7 +121,7 @@ const COMMON_SITES = [
   "SIPCOT Heavy PEB Shed",
 ];
 
-const YEARS = [2024, 2025, 2026, 2027, 2028];
+const YEARS = [2025, 2026, 2027, 2028, 2029, 2030];
 const MONTHS = [
   { value: "01", label: "January" },
   { value: "02", label: "February" },
@@ -160,10 +164,12 @@ export default function AttendancePage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showContractorModal, setShowContractorModal] = useState(false);
   const [showHolidayModal, setShowHolidayModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [holidayForm, setHolidayForm] = useState({ date: "", name: "", markStaff: true });
   
   // Lifetime Multi-Year Dossier Modal
   const [selectedDossierEmployee, setSelectedDossierEmployee] = useState<EmployeeItem | null>(null);
+  const [isContractorDossier, setIsContractorDossier] = useState(false);
   const [dossierLoading, setDossierLoading] = useState(false);
   const [dossierData, setDossierData] = useState<any>(null);
   const [dossierActiveYear, setDossierActiveYear] = useState<string>("2026");
@@ -173,7 +179,7 @@ export default function AttendancePage() {
     employee: EmployeeItem;
     date: string;
     dayNum: number;
-    currentStatus: "P" | "H" | "1H" | "A" | "L" | null;
+    currentStatus: "P" | "1H" | "H" | "PL" | "UP" | "A" | "L" | null;
     currentSite?: string | null;
     currentNote?: string | null;
   } | null>(null);
@@ -325,7 +331,7 @@ export default function AttendancePage() {
   // Mark status helper with Optimistic UI
   const handleMarkStatus = async (
     employeeId: string,
-    status: "P" | "H" | "1H" | "A" | "L",
+    status: "P" | "1H" | "H" | "PL" | "UP" | "A" | "L",
     siteName?: string,
     dateOverride?: string,
     permissionNote?: string
@@ -547,8 +553,9 @@ export default function AttendancePage() {
   };
 
   // Open Multi-Year Lifetime Dossier
-  const handleOpenDossier = async (emp: EmployeeItem) => {
+  const handleOpenDossier = async (emp: EmployeeItem, isContractor = false) => {
     setSelectedDossierEmployee(emp);
+    setIsContractorDossier(isContractor);
     setDossierLoading(true);
     try {
       const res = await fetch(`/api/attendance/history?employeeId=${emp.id}`);
@@ -724,14 +731,24 @@ export default function AttendancePage() {
         onExportExcel={handleExportMusterExcel}
         onPrintPDF={() => window.print()}
         extraControls={
-          <button
-            type="button"
-            onClick={() => setShowHolidayModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold text-xs rounded-xl border border-amber-200 dark:border-amber-800 transition cursor-pointer"
-          >
-            <Palmtree size={14} className="text-amber-600" />
-            <span>Company Holidays ({holidays.length})</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowSettingsModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 transition cursor-pointer"
+            >
+              <Settings size={14} className="text-slate-600 dark:text-slate-400" />
+              <span>Settings & Rules</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowHolidayModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold text-xs rounded-xl border border-amber-200 dark:border-amber-800 transition cursor-pointer"
+            >
+              <Palmtree size={14} className="text-amber-600" />
+              <span>Holidays ({holidays.length})</span>
+            </button>
+          </div>
         }
       />
 
@@ -743,222 +760,221 @@ export default function AttendancePage() {
         </div>
       )}
 
-      {/* 2. TOP 4 REAL-TIME ATTENDANCE KPI CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 2. TOP 4 REAL-TIME ATTENDANCE KPI CARDS (COMPACT SINGLE-LINE) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* KPI 1: Office Staff Presence */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 shadow-xs flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-3 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <Building size={14} className="text-emerald-600 dark:text-emerald-400" /> Office Presence
+              <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
+                <Building size={13} className="text-emerald-600 shrink-0" /> Office Presence
               </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                 {selectedDate}
               </span>
             </div>
-            <div className="flex items-baseline justify-between mt-3">
-              <div className="text-2xl font-black text-slate-900 dark:text-slate-100 tabular-nums">
+            <div className="flex items-baseline justify-between mt-2">
+              <div className="text-xl font-black text-slate-900 dark:text-slate-100 tabular-nums">
                 {kpis.presentOfficeToday || 0}
-                <span className="text-sm font-semibold text-slate-400"> / {kpis.totalOfficeStaff || 13}</span>
+                <span className="text-xs font-semibold text-slate-400"> / {employees.filter((e) => e.category === "OFFICE_STAFF").length || 13}</span>
               </div>
-              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                {Math.round(((kpis.presentOfficeToday || 0) / (kpis.totalOfficeStaff || 13)) * 100)}% Present
+              <span className="text-xs font-bold text-emerald-600">
+                {Math.round(((kpis.presentOfficeToday || 0) / (employees.filter((e) => e.category === "OFFICE_STAFF").length || 13)) * 100)}%
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              SR: 10 staff • Invi: 3 staff • Leaves: {kpis.leaveOfficeToday || 0}
+            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+              SR: 10 • Invi: 3 • Off: {kpis.leaveOfficeToday || 0}
             </p>
           </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden flex">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
             <div
               className="bg-emerald-500 h-full"
               style={{
-                width: `${Math.round(((kpis.presentOfficeToday || 0) / (kpis.totalOfficeStaff || 13)) * 100)}%`,
+                width: `${Math.round(((kpis.presentOfficeToday || 0) / (employees.filter((e) => e.category === "OFFICE_STAFF").length || 13)) * 100)}%`,
               }}
             />
           </div>
         </div>
 
         {/* KPI 2: Active Tamil Site Labours */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 shadow-xs flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-3 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <HardHat size={14} className="text-blue-600 dark:text-blue-400" /> Tamil Site Labours
+              <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
+                <HardHat size={13} className="text-blue-600 shrink-0" /> Tamil Site Labours
               </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+              <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                 On Duty
               </span>
             </div>
-            <div className="flex items-baseline justify-between mt-3">
-              <div className="text-2xl font-black text-blue-600 dark:text-blue-400 tabular-nums">
+            <div className="flex items-baseline justify-between mt-2">
+              <div className="text-xl font-black text-blue-600 dark:text-blue-400 tabular-nums">
                 {kpis.activeTamilSiteLabours || 0}
-                <span className="text-sm font-semibold text-slate-400"> / {kpis.totalTamilLabours || 64}</span>
+                <span className="text-xs font-semibold text-slate-400"> / {employees.filter((e) => e.category === "TAMIL_LABOUR").length || 71}</span>
               </div>
               <span className="text-xs font-bold text-slate-500">
-                {Object.keys(kpis.siteBreakdown || {}).length} Active Sites
+                {Object.keys(kpis.siteBreakdown || {}).length} Sites
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1 truncate">
+            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
               {Object.keys(kpis.siteBreakdown || {}).slice(0, 3).join(", ") || "SSM School, Kalloviyam..."}
             </p>
           </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
             <div
               className="bg-blue-600 h-full"
               style={{
-                width: `${Math.min(100, Math.round(((kpis.activeTamilSiteLabours || 0) / (kpis.totalTamilLabours || 64)) * 100))}%`,
+                width: `${Math.min(100, Math.round(((kpis.activeTamilSiteLabours || 0) / (employees.filter((e) => e.category === "TAMIL_LABOUR").length || 71)) * 100))}%`,
               }}
             />
           </div>
         </div>
 
         {/* KPI 3: Hindi Migrant Crew */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 shadow-xs flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-3 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <Truck size={14} className="text-purple-600 dark:text-purple-400" /> Hindi Helpers & Crew
+              <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
+                <Truck size={13} className="text-purple-600 shrink-0" /> Hindi Helpers & Crew
               </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                {kpis.totalHindiLabours || 5} Total
+              <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                {employees.filter((e) => e.category === "HINDI_LABOUR").length || 5} Crew
               </span>
             </div>
-            <div className="flex items-baseline justify-between mt-3">
-              <div className="text-2xl font-black text-purple-600 dark:text-purple-400 tabular-nums">
+            <div className="flex items-baseline justify-between mt-2">
+              <div className="text-xl font-black text-purple-600 dark:text-purple-400 tabular-nums">
                 {kpis.activeHindiToday || 4}
-                <span className="text-sm font-semibold text-slate-400"> Working</span>
+                <span className="text-xs font-semibold text-slate-400"> Working</span>
               </div>
               <span className="text-xs font-bold text-purple-600">80% Utilization</span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
               Rakeshkumar1, Nithish, Rakesh2, Ajith, Mithun
             </p>
           </div>
-          <div className="w-full bg-purple-100 dark:bg-purple-950 h-1.5 rounded-full mt-3 overflow-hidden">
+          <div className="w-full bg-purple-100 dark:bg-purple-950 h-1 rounded-full mt-2 overflow-hidden">
             <div className="bg-purple-600 h-full w-[80%]" />
           </div>
         </div>
 
         {/* KPI 4: Contractor Teams Headcount */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 shadow-xs flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-3 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <Users2 size={14} className="text-amber-600 dark:text-amber-400" /> Contractor Teams
+              <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
+                <Users2 size={13} className="text-amber-600 shrink-0" /> Contractor Teams
               </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+              <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                 6 Teams
               </span>
             </div>
-            <div className="flex items-baseline justify-between mt-3">
-              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 tabular-nums">
+            <div className="flex items-baseline justify-between mt-2">
+              <div className="text-xl font-black text-amber-600 dark:text-amber-400 tabular-nums">
                 {kpis.contractorHeadcountToday || 14}
-                <span className="text-sm font-semibold text-slate-400"> Labours</span>
+                <span className="text-xs font-semibold text-slate-400"> Labours</span>
               </div>
               <span className="text-xs font-bold text-amber-600">Active Sites</span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1 truncate">
+            <p className="text-[10px] text-slate-400 mt-0.5 truncate">
               Nandeeshwaran, Sakthi, Prashop, Suresh, Suthish, Hydarali
             </p>
           </div>
-          <div className="w-full bg-amber-100 dark:bg-amber-950 h-1.5 rounded-full mt-3 overflow-hidden">
+          <div className="w-full bg-amber-100 dark:bg-amber-950 h-1 rounded-full mt-2 overflow-hidden">
             <div className="bg-amber-500 h-full w-[70%]" />
           </div>
         </div>
       </div>
 
       {/* 3. DEDICATED 4-SUBTAB NAVIGATION & CONTROL STRIP */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 shadow-xs space-y-4">
-        {/* Top Controls Bar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-3">
-          {/* 4 Main Tabs */}
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-3.5 shadow-2xs space-y-3">
+        {/* Row 1: Segmented Workforce Tabs + Multi-Year/Month Switcher + Action Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* 4 Main Tabs with consistent 38px height */}
+          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl h-[38px] shrink-0">
             <button
               onClick={() => setActiveTab("office")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 h-full rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeTab === "office"
-                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
               }`}
             >
-              <Building size={15} />
-              <span>Office Employees ({employees.filter((e) => e.category === "OFFICE_STAFF").length || 13})</span>
+              <Building size={14} />
+              <span>Office Staff ({employees.filter((e) => e.category === "OFFICE_STAFF").length || 13})</span>
             </button>
 
             <button
               onClick={() => setActiveTab("tamil")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 h-full rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeTab === "tamil"
-                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
               }`}
             >
-              <HardHat size={15} />
-              <span>Tamil Site Labours ({employees.filter((e) => e.category === "TAMIL_LABOUR").length || 71})</span>
+              <HardHat size={14} />
+              <span>Tamil Labours ({employees.filter((e) => e.category === "TAMIL_LABOUR").length || 71})</span>
             </button>
 
             <button
               onClick={() => setActiveTab("hindi")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 h-full rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeTab === "hindi"
-                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
               }`}
             >
-              <Truck size={15} />
-              <span>Hindi Labours ({employees.filter((e) => e.category === "HINDI_LABOUR").length || 5})</span>
+              <Truck size={14} />
+              <span>Hindi Crew ({employees.filter((e) => e.category === "HINDI_LABOUR").length || 5})</span>
             </button>
 
             <button
               onClick={() => setActiveTab("contractor")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 h-full rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeTab === "contractor"
-                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
               }`}
             >
-              <Users2 size={15} />
-              <span>Contractor Teams (6)</span>
+              <Users2 size={14} />
+              <span>Contractors (6)</span>
             </button>
           </div>
 
-          {/* Persistent Year & Month Selector with Prev/Next Month Arrows */}
+          {/* Right Toolbar Controls with consistent 38px height */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            {/* Multi-Year & Month Switcher (2025-2030) */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl h-[38px] border border-slate-200/80 dark:border-slate-700">
               <button
                 type="button"
                 onClick={handlePrevMonth}
-                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-900 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                className="w-7 h-full flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-slate-900 text-slate-600 dark:text-slate-300 transition cursor-pointer"
                 title="Previous Month"
               >
                 <ChevronLeft size={15} />
               </button>
 
-              <div className="flex items-center gap-1.5 px-2">
-                {/* Year Dropdown */}
+              <div className="flex items-center gap-1 px-1.5">
                 <select
                   value={selectedYear}
                   onChange={(e) => handleYearMonthChange(Number(e.target.value), selectedMonthNum)}
-                  className="bg-transparent text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-hidden cursor-pointer"
+                  className="bg-transparent text-xs font-black text-slate-800 dark:text-slate-100 focus:outline-hidden cursor-pointer"
                 >
                   {YEARS.map((y) => (
-                    <option key={y} value={y} className="bg-white dark:bg-slate-900">
-                      FY {y}
+                    <option key={y} value={y} className="bg-white dark:bg-slate-900 text-slate-800">
+                      {y}
                     </option>
                   ))}
                 </select>
 
-                <span className="text-slate-400">×</span>
+                <span className="text-slate-400 text-xs">/</span>
 
-                {/* Month Dropdown */}
                 <select
                   value={selectedMonthNum}
                   onChange={(e) => handleYearMonthChange(selectedYear, e.target.value)}
                   className="bg-transparent text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-hidden cursor-pointer"
                 >
                   {MONTHS.map((m) => (
-                    <option key={m.value} value={m.value} className="bg-white dark:bg-slate-900">
+                    <option key={m.value} value={m.value} className="bg-white dark:bg-slate-900 text-slate-800">
                       {m.label}
                     </option>
                   ))}
@@ -968,38 +984,38 @@ export default function AttendancePage() {
               <button
                 type="button"
                 onClick={handleNextMonth}
-                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-900 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                className="w-7 h-full flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-slate-900 text-slate-600 dark:text-slate-300 transition cursor-pointer"
                 title="Next Month"
               >
                 <ChevronRight size={15} />
               </button>
             </div>
 
-            {/* Quick Action: Toggle Today Roll-Call */}
+            {/* Toggle Today Roll-Call */}
             {activeTab !== "contractor" && (
               <button
                 type="button"
                 onClick={() => setShowTodayRollCall(!showTodayRollCall)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer shadow-xs ${
+                className={`flex items-center gap-1.5 px-3 h-[38px] rounded-xl font-bold text-xs transition cursor-pointer ${
                   showTodayRollCall
-                    ? "bg-blue-600 text-white shadow-blue-500/20"
+                    ? "bg-blue-600 text-white shadow-2xs"
                     : "bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
                 }`}
-                title="Open fast daily roll-call sheet"
+                title="Quick mark today's presence"
               >
                 <Clock size={13} />
-                <span>{showTodayRollCall ? "Hide Roll-Call" : "+ Mark Today's Attendance"}</span>
+                <span>{showTodayRollCall ? "Hide Roll-Call" : "+ Mark Today"}</span>
               </button>
             )}
 
             {/* View Mode Switcher */}
             {activeTab !== "contractor" && (
-              <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
+              <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl h-[38px] text-xs font-bold">
                 <button
                   type="button"
                   onClick={() => setViewMode("monthly")}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                    viewMode === "monthly" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs" : "text-slate-500"
+                  className={`flex items-center gap-1 px-2.5 h-full rounded-lg transition cursor-pointer ${
+                    viewMode === "monthly" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-500"
                   }`}
                 >
                   <CalendarDays size={13} />
@@ -1008,8 +1024,8 @@ export default function AttendancePage() {
                 <button
                   type="button"
                   onClick={() => setViewMode("daily")}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                    viewMode === "daily" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs" : "text-slate-500"
+                  className={`flex items-center gap-1 px-2.5 h-full rounded-lg transition cursor-pointer ${
+                    viewMode === "daily" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-500"
                   }`}
                 >
                   <Clock size={13} />
@@ -1017,36 +1033,53 @@ export default function AttendancePage() {
                 </button>
               </div>
             )}
+
+            {/* Settings & Customization Button */}
+            <button
+              type="button"
+              onClick={() => setShowSettingsModal(true)}
+              className="flex items-center gap-1.5 px-3 h-[38px] rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
+              title="Attendance rules, company holidays and directory editor"
+            >
+              <Settings size={14} className="text-slate-500" />
+              <span>Settings</span>
+            </button>
           </div>
         </div>
 
-        {/* Clean Summary Strip & Filter Toolbar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 text-xs">
-          {/* Summary Strip (Scheduled Working Days, Sundays, Holidays) */}
+        {/* Row 2: Summary Strip & Sub-Filters */}
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs pt-1 border-t border-slate-100 dark:border-slate-800/60">
           <div className="flex flex-wrap items-center gap-2 font-mono">
-            <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold">
-              Total Days: <strong className="text-slate-900 dark:text-slate-100">{daysInMonth.length}</strong>
+            <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-[11px]">
+              Days: <strong>{daysInMonth.length}</strong>
             </span>
-            <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold">
-              Sundays (Unpaid L): <strong className="text-slate-700 dark:text-slate-300">{totalSundaysInMonth}</strong>
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold">
-              Holidays (Unpaid L): <strong className="text-slate-700 dark:text-slate-300">{totalHolidaysInMonth}</strong>
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-extrabold border border-blue-200 dark:border-blue-800">
-              Scheduled Working Days: <strong className="text-blue-800 dark:text-blue-200">{totalWorkingDaysInMonth}</strong>
-            </span>
+            {activeTab === "office" ? (
+              <>
+                <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold text-[11px]">
+                  Sundays (Off L): <strong>{totalSundaysInMonth}</strong>
+                </span>
+                <span className="px-2 py-0.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 font-bold text-[11px] border border-teal-200 dark:border-teal-800">
+                  Holidays (PL): <strong>{totalHolidaysInMonth}</strong>
+                </span>
+                <span className="px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-extrabold text-[11px] border border-blue-200 dark:border-blue-800">
+                  Working Days: <strong>{totalWorkingDaysInMonth}</strong>
+                </span>
+              </>
+            ) : (
+              <span className="px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-extrabold text-[11px] border border-amber-200 dark:border-amber-800">
+                Rule: Strict "Work = Paid, No Work = No Pay" (No Auto-Sunday L)
+              </span>
+            )}
           </div>
 
-          {/* Sub-Filters & Quick Actions */}
           <div className="flex flex-wrap items-center gap-2">
             {activeTab === "office" && (
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg h-[34px]">
                 <button
                   type="button"
                   onClick={() => setCompanyUnitFilter("ALL")}
-                  className={`px-2.5 py-1 rounded-md font-bold text-[11px] ${
-                    companyUnitFilter === "ALL" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs" : "text-slate-500"
+                  className={`px-2.5 h-full rounded-md font-bold text-[11px] transition cursor-pointer ${
+                    companyUnitFilter === "ALL" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-500"
                   }`}
                 >
                   All (13)
@@ -1054,8 +1087,8 @@ export default function AttendancePage() {
                 <button
                   type="button"
                   onClick={() => setCompanyUnitFilter("STANDARD_ROOFS")}
-                  className={`px-2.5 py-1 rounded-md font-bold text-[11px] ${
-                    companyUnitFilter === "STANDARD_ROOFS" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs" : "text-slate-500"
+                  className={`px-2.5 h-full rounded-md font-bold text-[11px] transition cursor-pointer ${
+                    companyUnitFilter === "STANDARD_ROOFS" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-500"
                   }`}
                 >
                   Standard Roofs (10)
@@ -1063,8 +1096,8 @@ export default function AttendancePage() {
                 <button
                   type="button"
                   onClick={() => setCompanyUnitFilter("INVI_CREATION")}
-                  className={`px-2.5 py-1 rounded-md font-bold text-[11px] ${
-                    companyUnitFilter === "INVI_CREATION" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs" : "text-slate-500"
+                  className={`px-2.5 h-full rounded-md font-bold text-[11px] transition cursor-pointer ${
+                    companyUnitFilter === "INVI_CREATION" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-500"
                   }`}
                 >
                   Invi Creation (3)
@@ -1072,34 +1105,24 @@ export default function AttendancePage() {
               </div>
             )}
 
-            {/* Instant Search */}
             <div className="relative min-w-[200px]">
-              <Search className="absolute left-2.5 top-2 text-slate-400" size={13} />
+              <Search className="absolute left-2.5 top-2.5 text-slate-400" size={13} />
               <input
                 type="text"
                 placeholder="Search name, ID, role..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs focus:outline-hidden focus:border-blue-500"
+                className="w-full pl-8 pr-3 h-[34px] rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs focus:outline-hidden focus:border-blue-500"
               />
             </div>
 
             <button
               type="button"
-              onClick={() => setShowHolidayModal(true)}
-              className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold rounded-lg border border-amber-200 dark:border-amber-800 transition cursor-pointer"
-            >
-              <Palmtree size={12} className="text-amber-600" />
-              <span>+ Add Company Holiday (L)</span>
-            </button>
-
-            <button
-              type="button"
               onClick={handleExportMusterExcel}
-              className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold rounded-lg border border-emerald-200 dark:border-emerald-800 transition cursor-pointer"
+              className="flex items-center gap-1 px-3 h-[34px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold rounded-xl border border-emerald-200 dark:border-emerald-800 transition cursor-pointer"
             >
-              <FileSpreadsheet size={12} className="text-emerald-600" />
-              <span>Export Month (.xlsx)</span>
+              <FileSpreadsheet size={13} className="text-emerald-600" />
+              <span>Export (.xlsx)</span>
             </button>
           </div>
         </div>
@@ -1181,9 +1204,24 @@ export default function AttendancePage() {
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-3 font-semibold text-blue-600 dark:text-blue-400">
-                          {log.contractorTeamName}
-                        </td>
+                        <td
+    className="py-3 px-3 font-semibold text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"
+    onClick={() =>
+      handleOpenDossier(
+        {
+          id: log.contractorTeamName,
+          name: log.contractorTeamName,
+          employeeCode: "CONT",
+          category: "CONTRACTOR_TEAM",
+          companyUnit: "STANDARD_ROOFS",
+          attendances: [],
+        },
+        true
+      )
+    }
+  >
+    {log.contractorTeamName}
+  </td>
                         <td className="py-3 px-3 font-medium flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
                           <MapPin size={13} className="text-slate-400" />
                           <span>{log.siteName || "Site Standby"}</span>
@@ -1794,18 +1832,30 @@ export default function AttendancePage() {
                   <th className="py-2.5 px-2 text-center bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-black border-l border-slate-200">
                     P (1.0)
                   </th>
+                  <th className="py-2.5 px-2 text-center bg-sky-50 dark:bg-sky-950 text-sky-800 dark:text-sky-300 font-black">
+                    1H (1.0)
+                  </th>
                   <th className="py-2.5 px-2 text-center bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-black">
                     H (0.5)
                   </th>
-                  <th className="py-2.5 px-2 text-center bg-cyan-50 dark:bg-cyan-950 text-cyan-800 dark:text-cyan-300 font-black">
-                    1H (1.0)
-                  </th>
+                  {activeTab === "office" && (
+                    <th className="py-2.5 px-2 text-center bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-black">
+                      PL (1.0)
+                    </th>
+                  )}
+                  {activeTab === "office" && (
+                    <th className="py-2.5 px-2 text-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black">
+                      UP (0.0)
+                    </th>
+                  )}
                   <th className="py-2.5 px-2 text-center bg-rose-50 dark:bg-rose-950 text-rose-800 dark:text-rose-300 font-black">
                     A (0.0)
                   </th>
-                  <th className="py-2.5 px-2 text-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black">
-                    L (Sun)
-                  </th>
+                  {activeTab === "office" && (
+                    <th className="py-2.5 px-2 text-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black">
+                      L (Sun)
+                    </th>
+                  )}
                   <th className="py-2.5 px-3 text-center bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-black sticky right-0 z-10 border-l border-blue-200 shadow-xs">
                     Payable Days
                   </th>
@@ -1813,25 +1863,41 @@ export default function AttendancePage() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {tabEmployees.map((emp) => {
+                  const isOffice = emp.category === "OFFICE_STAFF";
                   let pTotal = 0;
                   let hTotal = 0;
                   let p1hTotal = 0;
+                  let plTotal = 0;
+                  let halfPaidPlTotal = 0;
+                  let upTotal = 0;
                   let aTotal = 0;
                   let lTotal = 0;
 
-                  // Pre-calculate sums with Auto-Sunday Rule
+                  // Pre-calculate sums with Separate Rules:
+                  // Office: Sunday auto-marked L if no record.
+                  // Labours: Sunday is NOT auto-marked L. If no record, null.
                   daysInMonth.forEach((d) => {
                     const att = emp.attendances.find((a) => a.date.split("T")[0] === d.fullDate);
-                    const status = att ? att.status : d.isSunday ? "L" : null;
+                    const status = att ? att.status : isOffice && d.isSunday ? "L" : null;
 
                     if (status === "P") pTotal++;
-                    else if (status === "H") hTotal++;
                     else if (status === "1H") p1hTotal++;
+                    else if (status === "H") hTotal++;
+                    else if (status === "PL") {
+                      const isHalf = Number(att?.permissionHours) === 0.5 || (att?.workNotes && att?.workNotes.includes("HALF_PAID"));
+                      if (isHalf) halfPaidPlTotal++;
+                      else plTotal++;
+                    } else if (status === "UP") upTotal++;
                     else if (status === "A") aTotal++;
                     else if (status === "L") lTotal++;
                   });
 
-                  const netPayableDays = pTotal + p1hTotal + hTotal * 0.5;
+                  // Net Payable Days:
+                  // Office = P + 1H + PL + (0.5 * H) + (0.5 * halfPaidPl)
+                  // Labour = P + 1H + (0.5 * H)
+                  const netPayableDays = isOffice
+                    ? pTotal + p1hTotal + plTotal + hTotal * 0.5 + halfPaidPlTotal * 0.5
+                    : pTotal + p1hTotal + hTotal * 0.5;
 
                   return (
                     <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
@@ -1853,7 +1919,7 @@ export default function AttendancePage() {
                       {/* 1..31 Clickable Day Cells */}
                       {daysInMonth.map((d) => {
                         const att = emp.attendances.find((a) => a.date.split("T")[0] === d.fullDate);
-                        const status = att ? att.status : d.isSunday ? "L" : null;
+                        const status = att ? att.status : isOffice && d.isSunday ? "L" : null;
 
                         return (
                           <td
@@ -1863,15 +1929,15 @@ export default function AttendancePage() {
                                 employee: emp,
                                 date: d.fullDate,
                                 dayNum: d.dayNum,
-                                currentStatus: status,
+                                currentStatus: status as any,
                                 currentSite: att?.siteName,
-                                currentNote: att?.permissionNote,
+                                currentNote: att?.permissionNote || att?.workNotes,
                               });
-                              setSiteInput(att?.siteName || (emp.category === "OFFICE_STAFF" ? "Headquarters Office" : "SSM School"));
+                              setSiteInput(att?.siteName || (isOffice ? "Headquarters Office" : "SSM School"));
                               setPermissionInput(att?.permissionNote || "");
                             }}
                             className={`py-1.5 px-0.5 text-center font-black cursor-pointer transition select-none border-r border-slate-100 dark:border-slate-800/50 hover:bg-blue-50/70 dark:hover:bg-blue-900/30 ${
-                              d.isSunday
+                              d.isSunday && isOffice
                                 ? "bg-slate-100/60 dark:bg-slate-800/60"
                                 : d.fullDate === selectedDate
                                 ? "ring-2 ring-blue-500/50"
@@ -1879,24 +1945,30 @@ export default function AttendancePage() {
                             }`}
                             title={`${emp.name} - ${d.fullDate}: ${status || "Pending"} ${
                               att?.siteName ? `[${att.siteName}]` : ""
-                            } ${att?.permissionNote ? `(Perm: ${att.permissionNote})` : ""}`}
+                            } ${att?.permissionNote ? `(1H Perm: ${att.permissionNote})` : ""} ${
+                              att?.workNotes ? `(${att.workNotes})` : ""
+                            }`}
                           >
                             <span
-                              className={`w-6 h-6 rounded-md inline-flex items-center justify-center text-[10px] font-black transition ${
+                              className={`min-w-[26px] h-6 px-1 rounded-md inline-flex items-center justify-center font-black transition ${
                                 status === "P"
-                                  ? "bg-emerald-500 text-white"
-                                  : status === "H"
-                                  ? "bg-amber-400 text-white"
+                                  ? "bg-emerald-500 text-white shadow-2xs text-[10px]"
                                   : status === "1H"
-                                  ? "bg-cyan-600 text-white"
+                                  ? "bg-sky-500 text-white shadow-2xs text-[9px] font-extrabold tracking-tight"
+                                  : status === "H"
+                                  ? "bg-amber-400 text-white shadow-2xs text-[10px]"
+                                  : status === "PL"
+                                  ? "bg-teal-600 text-white shadow-2xs text-[9px] font-extrabold tracking-tight"
+                                  : status === "UP"
+                                  ? "bg-slate-600 text-white shadow-2xs text-[9px] font-extrabold tracking-tight"
                                   : status === "A"
-                                  ? "bg-rose-500 text-white"
+                                  ? "bg-rose-500 text-white shadow-2xs text-[10px]"
                                   : status === "L"
-                                  ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
-                                  : "bg-slate-100/60 text-slate-300 dark:text-slate-600 border border-dashed border-slate-200 dark:border-slate-700"
+                                  ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px]"
+                                  : "bg-slate-100/60 text-slate-300 dark:text-slate-600 border border-dashed border-slate-200 dark:border-slate-700 text-[10px]"
                               }`}
                             >
-                              {status || "—"}
+                              {status === "1H" ? "P·1H" : status || "—"}
                             </span>
                           </td>
                         );
@@ -1906,18 +1978,30 @@ export default function AttendancePage() {
                       <td className="py-2 px-2 text-center font-bold text-emerald-600 tabular-nums bg-emerald-50/30 dark:bg-emerald-950/20 border-l border-slate-200">
                         {pTotal}
                       </td>
+                      <td className="py-2 px-2 text-center font-bold text-sky-600 tabular-nums bg-sky-50/30 dark:bg-sky-950/20">
+                        {p1hTotal}
+                      </td>
                       <td className="py-2 px-2 text-center font-bold text-amber-500 tabular-nums bg-amber-50/30 dark:bg-amber-950/20">
                         {hTotal}
                       </td>
-                      <td className="py-2 px-2 text-center font-bold text-cyan-600 tabular-nums bg-cyan-50/30 dark:bg-cyan-950/20">
-                        {p1hTotal}
-                      </td>
+                      {activeTab === "office" && (
+                        <td className="py-2 px-2 text-center font-bold text-teal-600 tabular-nums bg-teal-50/30 dark:bg-teal-950/20">
+                          {plTotal + halfPaidPlTotal * 0.5}
+                        </td>
+                      )}
+                      {activeTab === "office" && (
+                        <td className="py-2 px-2 text-center font-bold text-slate-500 tabular-nums bg-slate-100/30 dark:bg-slate-800/20">
+                          {upTotal}
+                        </td>
+                      )}
                       <td className="py-2 px-2 text-center font-bold text-rose-500 tabular-nums bg-rose-50/30 dark:bg-rose-950/20">
                         {aTotal}
                       </td>
-                      <td className="py-2 px-2 text-center font-bold text-slate-500 tabular-nums bg-slate-100/40 dark:bg-slate-800/40">
-                        {lTotal}
-                      </td>
+                      {activeTab === "office" && (
+                        <td className="py-2 px-2 text-center font-bold text-slate-500 tabular-nums bg-slate-100/40 dark:bg-slate-800/40">
+                          {lTotal}
+                        </td>
+                      )}
                       <td className="py-2 px-3 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-blue-50/70 dark:bg-blue-950/60 sticky right-0 z-10 border-l border-blue-200 shadow-xs">
                         {netPayableDays}
                       </td>
@@ -1955,13 +2039,15 @@ export default function AttendancePage() {
 
             <div className="space-y-3 text-xs">
               <label className="block font-bold text-slate-700 dark:text-slate-300">Set Status</label>
-              <div className="grid grid-cols-5 gap-1.5">
+              <div className="grid grid-cols-7 gap-1">
                 {[
                   { key: "P", label: "P", desc: "Present (1.0)", bg: "bg-emerald-600 text-white" },
+                  { key: "1H", label: "1H", desc: "1-Hr Perm (1.0)", bg: "bg-sky-600 text-white" },
                   { key: "H", label: "H", desc: "Half-Day (0.5)", bg: "bg-amber-500 text-white" },
-                  { key: "1H", label: "1H", desc: "1-Hr Perm (1.0)", bg: "bg-cyan-600 text-white" },
+                  { key: "PL", label: "PL", desc: "Paid Leave (1.0)", bg: "bg-teal-600 text-white" },
+                  { key: "UP", label: "UP", desc: "Unpaid Leave (0.0)", bg: "bg-slate-600 text-white" },
                   { key: "A", label: "A", desc: "Absent (0.0)", bg: "bg-rose-600 text-white" },
-                  { key: "L", label: "L", desc: "Weekly Off / Leave", bg: "bg-slate-700 text-white" },
+                  { key: "L", label: "L", desc: "Sunday Off (0.0)", bg: "bg-slate-700 text-white" },
                 ].map((s) => (
                   <button
                     key={s.key}

@@ -34,12 +34,14 @@ import {
   FileCheck,
   History,
   CalendarDays,
+  Settings,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
 import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
 import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
 import ExcelImportModal from "@/components/common/ExcelImportModal";
 import EmployeeMultiYearDossierModal from "@/components/attendance/EmployeeMultiYearDossierModal";
+import AttendanceSettingsModal from "@/components/attendance/AttendanceSettingsModal";
 import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 
 interface WorkerItem {
@@ -83,6 +85,7 @@ export default function WorkforceKYCDirectoryPage() {
   const [showAddEditModal, setShowAddEditModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState<WorkerItem | null>(null);
   const [dossierWorker, setDossierWorker] = useState<WorkerItem | null>(null);
 
@@ -312,6 +315,16 @@ export default function WorkforceKYCDirectoryPage() {
         onImportExcel={() => setShowImportModal(true)}
         onExportExcel={handleExportExcel}
         onPrintPDF={handlePrintPDF}
+        extraControls={
+          <button
+            type="button"
+            onClick={() => setShowSettingsModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 transition cursor-pointer"
+          >
+            <Settings size={14} className="text-slate-600 dark:text-slate-400" />
+            <span>⚙️ Settings & Customization</span>
+          </button>
+        }
         charts={[
           {
             title: "Workforce KYC Verification Status",
@@ -978,6 +991,13 @@ export default function WorkforceKYCDirectoryPage() {
         isOpen={Boolean(dossierWorker)}
         onClose={() => setDossierWorker(null)}
         employee={dossierWorker}
+      />
+
+      {/* 8. ATTENDANCE & WORKFORCE SETTINGS MODAL */}
+      <AttendanceSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        onRefreshData={fetchWorkers}
       />
     </div>
   );

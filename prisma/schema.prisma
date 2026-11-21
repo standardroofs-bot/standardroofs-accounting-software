@@ -870,8 +870,9 @@ model AttendanceRecord {
 model CompanyHoliday {
   id          String   @id @default(cuid())
   date        DateTime @unique @db.Date
-  name        String   // e.g. "Pongal", "Diwali", "May Day", "Tamil New Year", "Independence Day"
+  name        String   // e.g. "Deepavali", "New Year", "Pongal", "Saraswathi Pooja"
   year        Int      @default(2026)
+  holidayType String   @default("PL") // "PL" (Paid Leave = 1.0), "UP" (Non-Paid Leave = 0.0), "HALF_PAID" (Half-Day Paid Leave = 0.5)
   description String?
   isPublic    Boolean  @default(true)
   createdAt   DateTime @default(now())

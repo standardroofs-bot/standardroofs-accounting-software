@@ -3,52 +3,38 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-// Standard Tamil Nadu & National Public Holidays 2026
-const DEFAULT_HOLIDAYS_2026 = [
-  { date: "2026-01-01", name: "New Year's Day", year: 2026 },
-  { date: "2026-01-14", name: "Pongal", year: 2026 },
-  { date: "2026-01-15", name: "Thiruvalluvar Day / Mattu Pongal", year: 2026 },
-  { date: "2026-01-16", name: "Uzhavar Thirunal", year: 2026 },
-  { date: "2026-01-26", name: "Republic Day", year: 2026 },
-  { date: "2026-04-14", name: "Tamil New Year / Dr. B.R. Ambedkar Jayanti", year: 2026 },
-  { date: "2026-05-01", name: "May Day / International Labour Day", year: 2026 },
-  { date: "2026-08-15", name: "Independence Day", year: 2026 },
-  { date: "2026-10-02", name: "Gandhi Jayanti", year: 2026 },
-  { date: "2026-10-19", name: "Ayutha Pooja / Saraswathi Pooja", year: 2026 },
-  { date: "2026-10-20", name: "Vijaya Dasami", year: 2026 },
-  { date: "2026-11-08", name: "Deepavali", year: 2026 },
-  { date: "2026-12-25", name: "Christmas Day", year: 2026 },
+const OFFICIAL_12_HOLIDAYS = [
+  { date: "2026-10-19", name: "Saraswathi Pooja", holidayType: "HALF_PAID", year: 2026, description: "Half-Day Paid Leave (0.5 day payable)" },
+  { date: "2026-10-20", name: "Saraswathi Pooja", holidayType: "UP", year: 2026, description: "Non-Paid Leave (0.0 day payable)" },
+  { date: "2026-11-09", name: "Deepavali", holidayType: "PL", year: 2026, description: "Deepavali Day 1 (1.0 day payable)" },
+  { date: "2026-11-10", name: "Deepavali", holidayType: "PL", year: 2026, description: "Deepavali Day 2 (1.0 day payable)" },
+  { date: "2027-01-01", name: "New Year", holidayType: "PL", year: 2027, description: "New Year's Day (1.0 day payable)" },
+  { date: "2027-01-02", name: "New Year Holiday", holidayType: "UP", year: 2027, description: "New Year Additional Holiday (0.0 day payable)" },
+  { date: "2027-01-15", name: "Thai Pongal / Makar Sankranti", holidayType: "PL", year: 2027, description: "Thai Pongal (1.0 day payable)" },
+  { date: "2027-01-16", name: "Mattu Pongal", holidayType: "UP", year: 2027, description: "Mattu Pongal (0.0 day payable)" },
+  { date: "2027-10-09", name: "Saraswathi Pooja / Ayudha Pooja", holidayType: "HALF_PAID", year: 2027, description: "Half-Day Paid Leave (0.5 day payable)" },
+  { date: "2027-10-29", name: "Deepavali", holidayType: "PL", year: 2027, description: "Deepavali Day 1 (1.0 day payable)" },
+  { date: "2027-10-30", name: "Deepavali", holidayType: "PL", year: 2027, description: "Deepavali Day 2 (1.0 day payable)" },
+  { date: "2028-01-01", name: "New Year", holidayType: "PL", year: 2028, description: "New Year's Day (1.0 day payable)" },
 ];
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const yearStr = searchParams.get("year") || "2026";
-    const year = parseInt(yearStr, 10) || 2026;
+    const yearStr = searchParams.get("year");
+    const year = yearStr ? parseInt(yearStr, 10) : undefined;
 
-    // Check if holidays exist in DB, if not auto-seed default 2026 holidays
-    const count = await prisma.companyHoliday.count({ where: { year } });
-    if (count === 0 && year === 2026) {
-      for (const h of DEFAULT_HOLIDAYS_2026) {
-        await prisma.companyHoliday.upsert({
-          where: { date: new Date(`${h.date}T00:00:00.000Z`) },
-          update: { name: h.name, year: h.year },
-          create: {
-            date: new Date(`${h.date}T00:00:00.000Z`),
-            name: h.name,
-            year: h.year,
-            isPublic: true,
-          },
-        });
-      }
+    const whereClause: any = {};
+    if (year) {
+      whereClause.year = year;
     }
 
     const holidays = await prisma.companyHoliday.findMany({
-      where: { year },
+      where: whereClause,
       orderBy: { date: "asc" },
     });
 
-    return NextResponse.json({ success: true, holidays, year });
+    return NextResponse.json({ success: true, holidays, count: holidays.length });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -57,7 +43,57 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action = "add", date, name, year, description, markAllStaff = true } = body;
+    const { action = "add", id, date, name, year, holidayType = "PL", description, markOfficeStaff = true } = body;
+
+    // Action: Apply all holidays for year to office staff
+    if (action === "applyAll") {
+      const targetYear = year || 2026;
+      const holidays = await prisma.companyHoliday.findMany({
+        where: { year: targetYear },
+      });
+
+      const officeEmployees = await prisma.employeeOrLabour.findMany({
+        where: { category: "OFFICE_STAFF", status: "ACTIVE" },
+      });
+
+      for (const h of holidays) {
+        const targetDate = h.date;
+        const status = h.holidayType === "UP" ? "UP" : "PL";
+        const permissionHours = h.holidayType === "HALF_PAID" ? 0.5 : 1.0;
+
+        for (const emp of officeEmployees) {
+          await prisma.attendanceRecord.upsert({
+            where: {
+              employeeId_date: {
+                employeeId: emp.id,
+                date: targetDate,
+              },
+            },
+            update: {
+              status,
+              permissionHours,
+              workNotes: `Company Holiday: ${h.name} (${h.holidayType})`,
+              category: emp.category,
+              companyUnit: emp.companyUnit,
+            },
+            create: {
+              employeeId: emp.id,
+              date: targetDate,
+              status,
+              permissionHours,
+              workNotes: `Company Holiday: ${h.name} (${h.holidayType})`,
+              category: emp.category,
+              companyUnit: emp.companyUnit,
+            },
+          });
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Applied ${holidays.length} holidays to ${officeEmployees.length} office staff members.`,
+      });
+    }
 
     if (!date || !name) {
       return NextResponse.json({ success: false, error: "Date and holiday name are required." }, { status: 400 });
@@ -66,12 +102,12 @@ export async function POST(request: Request) {
     const targetDate = new Date(`${date}T00:00:00.000Z`);
     const holidayYear = year || targetDate.getFullYear();
 
-    // Upsert Holiday in calendar
     const holiday = await prisma.companyHoliday.upsert({
       where: { date: targetDate },
       update: {
         name,
         year: holidayYear,
+        holidayType,
         description: description || null,
         isPublic: true,
       },
@@ -79,19 +115,23 @@ export async function POST(request: Request) {
         date: targetDate,
         name,
         year: holidayYear,
+        holidayType,
         description: description || null,
         isPublic: true,
       },
     });
 
     let staffMarkedCount = 0;
-    // Mark holiday as 'L' across all staff if requested
-    if (markAllStaff) {
-      const activeEmployees = await prisma.employeeOrLabour.findMany({
-        where: { status: "ACTIVE" },
+    // Mark holiday on Office Staff attendance if requested
+    if (markOfficeStaff) {
+      const officeEmployees = await prisma.employeeOrLabour.findMany({
+        where: { category: "OFFICE_STAFF", status: "ACTIVE" },
       });
 
-      const promises = activeEmployees.map((emp) =>
+      const status = holidayType === "UP" ? "UP" : "PL";
+      const permissionHours = holidayType === "HALF_PAID" ? 0.5 : 1.0;
+
+      const promises = officeEmployees.map((emp) =>
         prisma.attendanceRecord.upsert({
           where: {
             employeeId_date: {
@@ -100,16 +140,18 @@ export async function POST(request: Request) {
             },
           },
           update: {
-            status: "L",
-            workNotes: `Company Holiday: ${name}`,
+            status,
+            permissionHours,
+            workNotes: `Company Holiday: ${name} (${holidayType})`,
             category: emp.category,
             companyUnit: emp.companyUnit,
           },
           create: {
             employeeId: emp.id,
             date: targetDate,
-            status: "L",
-            workNotes: `Company Holiday: ${name}`,
+            status,
+            permissionHours,
+            workNotes: `Company Holiday: ${name} (${holidayType})`,
             category: emp.category,
             companyUnit: emp.companyUnit,
           },
@@ -117,7 +159,7 @@ export async function POST(request: Request) {
       );
 
       await Promise.all(promises);
-      staffMarkedCount = activeEmployees.length;
+      staffMarkedCount = officeEmployees.length;
     }
 
     return NextResponse.json({ success: true, holiday, staffMarkedCount });
