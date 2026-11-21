@@ -1,9 +1,9 @@
 param(
-    [string]$CommitMessage = "feat: upgrade executive dashboard visual analytics, attendance command center and workforce directory"
+    [string]$CommitMessage = "feat: upgrade attendance command center, non-payable leave formula, and multi-repo sync"
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   SR-BOOKS ERP -- DUAL GITHUB SYNC AND LOCAL BACKUP      " -ForegroundColor Cyan
+Write-Host "   SR-BOOKS ERP -- 3-WAY REPO SYNC & LOCAL STORAGE BACKUP  " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 $RepoDir = Split-Path -Parent $PSScriptRoot
@@ -29,7 +29,7 @@ if ($gitStatus) {
 
 # Step 3: Push to Personal GitHub Repo (Srimanikandan K)
 Write-Host "`n[2/4] Pushing to Personal GitHub Repo (Owner: Srimanikandan K)..." -ForegroundColor Yellow
-Write-Host "     Remote: https://github.com/Srimani26/standardroof-accounting-software.git" -ForegroundColor DarkGray
+Write-Host "     Target: Personal GitHub (origin main)" -ForegroundColor DarkGray
 try {
     git push origin main
     Write-Host "[OK] Personal repository pushed successfully!" -ForegroundColor Green
@@ -37,24 +37,14 @@ try {
     Write-Host "[!] Error pushing to origin: $_" -ForegroundColor Red
 }
 
-# Step 4: Configure & Push to Company GitHub Repo (standardroofs-bot)
-Write-Host "`n[3/4] Checking Company GitHub Remote (Owner: Standard Roofs)..." -ForegroundColor Yellow
-$remotes = git remote
-if ($remotes -notcontains "company") {
-    Write-Host "[+] Adding remote 'company' -> https://github.com/standardroofs-bot/standardroof-accounting-software.git" -ForegroundColor Cyan
-    git remote add company https://github.com/standardroofs-bot/standardroof-accounting-software.git
-}
-
-Write-Host "     Remote: https://github.com/standardroofs-bot/standardroof-accounting-software.git" -ForegroundColor DarkGray
+# Step 4: Push to Company GitHub Repo (standardroofs-bot)
+Write-Host "`n[3/4] Pushing to Company GitHub Repo (Owner: Standard Roofs)..." -ForegroundColor Yellow
+Write-Host "     Target: Company GitHub (company main)" -ForegroundColor DarkGray
 try {
-    $companyOutput = git push company main 2>&1
-    if ($companyOutput -match "fatal|error|Repository not found") {
-        Write-Host "[INFO] Company repo push pending: Repository not yet initialized on github.com/standardroofs-bot." -ForegroundColor DarkYellow
-    } else {
-        Write-Host "[OK] Company repository pushed successfully!" -ForegroundColor Green
-    }
+    git push company main
+    Write-Host "[OK] Company repository pushed successfully!" -ForegroundColor Green
 } catch {
-    Write-Host "[!] Company push note: $_" -ForegroundColor DarkYellow
+    Write-Host "[!] Error pushing to company: $_" -ForegroundColor Red
 }
 
 # Step 5: Generate Portable Local Storage Git Bundle
@@ -63,12 +53,12 @@ $bundlePath = Join-Path $BackupDir "sr-books-backup.bundle"
 git bundle create $bundlePath --all
 if (Test-Path $bundlePath) {
     $bundleSize = [math]::Round((Get-Item $bundlePath).Length / 1MB, 2)
-    Write-Host "[OK] Git Bundle created: $bundlePath ($bundleSize MB)" -ForegroundColor Green
+    Write-Host "[OK] Local Git Bundle created: $bundlePath ($bundleSize MB)" -ForegroundColor Green
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Cyan
-Write-Host "   SYNC COMPLETED SUCCESSFULLY!                           " -ForegroundColor Green
+Write-Host "   3-WAY SYNC COMPLETED SUCCESSFULLY!                     " -ForegroundColor Green
 Write-Host "   1. Personal Repo: https://github.com/Srimani26/standardroof-accounting-software" -ForegroundColor White
-Write-Host "   2. Company Repo:  https://github.com/standardroofs-bot/standardroof-accounting-software" -ForegroundColor White
-Write-Host "   3. Local Storage: $BackupDir" -ForegroundColor White
+Write-Host "   2. Company Repo:  https://github.com/standardroofs-bot/standardroofs-accounting-software" -ForegroundColor White
+Write-Host "   3. Local Storage: $bundlePath" -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Cyan
