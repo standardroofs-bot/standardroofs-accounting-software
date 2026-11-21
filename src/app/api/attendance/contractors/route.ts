@@ -49,6 +49,9 @@ export async function POST(request: Request) {
       workerBreakdown,
       siteWorkStatus = "Active Work",
       remarks,
+      otHours = 0,
+      otTimeRange,
+      otReason,
     } = body;
 
     if (!contractorTeamName || !date) {
@@ -90,6 +93,9 @@ export async function POST(request: Request) {
           workerBreakdown: combinedNote !== null ? combinedNote : existing.workerBreakdown,
           siteWorkStatus: siteWorkStatus ?? existing.siteWorkStatus,
           remarks: combinedNote !== null ? combinedNote : existing.remarks,
+          otHours: otHours !== undefined ? Number(otHours) : existing.otHours,
+          otTimeRange: otTimeRange !== undefined ? otTimeRange : existing.otTimeRange,
+          otReason: otReason !== undefined ? otReason : existing.otReason,
           contractorId: contractor?.id || existing.contractorId,
         },
       });
@@ -103,6 +109,9 @@ export async function POST(request: Request) {
           workerBreakdown: combinedNote,
           siteWorkStatus: siteWorkStatus || (Number(headcount) > 0 ? "Active Work" : "No Work / Absent"),
           remarks: combinedNote,
+          otHours: Number(otHours) || 0,
+          otTimeRange: otTimeRange || null,
+          otReason: otReason || null,
           contractorId: contractor?.id || null,
         },
       });

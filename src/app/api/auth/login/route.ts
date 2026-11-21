@@ -14,8 +14,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: email.trim().toLowerCase() },
+    const cleanInput = email.trim().toLowerCase();
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: cleanInput },
+          { email: `${cleanInput}@standardroofs.com` },
+          {
+            employeeId: {
+              in: (
+                await prisma.employeeOrLabour.findMany({
+                  where: { employeeCode: { equals: email.trim(), mode: "insensitive" } },
+                  select: { id: true },
+                })
+              ).map((e) => e.id),
+            },
+          },
+        ],
+      },
     });
 
     if (!user || !user.active) {
@@ -41,6 +57,7 @@ export async function POST(request: Request) {
       email: user.email,
       name: user.name,
       role: user.role,
+      employeeId: user.employeeId || undefined,
       permissions,
     });
 
@@ -51,6 +68,7 @@ export async function POST(request: Request) {
         email: user.email,
         name: user.name,
         role: user.role,
+        employeeId: user.employeeId || undefined,
         permissions,
       },
     });

@@ -50,6 +50,7 @@ export interface SessionPayload {
   email: string;
   name: string;
   role: UserRole;
+  employeeId?: string;
   permissions?: UserPermissions;
 }
 

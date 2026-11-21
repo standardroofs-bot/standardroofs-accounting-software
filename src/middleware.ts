@@ -110,6 +110,32 @@ export async function middleware(request: NextRequest) {
     return applyAntiCacheHeaders(NextResponse.redirect(loginUrl));
   }
 
+  // 3.1 Strict Role Isolation for EMPLOYEE (Self-Service Portal Only)
+  if (session.role === "EMPLOYEE") {
+    const isEmployeeAllowed =
+      pathname === "/my-attendance" ||
+      pathname.startsWith("/my-attendance/") ||
+      pathname === "/api/my-attendance" ||
+      pathname.startsWith("/api/my-attendance/") ||
+      pathname === "/api/leave-requests" ||
+      pathname.startsWith("/api/leave-requests/") ||
+      pathname === "/api/auth/me" ||
+      pathname === "/api/auth/logout";
+
+    if (!isEmployeeAllowed) {
+      if (pathname.startsWith("/api/")) {
+        return applyAntiCacheHeaders(
+          NextResponse.json(
+            { success: false, error: "Access Denied: Employee accounts are restricted to the Self-Service Portal." },
+            { status: 403 }
+          )
+        );
+      }
+      return applyAntiCacheHeaders(NextResponse.redirect(new URL("/my-attendance", request.url)));
+    }
+    return applyAntiCacheHeaders(NextResponse.next());
+  }
+
   // 4. Granular Module Permission Enforcement
   for (const [routePrefix, moduleKey] of Object.entries(ROUTE_MODULE_MAP)) {
     if (pathname === routePrefix || pathname.startsWith(routePrefix + "/")) {

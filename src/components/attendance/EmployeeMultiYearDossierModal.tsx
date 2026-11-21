@@ -16,6 +16,9 @@ import {
   Palmtree,
   ShieldCheck,
   Users2,
+  Timer,
+  Flame,
+  Award,
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
 
@@ -47,6 +50,7 @@ export default function EmployeeMultiYearDossierModal({
   const [dossierData, setDossierData] = useState<any>(null);
   const [activeYear, setActiveYear] = useState<string>("2026");
   const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(10); // Nov = 10 (0-indexed)
+  const [activeTab, setActiveTab] = useState<"SCORECARD" | "MONTHLY" | "OVERTIME" | "PERMISSIONS">("SCORECARD");
 
   const supportedYears = ["2025", "2026", "2027", "2028", "2029", "2030"];
 
@@ -82,7 +86,19 @@ export default function EmployeeMultiYearDossierModal({
 
   if (!isOpen || !employee) return null;
 
-  const handleExportExcel = () => {
+  const currentYearData = dossierData?.yearlyData?.[activeYear];
+  const activeMonthData = currentYearData?.months?.[selectedMonthIndex];
+  const isOffice = employee.category === "OFFICE_STAFF";
+
+  // Scorecard calculations for selected activeYear
+  const yearTotals = currentYearData?.totals || {};
+  const totalDaysInYear = 365;
+  const sundaysAndLeaves = yearTotals.leave || 52;
+  const scheduledOrgWorkingDays = Math.max(1, totalDaysInYear - sundaysAndLeaves);
+  const actualDaysWorked = yearTotals.payableDays || 0;
+  const attendancePercentage = Math.min(100, Math.round((actualDaysWorked / scheduledOrgWorkingDays) * 100));
+
+  const handleExportExcel = (mode: "FULL_YEAR" | "SELECTED_MONTH") => {
     if (!dossierData || !employee) return;
     const yearData = dossierData.yearlyData?.[activeYear];
     if (!yearData) return;
@@ -93,12 +109,32 @@ export default function EmployeeMultiYearDossierModal({
         Month: m.monthName,
         "Total Labours (Headcount)": m.headcount,
         "Active Work Days": m.logsCount,
+        "OT Hours": m.otHours || 0,
         "Sites Deployed": m.sites?.join(", ") || "-",
       }));
       exportToExcel(
         exportRows,
-        `${employee.name}_Contractor_Attendance_Dossier_${activeYear}`,
+        `${employee.name}_Contractor_Dossier_${activeYear}`,
         "ContractorDossier"
+      );
+      return;
+    }
+
+    if (mode === "SELECTED_MONTH" && activeMonthData) {
+      const exportRows = (activeMonthData.dailyRecords || []).map((r: any) => ({
+        Date: r.date,
+        Status: r.status,
+        "In Time": r.inTime || "-",
+        "Out Time": r.outTime || "-",
+        "Site Location": r.siteName || (isOffice ? "Headquarters Office" : "-"),
+        "1H Permission": r.permissionNote || "-",
+        "OT Hours": r.otHours || 0,
+        "OT Reason": r.otReason || "-",
+      }));
+      exportToExcel(
+        exportRows,
+        `${employee.employeeCode}_${employee.name}_${activeMonthData.monthName}_${activeYear}`,
+        "MonthAttendance"
       );
       return;
     }
@@ -109,24 +145,23 @@ export default function EmployeeMultiYearDossierModal({
       "Present (P)": m.present,
       "Half-Day (H)": m.halfDay,
       "1-Hr Permission (1H)": m.permission,
+      "1H Morning": m.permissionMorning || 0,
+      "1H Evening": m.permissionEvening || 0,
       "Paid Leave (PL)": m.paidLeave || 0,
       "Unpaid Leave (UP)": m.unpaidLeave || 0,
       "Absent (A)": m.absent,
       "Sunday Off (L)": m.leave,
       "Net Payable Days": m.payableDays,
+      "OT Hours": m.otHours || 0,
       "Deployed Sites": m.sites?.join(", ") || "-",
     }));
 
     exportToExcel(
       exportRows,
-      `${employee.employeeCode}_${employee.name}_Attendance_Dossier_${activeYear}`,
+      `${employee.employeeCode}_${employee.name}_Dossier_${activeYear}`,
       "MultiYearDossier"
     );
   };
-
-  const currentYearData = dossierData?.yearlyData?.[activeYear];
-  const activeMonthData = currentYearData?.months?.[selectedMonthIndex];
-  const isOffice = employee.category === "OFFICE_STAFF";
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 md:p-4 animate-in fade-in">
@@ -157,7 +192,7 @@ export default function EmployeeMultiYearDossierModal({
                   </span>
                 )}
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                  Attendance & Tenure Dossier
+                  HRIS Attendance Dossier
                 </span>
               </h3>
               <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
@@ -166,7 +201,7 @@ export default function EmployeeMultiYearDossierModal({
                 <span>•</span>
                 <span className="capitalize">{employee.category.replace(/_/g, " ").toLowerCase()}</span>
                 <span>•</span>
-                <span className="text-slate-400">Strict Attendance Records (No Payroll / Salary)</span>
+                <span className="text-slate-400">Tenure Attendance Record (Pure HRIS)</span>
               </p>
             </div>
           </div>
@@ -174,12 +209,12 @@ export default function EmployeeMultiYearDossierModal({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleExportExcel}
+              onClick={() => handleExportExcel("FULL_YEAR")}
               disabled={!dossierData}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-700 transition disabled:opacity-50 cursor-pointer"
             >
               <Download size={13} />
-              <span>Export (.xlsx)</span>
+              <span>Export Year (.xlsx)</span>
             </button>
             <button
               type="button"
@@ -208,220 +243,11 @@ export default function EmployeeMultiYearDossierModal({
           <div className="py-12 text-center text-slate-400 text-xs">
             No attendance records found for this person yet.
           </div>
-        ) : isContractorTeam ? (
-          /* ================= CONTRACTOR TEAM DOSSIER ================= */
-          <div className="flex-1 overflow-y-auto pr-1 space-y-4">
-            {/* Lifetime Summary */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-center">
-                <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 block">
-                  Total Active Logs
-                </span>
-                <span className="text-xl font-black text-emerald-600 tabular-nums">
-                  {dossierData.lifetimeSummary?.totalLogs || 0} Days
-                </span>
-              </div>
-              <div className="p-3 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-center">
-                <span className="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-400 block">
-                  Total Cumulative Man-Days
-                </span>
-                <span className="text-xl font-black text-blue-600 tabular-nums">
-                  {dossierData.lifetimeSummary?.lifetimeHeadcount || 0} Labours
-                </span>
-              </div>
-              <div className="p-3 rounded-2xl bg-purple-50/60 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-center">
-                <span className="text-[10px] uppercase font-bold text-purple-700 dark:text-purple-400 block">
-                  Project Sites Worked
-                </span>
-                <span className="text-xl font-black text-purple-600 tabular-nums">
-                  {dossierData.lifetimeSummary?.sitesWorked?.length || 0} Sites
-                </span>
-              </div>
-            </div>
-
-            {/* Year Switcher */}
-            <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Year:</span>
-                <div className="flex items-center gap-1">
-                  {supportedYears.map((yr) => (
-                    <button
-                      key={yr}
-                      type="button"
-                      onClick={() => setActiveYear(yr)}
-                      className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                        activeYear === yr
-                          ? "bg-blue-600 text-white shadow-2xs"
-                          : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 border border-slate-200 dark:border-slate-700"
-                      }`}
-                    >
-                      {yr}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="text-xs text-slate-500">
-                <span>{activeYear} Total Labours Deployed: </span>
-                <strong className="text-blue-600 text-sm">{currentYearData?.totals?.headcount || 0} Labours</strong>
-              </div>
-            </div>
-
-            {/* 12-Month Table Breakdown */}
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-              <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 text-slate-400 font-bold uppercase text-[10px]">
-                    <th className="py-2.5 px-3">Month</th>
-                    <th className="py-2.5 px-3 text-center text-emerald-700">Active Work Days</th>
-                    <th className="py-2.5 px-3 text-center font-black text-blue-700">Total Man-Days</th>
-                    <th className="py-2.5 px-3">Sites Deployed</th>
-                    <th className="py-2.5 px-3 text-center">Inspect</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {currentYearData?.months?.map((m: any, idx: number) => (
-                    <tr
-                      key={m.monthName}
-                      onClick={() => setSelectedMonthIndex(idx)}
-                      className={`cursor-pointer transition ${
-                        selectedMonthIndex === idx ? "bg-blue-50/80 dark:bg-blue-950/40 font-semibold" : "hover:bg-slate-50 dark:hover:bg-slate-800/30"
-                      }`}
-                    >
-                      <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100">
-                        {m.monthName} {activeYear}
-                      </td>
-                      <td className="py-2 px-3 text-center font-bold text-emerald-600 tabular-nums">
-                        {m.logsCount} Days
-                      </td>
-                      <td className="py-2 px-3 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-blue-50/50 dark:bg-blue-950/30">
-                        {m.headcount} Labours
-                      </td>
-                      <td className="py-2 px-3 text-slate-600 dark:text-slate-300 truncate max-w-[280px]">
-                        {m.sites?.join(", ") || "—"}
-                      </td>
-                      <td className="py-2 px-3 text-center text-blue-600 font-bold text-[11px]">
-                        {selectedMonthIndex === idx ? "Viewing" : "Click to view"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Daily Log Inspector */}
-            {activeMonthData && (
-              <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-3">
-                <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 flex items-center justify-between">
-                  <span>
-                    Daily Logs Inspector • {activeMonthData.monthName} {activeYear} ({activeMonthData.records?.length || 0} Entries)
-                  </span>
-                </h4>
-                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-                  <table className="w-full text-left text-xs whitespace-nowrap">
-                    <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-400 font-bold text-[10px] uppercase">
-                        <th className="py-2 px-3">Date</th>
-                        <th className="py-2 px-3">Site Location</th>
-                        <th className="py-2 px-3 text-center">Headcount</th>
-                        <th className="py-2 px-3">Work Status</th>
-                        <th className="py-2 px-3">Worker Breakdown / Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {activeMonthData.records?.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="py-6 text-center text-slate-400">
-                            No logs recorded in {activeMonthData.monthName} {activeYear}.
-                          </td>
-                        </tr>
-                      ) : (
-                        activeMonthData.records?.map((rec: any) => (
-                          <tr key={rec.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                            <td className="py-2 px-3 font-mono font-bold text-slate-800 dark:text-slate-200">
-                              {String(rec.date).split("T")[0]}
-                            </td>
-                            <td className="py-2 px-3 flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-                              <MapPin size={12} className="text-slate-400" />
-                              <span>{rec.siteName || "Site Standby"}</span>
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <span className="px-2 py-0.5 rounded-full font-black text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                {rec.headcount} Labours
-                              </span>
-                            </td>
-                            <td className="py-2 px-3 text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                              {rec.siteWorkStatus || "Active Work"}
-                            </td>
-                            <td className="py-2 px-3 font-mono text-[11px] text-slate-500">
-                              {rec.workerBreakdown || rec.remarks || "—"}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
         ) : (
-          /* ================= INDIVIDUAL EMPLOYEE / LABOUR ATTENDANCE DOSSIER ================= */
           <div className="flex-1 overflow-y-auto pr-1 space-y-4">
-            {/* Lifetime Summary Tenure KPIs - Pure Attendance */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
-              <div className="p-2.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-center">
-                <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 block">Present (P)</span>
-                <span className="text-lg font-black text-emerald-600 tabular-nums">
-                  {dossierData.lifetimeSummary?.present || 0}
-                </span>
-              </div>
-              <div className="p-2.5 rounded-2xl bg-sky-50/60 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 text-center">
-                <span className="text-[10px] uppercase font-bold text-sky-700 dark:text-sky-400 block">1-Hr Perm (1H)</span>
-                <span className="text-lg font-black text-sky-600 tabular-nums">
-                  {dossierData.lifetimeSummary?.permission || 0}
-                </span>
-              </div>
-              <div className="p-2.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-center">
-                <span className="text-[10px] uppercase font-bold text-amber-700 dark:text-amber-400 block">Half-Day (H)</span>
-                <span className="text-lg font-black text-amber-500 tabular-nums">
-                  {dossierData.lifetimeSummary?.halfDay || 0}
-                </span>
-              </div>
-              <div className="p-2.5 rounded-2xl bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800 text-center">
-                <span className="text-[10px] uppercase font-bold text-teal-700 dark:text-teal-400 block">Paid Leave (PL)</span>
-                <span className="text-lg font-black text-teal-600 tabular-nums">
-                  {dossierData.lifetimeSummary?.paidLeave || 0}
-                </span>
-              </div>
-              <div className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
-                <span className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400 block">Unpaid (UP)</span>
-                <span className="text-lg font-black text-slate-600 dark:text-slate-300 tabular-nums">
-                  {dossierData.lifetimeSummary?.unpaidLeave || 0}
-                </span>
-              </div>
-              <div className="p-2.5 rounded-2xl bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-center">
-                <span className="text-[10px] uppercase font-bold text-rose-700 dark:text-rose-400 block">Absent (A)</span>
-                <span className="text-lg font-black text-rose-500 tabular-nums">
-                  {dossierData.lifetimeSummary?.absent || 0}
-                </span>
-              </div>
-              <div className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Sundays (L)</span>
-                <span className="text-lg font-black text-slate-500 tabular-nums">
-                  {dossierData.lifetimeSummary?.leave || 0}
-                </span>
-              </div>
-              <div className="p-2.5 rounded-2xl bg-blue-50/80 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-center">
-                <span className="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-300 block">Net Payable</span>
-                <span className="text-lg font-black text-blue-700 dark:text-blue-300 tabular-nums">
-                  {dossierData.lifetimeSummary?.payableDays || 0}
-                </span>
-              </div>
-            </div>
-
-            {/* Multi-Year Switcher (2025 - 2030) */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+            {/* Top Navigation & Year Switcher Strip */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+              {/* Year Switcher */}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Year:</span>
                 <div className="flex items-center gap-1">
@@ -442,160 +268,414 @@ export default function EmployeeMultiYearDossierModal({
                 </div>
               </div>
 
-              <div className="text-xs text-slate-500">
-                <span>{activeYear} Total Net Payable: </span>
-                <strong className="text-blue-600 text-sm">{currentYearData?.totals?.payableDays || 0} Days</strong>
+              {/* View Tabs */}
+              <div className="flex items-center p-0.5 bg-slate-200/60 dark:bg-slate-800 rounded-xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("SCORECARD")}
+                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                    activeTab === "SCORECARD" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-600 dark:text-slate-400"
+                  }`}
+                >
+                  Year Scorecard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("MONTHLY")}
+                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                    activeTab === "MONTHLY" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-600 dark:text-slate-400"
+                  }`}
+                >
+                  12-Month Matrix
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("OVERTIME")}
+                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                    activeTab === "OVERTIME" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-600 dark:text-slate-400"
+                  }`}
+                >
+                  Overtime Log ({dossierData.overtimeLog?.length || 0})
+                </button>
+                {!isContractorTeam && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("PERMISSIONS")}
+                    className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                      activeTab === "PERMISSIONS" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-600 dark:text-slate-400"
+                    }`}
+                  >
+                    1-Hr Permissions ({dossierData.permissionsLog?.length || 0})
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* 12-Month Table Breakdown for Selected Year - PURE ATTENDANCE */}
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-              <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 text-slate-400 font-bold uppercase text-[10px]">
-                    <th className="py-2.5 px-3">Month</th>
-                    <th className="py-2.5 px-2 text-center text-emerald-700">P (1.0)</th>
-                    <th className="py-2.5 px-2 text-center text-sky-700">1H (1.0)</th>
-                    <th className="py-2.5 px-2 text-center text-amber-700">H (0.5)</th>
-                    <th className="py-2.5 px-2 text-center text-teal-700">PL (1.0)</th>
-                    <th className="py-2.5 px-2 text-center text-slate-600">UP (0.0)</th>
-                    <th className="py-2.5 px-2 text-center text-rose-700">A (0.0)</th>
-                    <th className="py-2.5 px-2 text-center text-slate-600">L (Sun)</th>
-                    <th className="py-2.5 px-2 text-center font-black bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
-                      Net Payable
-                    </th>
-                    <th className="py-2.5 px-3">Sites Deployed</th>
-                    <th className="py-2.5 px-3 text-center">Inspect</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {currentYearData?.months?.map((m: any, idx: number) => {
-                    const isSelectedMonth = selectedMonthIndex === idx;
-                    return (
-                      <tr
-                        key={m.monthName}
-                        onClick={() => setSelectedMonthIndex(idx)}
-                        className={`cursor-pointer transition ${
-                          isSelectedMonth
-                            ? "bg-blue-50/80 dark:bg-blue-950/40 font-semibold"
-                            : "hover:bg-slate-50 dark:hover:bg-slate-800/30"
-                        }`}
-                      >
-                        <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100">
-                          {m.monthName} {activeYear}
-                        </td>
-                        <td className="py-2 px-2 text-center font-bold text-emerald-600 tabular-nums">{m.present}</td>
-                        <td className="py-2 px-2 text-center font-bold text-sky-600 tabular-nums">{m.permission}</td>
-                        <td className="py-2 px-2 text-center font-bold text-amber-500 tabular-nums">{m.halfDay}</td>
-                        <td className="py-2 px-2 text-center font-bold text-teal-600 tabular-nums">{m.paidLeave || 0}</td>
-                        <td className="py-2 px-2 text-center font-bold text-slate-500 tabular-nums">{m.unpaidLeave || 0}</td>
-                        <td className="py-2 px-2 text-center font-bold text-rose-500 tabular-nums">{m.absent}</td>
-                        <td className="py-2 px-2 text-center font-bold text-slate-400 tabular-nums">{m.leave}</td>
-                        <td className="py-2 px-2 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-blue-50/50 dark:bg-blue-950/30">
-                          {m.payableDays}
-                        </td>
-                        <td className="py-2 px-3 text-slate-600 dark:text-slate-300 truncate max-w-[200px]">
-                          {m.sites?.join(", ") || "—"}
-                        </td>
-                        <td className="py-2 px-3 text-center text-blue-600 font-bold text-[11px]">
-                          {isSelectedMonth ? "Viewing" : "Click to view"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {/* TAB 1: ANNUAL & FISCAL SCORECARD */}
+            {activeTab === "SCORECARD" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-center">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Days</span>
+                    <span className="text-xl font-black text-slate-800 dark:text-slate-100 tabular-nums">
+                      {totalDaysInYear}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">Calendar Days</span>
+                  </div>
 
-            {/* 1-Hour Permissions Audit Log */}
-            {dossierData.permissionsLog && dossierData.permissionsLog.length > 0 && (
-              <div className="p-4 rounded-2xl border border-sky-200 dark:border-sky-800 bg-sky-50/40 dark:bg-sky-950/20 space-y-2">
-                <div className="flex items-center gap-2 text-sky-900 dark:text-sky-300 font-extrabold text-xs">
-                  <Clock size={14} className="text-sky-600" />
-                  <span>1-Hour Permission Records Log ({dossierData.permissionsLog.length} Permissions)</span>
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-center">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Sundays & Off</span>
+                    <span className="text-xl font-black text-slate-700 dark:text-slate-300 tabular-nums">
+                      {yearTotals.leave || 0}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">Non-Working</span>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-center">
+                    <span className="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-300 block">Org Working Days</span>
+                    <span className="text-xl font-black text-blue-600 tabular-nums">
+                      {scheduledOrgWorkingDays}
+                    </span>
+                    <span className="text-[10px] text-blue-400 block mt-0.5">Scheduled</span>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-center">
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-300 block">Days Worked</span>
+                    <span className="text-xl font-black text-emerald-600 tabular-nums">
+                      {actualDaysWorked}
+                    </span>
+                    <span className="text-[10px] text-emerald-500 block mt-0.5">Net Payable</span>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-center">
+                    <span className="text-[10px] uppercase font-bold text-indigo-700 dark:text-indigo-300 block">Attendance %</span>
+                    <span className="text-xl font-black text-indigo-600 tabular-nums">
+                      {attendancePercentage}%
+                    </span>
+                    <span className="text-[10px] text-indigo-400 block mt-0.5">Annual Efficiency</span>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-center">
+                    <span className="text-[10px] uppercase font-bold text-amber-700 dark:text-amber-300 block">Total OT</span>
+                    <span className="text-xl font-black text-amber-600 tabular-nums">
+                      {yearTotals.otHours || 0}h
+                    </span>
+                    <span className="text-[10px] text-amber-500 block mt-0.5">Overtime Hours</span>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-sky-50/60 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 text-center">
+                    <span className="text-[10px] uppercase font-bold text-sky-700 dark:text-sky-300 block">1H Permissions</span>
+                    <span className="text-xl font-black text-sky-600 tabular-nums">
+                      {yearTotals.permission || 0}
+                    </span>
+                    <span className="text-[10px] text-sky-500 block mt-0.5">
+                      {yearTotals.permissionMorning || 0}M · {yearTotals.permissionEvening || 0}E
+                    </span>
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                  {dossierData.permissionsLog.map((p: any, i: number) => (
-                    <div key={i} className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-sky-100 dark:border-sky-900 text-xs">
-                      <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
-                        <span>{p.date}</span>
-                        <span className="text-[10px] text-sky-600 bg-sky-50 dark:bg-sky-950 px-1.5 py-0.2 rounded font-black">
-                          1H Approved
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-1 italic">"{p.note || "1-Hour Morning Permission"}"</p>
+
+                {/* Lifetime Summary Tenure KPIs */}
+                <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-800/20 space-y-3">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                    Tenure Summary Across All Years
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center">
+                      <span className="text-[10px] text-slate-400 block font-bold">Total Present (P)</span>
+                      <strong className="text-base text-emerald-600 font-black">{dossierData.lifetimeSummary?.present || 0}</strong>
                     </div>
-                  ))}
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center">
+                      <span className="text-[10px] text-slate-400 block font-bold">Half-Days (H)</span>
+                      <strong className="text-base text-amber-500 font-black">{dossierData.lifetimeSummary?.halfDay || 0}</strong>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center">
+                      <span className="text-[10px] text-slate-400 block font-bold">1-Hr Perm (1H)</span>
+                      <strong className="text-base text-sky-600 font-black">{dossierData.lifetimeSummary?.permission || 0}</strong>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center">
+                      <span className="text-[10px] text-slate-400 block font-bold">Total OT Hours</span>
+                      <strong className="text-base text-amber-600 font-black">{dossierData.lifetimeSummary?.otHours || 0}h</strong>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center">
+                      <span className="text-[10px] text-slate-400 block font-bold">Total Absent (A)</span>
+                      <strong className="text-base text-rose-500 font-black">{dossierData.lifetimeSummary?.absent || 0}</strong>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center">
+                      <span className="text-[10px] text-slate-400 block font-bold">Net Payable Days</span>
+                      <strong className="text-base text-blue-600 font-black">{dossierData.lifetimeSummary?.payableDays || 0}</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Daily Records Inspector for Selected Month - PURE ATTENDANCE */}
-            {activeMonthData && (
-              <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-3">
-                <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 flex items-center justify-between">
-                  <span>
-                    Daily Attendance Inspector • {activeMonthData.monthName} {activeYear} ({activeMonthData.dailyRecords?.length || 0} Entries)
-                  </span>
-                </h4>
-                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            {/* TAB 2: 12-MONTH MATRIX & DAILY RECORD INSPECTOR */}
+            {activeTab === "MONTHLY" && (
+              <div className="space-y-4">
+                <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
                   <table className="w-full text-left text-xs whitespace-nowrap">
                     <thead>
-                      <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-400 font-bold text-[10px] uppercase">
-                        <th className="py-2 px-3">Date</th>
-                        <th className="py-2 px-3 text-center">Status</th>
-                        <th className="py-2 px-3 text-center">In Time</th>
-                        <th className="py-2 px-3 text-center">Out Time</th>
-                        <th className="py-2 px-3">Site / Deployment</th>
-                        <th className="py-2 px-3">Work Notes / Permission Reason</th>
+                      <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 text-slate-400 font-bold uppercase text-[10px]">
+                        <th className="py-2.5 px-3">Month</th>
+                        <th className="py-2.5 px-2 text-center text-emerald-700">P (1.0)</th>
+                        <th className="py-2.5 px-2 text-center text-sky-700">1H (1.0)</th>
+                        <th className="py-2.5 px-2 text-center text-amber-700">H (0.5)</th>
+                        <th className="py-2.5 px-2 text-center text-teal-700">PL (1.0)</th>
+                        <th className="py-2.5 px-2 text-center text-slate-600">UP (0.0)</th>
+                        <th className="py-2.5 px-2 text-center text-rose-700">A (0.0)</th>
+                        <th className="py-2.5 px-2 text-center text-amber-600">OT (HRS)</th>
+                        <th className="py-2.5 px-2 text-center text-slate-600">L (Sun)</th>
+                        <th className="py-2.5 px-2 text-center font-black bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
+                          Net Payable
+                        </th>
+                        <th className="py-2.5 px-3">Sites Deployed</th>
+                        <th className="py-2.5 px-3 text-center">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {activeMonthData.dailyRecords?.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-6 text-center text-slate-400">
-                            No attendance records marked in {activeMonthData.monthName} {activeYear}.
-                          </td>
-                        </tr>
-                      ) : (
-                        activeMonthData.dailyRecords?.map((rec: any) => (
-                          <tr key={rec.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                            <td className="py-2 px-3 font-mono font-bold text-slate-800 dark:text-slate-200">
-                              {rec.date}
+                      {currentYearData?.months?.map((m: any, idx: number) => {
+                        const isSelectedMonth = selectedMonthIndex === idx;
+                        return (
+                          <tr
+                            key={m.monthName}
+                            onClick={() => setSelectedMonthIndex(idx)}
+                            className={`cursor-pointer transition ${
+                              isSelectedMonth
+                                ? "bg-blue-50/80 dark:bg-blue-950/40 font-semibold"
+                                : "hover:bg-slate-50 dark:hover:bg-slate-800/30"
+                            }`}
+                          >
+                            <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-slate-100">
+                              {m.monthName} {activeYear}
                             </td>
-                            <td className="py-2 px-3 text-center">
-                              <span
-                                className={`px-2 py-0.5 rounded-md font-black text-[10px] ${
-                                  rec.status === "P"
-                                    ? "bg-emerald-600 text-white"
-                                    : rec.status === "1H"
-                                    ? "bg-sky-600 text-white"
-                                    : rec.status === "H"
-                                    ? "bg-amber-500 text-white"
-                                    : rec.status === "PL"
-                                    ? "bg-teal-600 text-white"
-                                    : rec.status === "UP"
-                                    ? "bg-slate-600 text-white"
-                                    : rec.status === "A"
-                                    ? "bg-rose-600 text-white"
-                                    : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
-                                }`}
-                              >
-                                {rec.status === "1H" ? "P·1H" : rec.status}
-                              </span>
+                            <td className="py-2 px-2 text-center font-bold text-emerald-600 tabular-nums">{m.present}</td>
+                            <td className="py-2 px-2 text-center font-bold text-sky-600 tabular-nums">
+                              {m.permission}
+                              {m.permission > 0 && (
+                                <span className="text-[9px] text-slate-400 block font-normal">
+                                  {m.permissionMorning || 0}M / {m.permissionEvening || 0}E
+                                </span>
+                              )}
                             </td>
-                            <td className="py-2 px-3 text-center font-mono text-slate-500">{rec.inTime || "—"}</td>
-                            <td className="py-2 px-3 text-center font-mono text-slate-500">{rec.outTime || "—"}</td>
-                            <td className="py-2 px-3 text-slate-700 dark:text-slate-300">{rec.siteName || (isOffice ? "Headquarters Office" : "—")}</td>
-                            <td className="py-2 px-3 text-slate-500 italic max-w-[280px] truncate">
-                              {rec.permissionNote || rec.workNotes || "—"}
+                            <td className="py-2 px-2 text-center font-bold text-amber-500 tabular-nums">{m.halfDay}</td>
+                            <td className="py-2 px-2 text-center font-bold text-teal-600 tabular-nums">{m.paidLeave || 0}</td>
+                            <td className="py-2 px-2 text-center font-bold text-slate-500 tabular-nums">{m.unpaidLeave || 0}</td>
+                            <td className="py-2 px-2 text-center font-bold text-rose-500 tabular-nums">{m.absent}</td>
+                            <td className="py-2 px-2 text-center font-bold text-amber-600 tabular-nums">{m.otHours || 0}h</td>
+                            <td className="py-2 px-2 text-center font-bold text-slate-400 tabular-nums">{m.leave}</td>
+                            <td className="py-2 px-2 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-blue-50/50 dark:bg-blue-950/30">
+                              {m.payableDays}
+                            </td>
+                            <td className="py-2 px-3 text-slate-600 dark:text-slate-300 truncate max-w-[180px]">
+                              {m.sites?.join(", ") || "—"}
+                            </td>
+                            <td className="py-2 px-3 text-center text-blue-600 font-bold text-[11px]">
+                              {isSelectedMonth ? "Viewing" : "Click to view"}
                             </td>
                           </tr>
-                        ))
-                      )}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
+
+                {/* Daily Records Inspector for Selected Month */}
+                {activeMonthData && (
+                  <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200">
+                        Daily Attendance Inspector • {activeMonthData.monthName} {activeYear} ({activeMonthData.dailyRecords?.length || 0} Entries)
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => handleExportExcel("SELECTED_MONTH")}
+                        className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        <Download size={12} />
+                        Export {activeMonthData.monthName} (.xlsx)
+                      </button>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 max-h-60 overflow-y-auto">
+                      <table className="w-full text-left text-xs whitespace-nowrap">
+                        <thead>
+                          <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-400 font-bold text-[10px] uppercase sticky top-0">
+                            <th className="py-2 px-3">Date</th>
+                            <th className="py-2 px-3 text-center">Status</th>
+                            <th className="py-2 px-3 text-center">In / Out Time</th>
+                            <th className="py-2 px-3 text-center">Overtime</th>
+                            <th className="py-2 px-3">Site / Deployment</th>
+                            <th className="py-2 px-3">Work Notes / Permission Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {activeMonthData.dailyRecords?.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="py-6 text-center text-slate-400">
+                                No attendance records marked in {activeMonthData.monthName} {activeYear}.
+                              </td>
+                            </tr>
+                          ) : (
+                            activeMonthData.dailyRecords?.map((rec: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                                <td className="py-2 px-3 font-mono font-bold text-slate-800 dark:text-slate-200">
+                                  {rec.date}
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-md font-black text-[10px] ${
+                                      rec.status === "P"
+                                        ? "bg-emerald-600 text-white"
+                                        : rec.status === "1H"
+                                        ? "bg-sky-600 text-white"
+                                        : rec.status === "H"
+                                        ? "bg-amber-500 text-white"
+                                        : rec.status === "PL"
+                                        ? "bg-teal-600 text-white"
+                                        : rec.status === "UP"
+                                        ? "bg-slate-600 text-white"
+                                        : rec.status === "A"
+                                        ? "bg-rose-600 text-white"
+                                        : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
+                                    }`}
+                                  >
+                                    {rec.status === "1H" ? (rec.permissionSlot === "EVENING" ? "1H·E" : "1H·M") : rec.status}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 text-center font-mono text-slate-500">
+                                  {rec.inTime && rec.outTime ? `${rec.inTime} - ${rec.outTime}` : rec.inTime || rec.outTime || "—"}
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  {rec.otHours && rec.otHours > 0 ? (
+                                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold text-[10px]">
+                                      +{rec.otHours}h {rec.otTimeRange ? `(${rec.otTimeRange})` : ""}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300">—</span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 text-slate-700 dark:text-slate-300">
+                                  {rec.siteName || (isOffice ? "Headquarters Office" : "—")}
+                                </td>
+                                <td className="py-2 px-3 text-slate-500 italic max-w-[280px] truncate">
+                                  {rec.permissionNote || rec.workNotes || rec.otReason || "—"}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: DEDICATED OVERTIME (OT) LOG */}
+            {activeTab === "OVERTIME" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <Flame className="text-amber-500" size={16} />
+                    <span>Overtime (OT) Audit Log • Lifetime Total: {dossierData.lifetimeSummary?.otHours || 0} Hours</span>
+                  </h4>
+                  <span className="text-xs text-slate-500 font-bold">
+                    {dossierData.overtimeLog?.length || 0} OT Sessions Logged
+                  </span>
+                </div>
+
+                {(!dossierData.overtimeLog || dossierData.overtimeLog.length === 0) ? (
+                  <div className="p-8 text-center text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs">
+                    No overtime hours logged for this personnel yet.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-left text-xs whitespace-nowrap">
+                      <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-400 font-bold uppercase text-[10px]">
+                          <th className="py-2.5 px-3">Date</th>
+                          <th className="py-2.5 px-3 text-center">OT Hours</th>
+                          <th className="py-2.5 px-3">Time Range</th>
+                          <th className="py-2.5 px-3">Reason / Justification</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {dossierData.overtimeLog.map((ot: any, i: number) => (
+                          <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                            <td className="py-2.5 px-3 font-mono font-bold text-slate-800 dark:text-slate-200">
+                              {ot.date}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-extrabold text-xs">
+                                +{ot.otHours} Hours
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-300">
+                              {ot.otTimeRange || "Standard Extended Shift"}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 italic">
+                              {ot.otReason || "Urgent site work / fabrication"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 4: 1-HOUR PERMISSION AUDIT LOG (MORNING VS. EVENING) */}
+            {activeTab === "PERMISSIONS" && !isContractorTeam && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <Timer className="text-cyan-600" size={16} />
+                    <span>1-Hour Permission History ({dossierData.permissionsLog?.length || 0} Total Permissions)</span>
+                  </h4>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="px-2 py-0.5 rounded-lg bg-sky-100 text-sky-800 font-bold">
+                      Morning: {dossierData.lifetimeSummary?.permissionMorning || 0}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-lg bg-cyan-100 text-cyan-800 font-bold">
+                      Evening: {dossierData.lifetimeSummary?.permissionEvening || 0}
+                    </span>
+                  </div>
+                </div>
+
+                {(!dossierData.permissionsLog || dossierData.permissionsLog.length === 0) ? (
+                  <div className="p-8 text-center text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs">
+                    No 1-hour permission slips logged for this personnel.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {dossierData.permissionsLog.map((p: any, i: number) => {
+                      const isEve = p.slot === "EVENING";
+                      return (
+                        <div key={i} className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs shadow-2xs space-y-1.5">
+                          <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
+                            <span className="font-mono">{p.date}</span>
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                                isEve ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300" : "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
+                              }`}
+                            >
+                              {isEve ? "Evening 1H·E" : "Morning 1H·M"}
+                            </span>
+                          </div>
+                          {p.time && (
+                            <p className="text-[11px] font-mono text-slate-400">
+                              Time: {p.time}
+                            </p>
+                          )}
+                          <p className="text-[11px] text-slate-600 dark:text-slate-400 italic">
+                            "{p.note || "Official 1-Hour Permission"}"
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -604,7 +684,7 @@ export default function EmployeeMultiYearDossierModal({
         {/* Modal Footer */}
         <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3">
           <span className="text-xs text-slate-400">
-            Attendance verification record • Standard Roofs Books HRIS
+            Attendance verification record • Standard Roofs Books HRIS (Workspace 3)
           </span>
           <button
             type="button"

@@ -40,11 +40,15 @@ import {
   Timer,
   Info,
   Settings,
+  Send,
+  CheckCircle2 as CheckCircleIcon,
+  XCircle,
 } from "lucide-react";
 import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
 import ExcelImportModal from "@/components/common/ExcelImportModal";
 import EmployeeMultiYearDossierModal from "@/components/attendance/EmployeeMultiYearDossierModal";
 import AttendanceSettingsModal from "@/components/attendance/AttendanceSettingsModal";
+import UniversalAttendanceExportModal from "@/components/attendance/UniversalAttendanceExportModal";
 import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 import { formatINR } from "@/lib/decimal";
 
@@ -59,6 +63,11 @@ interface AttendanceRecordItem {
   dailyAdvance?: number;
   permissionNote?: string | null;
   permissionHours?: number | null;
+  permissionSlot?: "MORNING" | "EVENING" | null;
+  permissionTime?: string | null;
+  otHours?: number;
+  otTimeRange?: string | null;
+  otReason?: string | null;
   workNotes?: string | null;
   remarks?: string | null;
 }
@@ -204,6 +213,9 @@ export default function AttendancePage() {
     workerBreakdown?: string | null;
     remarks?: string | null;
     status: "P" | "H" | "A";
+    otHours?: number;
+    otTimeRange?: string | null;
+    otReason?: string | null;
   } | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [holidayForm, setHolidayForm] = useState({ date: "", name: "", markStaff: true });
@@ -227,6 +239,16 @@ export default function AttendancePage() {
   } | null>(null);
   const [permissionInput, setPermissionInput] = useState("");
   const [siteInput, setSiteInput] = useState("");
+  const [otHoursInput, setOtHoursInput] = useState<number>(0);
+  const [otTimeRangeInput, setOtTimeRangeInput] = useState<string>("");
+  const [otReasonInput, setOtReasonInput] = useState<string>("");
+  const [permSlotInput, setPermSlotInput] = useState<"MORNING" | "EVENING">("MORNING");
+  const [permTimeInput, setPermTimeInput] = useState<string>("");
+
+  // Leave Requests state for HR drawer
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [showLeaveDrawer, setShowLeaveDrawer] = useState<boolean>(false);
+  const [showUniversalExportModal, setShowUniversalExportModal] = useState<boolean>(false);
 
   // Quick 1H permission prompt in Daily View
   const [permPromptTarget, setPermPromptTarget] = useState<{
@@ -258,7 +280,10 @@ export default function AttendancePage() {
     siteName: string,
     siteWorkStatus: string,
     workerBreakdown?: string,
-    remarks?: string
+    remarks?: string,
+    otHours?: number,
+    otTimeRange?: string,
+    otReason?: string
   ) => {
     try {
       const res = await fetch("/api/attendance/contractors", {
@@ -272,6 +297,9 @@ export default function AttendancePage() {
           siteWorkStatus: siteWorkStatus || (Number(headcount) > 0 ? "Active Work" : "No Work / Absent"),
           workerBreakdown: workerBreakdown || null,
           remarks: remarks || null,
+          otHours: otHours ? Number(otHours) : undefined,
+          otTimeRange: otTimeRange || undefined,
+          otReason: otReason || undefined,
         }),
       });
       const data = await res.json();
@@ -308,12 +336,55 @@ export default function AttendancePage() {
         setContractorLogs(data.contractorLogs || []);
         setContractorsFromDb(data.contractors || []);
         setHolidays(data.holidays || []);
+        setLeaveRequests(data.leaveRequests || []);
         setKpis(data.kpis || {});
       }
     } catch (err) {
       console.error("Error fetching attendance:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApproveLeave = async (requestId: string) => {
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve-leave", requestId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Leave approved and marked on attendance grid.");
+        fetchAttendance();
+      } else {
+        alert(data.error || "Failed to approve leave.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error approving leave.");
+    }
+  };
+
+  const handleRejectLeave = async (requestId: string) => {
+    const reason = prompt("Enter reason for rejection (optional):", "Leave rejected by HR");
+    if (reason === null) return;
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reject-leave", requestId, rejectionNote: reason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Leave request rejected.");
+        fetchAttendance();
+      } else {
+        alert(data.error || "Failed to reject leave.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error rejecting leave.");
     }
   };
 
@@ -419,7 +490,12 @@ export default function AttendancePage() {
     status: "P" | "1H" | "H" | "PL" | "UP" | "A" | "L",
     siteName?: string,
     dateOverride?: string,
-    permissionNote?: string
+    permissionNote?: string,
+    permissionSlot?: "MORNING" | "EVENING",
+    permissionTime?: string,
+    otHours?: number,
+    otTimeRange?: string,
+    otReason?: string
   ) => {
     const markDate = dateOverride || selectedDate;
     const draftKey = `${employeeId}_${markDate}`;
@@ -433,6 +509,11 @@ export default function AttendancePage() {
         status,
         siteName,
         permissionNote: finalNote,
+        permissionSlot: status === "1H" ? (permissionSlot || "MORNING") : undefined,
+        permissionTime: status === "1H" ? permissionTime : undefined,
+        otHours: otHours !== undefined ? otHours : prev[draftKey]?.otHours,
+        otTimeRange: otTimeRange !== undefined ? otTimeRange : prev[draftKey]?.otTimeRange,
+        otReason: otReason !== undefined ? otReason : prev[draftKey]?.otReason,
         workNotes: finalNote,
         permissionHours: status === "1H" ? 1.0 : undefined,
       },
@@ -452,6 +533,11 @@ export default function AttendancePage() {
                   status,
                   siteName: siteName || a.siteName,
                   permissionNote: finalNote !== undefined ? finalNote : a.permissionNote,
+                  permissionSlot: status === "1H" ? (permissionSlot || a.permissionSlot || "MORNING") : a.permissionSlot,
+                  permissionTime: status === "1H" ? (permissionTime || a.permissionTime) : a.permissionTime,
+                  otHours: otHours !== undefined ? otHours : a.otHours,
+                  otTimeRange: otTimeRange !== undefined ? otTimeRange : a.otTimeRange,
+                  otReason: otReason !== undefined ? otReason : a.otReason,
                   workNotes: finalNote !== undefined ? finalNote : a.workNotes,
                 }
               : a
@@ -467,6 +553,11 @@ export default function AttendancePage() {
               siteName: siteName || (emp.category === "OFFICE_STAFF" ? "Headquarters Office" : "SSM School"),
               dailyAdvance: 0,
               permissionNote: finalNote || null,
+              permissionSlot: status === "1H" ? (permissionSlot || "MORNING") : null,
+              permissionTime: status === "1H" ? (permissionTime || null) : null,
+              otHours: otHours || 0,
+              otTimeRange: otTimeRange || null,
+              otReason: otReason || null,
               permissionHours: status === "1H" ? 1.0 : null,
               workNotes: finalNote || null,
             },
@@ -488,6 +579,11 @@ export default function AttendancePage() {
             status,
             siteName: siteName || undefined,
             permissionNote: finalNote || undefined,
+            permissionSlot: status === "1H" ? (permissionSlot || "MORNING") : undefined,
+            permissionTime: status === "1H" ? permissionTime : undefined,
+            otHours: otHours ? Number(otHours) : undefined,
+            otTimeRange: otTimeRange || undefined,
+            otReason: otReason || undefined,
             workNotes: finalNote || undefined,
             permissionHours: status === "1H" ? 1.0 : undefined,
             inTime: activeTab === "office" ? "09:00 AM" : undefined,
@@ -802,10 +898,24 @@ export default function AttendancePage() {
         }
         archivedCount={employees.filter((e) => e.category === "OFFICE_STAFF").length}
         onImportExcel={() => setShowImportModal(true)}
-        onExportExcel={handleExportMusterExcel}
-        onPrintPDF={() => window.print()}
+        onExportExcel={() => setShowUniversalExportModal(true)}
+        onPrintPDF={() => setShowUniversalExportModal(true)}
         extraControls={
           <div className="flex items-center gap-2 whitespace-nowrap">
+            <button
+              type="button"
+              onClick={() => setShowLeaveDrawer(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold text-xs rounded-xl border border-indigo-200 dark:border-indigo-800 transition cursor-pointer shrink-0"
+              title="Employee leave requests drawer"
+            >
+              <Calendar size={14} className="text-indigo-600" />
+              <span>Leave Requests</span>
+              {leaveRequests.filter((r) => r.status === "PENDING").length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-black text-[10px] ml-1">
+                  {leaveRequests.filter((r) => r.status === "PENDING").length}
+                </span>
+              )}
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -2079,8 +2189,8 @@ export default function AttendancePage() {
                   <th className="py-2.5 px-2 text-center bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-black border-l border-slate-200">
                     P (1.0)
                   </th>
-                  <th className="py-2.5 px-2 text-center bg-sky-50 dark:bg-sky-950 text-sky-800 dark:text-sky-300 font-black">
-                    1H (1.0)
+                  <th className="py-2.5 px-2 text-center bg-sky-50 dark:bg-sky-950 text-sky-800 dark:text-sky-300 font-black" title="1-Hour Permissions: Total (Morning / Evening)">
+                    1H (M/E)
                   </th>
                   <th className="py-2.5 px-2 text-center bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-black">
                     H (0.5)
@@ -2097,6 +2207,9 @@ export default function AttendancePage() {
                   )}
                   <th className="py-2.5 px-2 text-center bg-rose-50 dark:bg-rose-950 text-rose-800 dark:text-rose-300 font-black">
                     A (0.0)
+                  </th>
+                  <th className="py-2.5 px-2 text-center bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-black">
+                    OT HRS
                   </th>
                   {activeTab === "office" && (
                     <th className="py-2.5 px-2 text-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black">
@@ -2225,6 +2338,11 @@ export default function AttendancePage() {
                         <td className="py-2 px-2 text-center font-bold text-rose-500 tabular-nums bg-rose-50/30 dark:bg-rose-950/20">
                           {daysInMonth.length - activeDays}
                         </td>
+                        <td className="py-2 px-2 text-center font-bold text-amber-600 tabular-nums bg-amber-50/30 dark:bg-amber-950/20">
+                          {contractorLogs
+                            .filter((c) => c.contractorTeamName === team.name)
+                            .reduce((acc, curr) => acc + (Number((curr as any).otHours) || 0), 0)}h
+                        </td>
                         <td className="py-2 px-3 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-blue-50/70 dark:bg-blue-950/60 sticky right-0 z-10 border-l border-blue-200 shadow-xs">
                           {totalManDays}L
                         </td>
@@ -2237,11 +2355,14 @@ export default function AttendancePage() {
                   let pTotal = 0;
                   let hTotal = 0;
                   let p1hTotal = 0;
+                  let p1hMorningTotal = 0;
+                  let p1hEveningTotal = 0;
                   let plTotal = 0;
                   let halfPaidPlTotal = 0;
                   let upTotal = 0;
                   let aTotal = 0;
                   let lTotal = 0;
+                  let otHoursTotal = 0;
 
                   // Pre-calculate sums with Separate Rules:
                   // Office: Sunday auto-marked L if no record.
@@ -2251,8 +2372,11 @@ export default function AttendancePage() {
                     const status = att ? att.status : isOffice && d.isSunday ? "L" : null;
 
                     if (status === "P") pTotal++;
-                    else if (status === "1H") p1hTotal++;
-                    else if (status === "H") hTotal++;
+                    else if (status === "1H") {
+                      p1hTotal++;
+                      if (att?.permissionSlot === "EVENING") p1hEveningTotal++;
+                      else p1hMorningTotal++;
+                    } else if (status === "H") hTotal++;
                     else if (status === "PL") {
                       const isHalf = Number(att?.permissionHours) === 0.5 || (att?.workNotes && att?.workNotes.includes("HALF_PAID"));
                       if (isHalf) halfPaidPlTotal++;
@@ -2260,6 +2384,8 @@ export default function AttendancePage() {
                     } else if (status === "UP") upTotal++;
                     else if (status === "A") aTotal++;
                     else if (status === "L") lTotal++;
+
+                    if (att?.otHours) otHoursTotal += Number(att.otHours);
                   });
 
                   // Net Payable Days:
@@ -2270,9 +2396,9 @@ export default function AttendancePage() {
                     : pTotal + p1hTotal + hTotal * 0.5;
 
                   return (
-                    <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                    <tr key={emp.id} className="h-9 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
                       {/* Fixed Left Column (Clickable to open Dossier) */}
-                      <td className="py-2 px-3 sticky left-0 bg-white dark:bg-slate-900 z-10 font-bold border-r border-slate-200 dark:border-slate-800">
+                      <td className="py-1 px-3 sticky left-0 bg-white dark:bg-slate-900 z-10 font-bold border-r border-slate-200 dark:border-slate-800 shadow-xs">
                         <div
                           onClick={() => handleOpenDossier(emp)}
                           className="truncate max-w-[150px] text-slate-800 dark:text-slate-200 hover:text-blue-600 cursor-pointer flex items-center justify-between"
@@ -2281,7 +2407,7 @@ export default function AttendancePage() {
                           <span className="truncate">{emp.name}</span>
                           <History size={11} className="text-slate-400 opacity-60 shrink-0 ml-1" />
                         </div>
-                        <span className="text-[10px] text-slate-400 font-mono block">
+                        <span className="text-[9.5px] text-slate-400 font-mono block -mt-0.5">
                           {emp.employeeCode}
                         </span>
                       </td>
@@ -2290,6 +2416,7 @@ export default function AttendancePage() {
                       {daysInMonth.map((d) => {
                         const att = emp.attendances.find((a) => a.date.split("T")[0] === d.fullDate);
                         const status = att ? att.status : isOffice && d.isSunday ? "L" : null;
+                        const isEve = att?.permissionSlot === "EVENING";
 
                         return (
                           <td
@@ -2308,8 +2435,13 @@ export default function AttendancePage() {
                               setCellEditStatus(currentSt);
                               setSiteInput(att?.siteName || (isOffice ? "Headquarters Office" : "SSM School"));
                               setPermissionInput(savedNote);
+                              setPermSlotInput(isEve ? "EVENING" : "MORNING");
+                              setPermTimeInput(att?.permissionTime || "");
+                              setOtHoursInput(att?.otHours || 0);
+                              setOtTimeRangeInput(att?.otTimeRange || "");
+                              setOtReasonInput(att?.otReason || "");
                             }}
-                            className={`py-1.5 px-0.5 text-center font-black cursor-pointer transition select-none border-r border-slate-100 dark:border-slate-800/50 hover:bg-blue-50/70 dark:hover:bg-blue-900/30 ${
+                            className={`py-1 px-0.5 text-center font-black cursor-pointer transition select-none border-r border-slate-100 dark:border-slate-800/50 hover:bg-blue-50/70 dark:hover:bg-blue-900/30 ${
                               d.isSunday && isOffice
                                 ? "bg-slate-100/60 dark:bg-slate-800/60"
                                 : d.fullDate === selectedDate
@@ -2318,8 +2450,8 @@ export default function AttendancePage() {
                             }`}
                             title={`${emp.name} - ${d.fullDate}: ${status || "Pending"} ${
                               att?.siteName ? `[${att.siteName}]` : ""
-                            } ${att?.permissionNote ? `(1H Perm: ${att.permissionNote})` : ""} ${
-                              att?.workNotes ? `(${att.workNotes})` : ""
+                            } ${att?.permissionNote ? `(1H: ${isEve ? "Eve" : "Mrg"} - ${att.permissionNote})` : ""} ${
+                              att?.otHours ? `(OT: +${att.otHours}h)` : ""
                             }`}
                           >
                             <span
@@ -2327,7 +2459,9 @@ export default function AttendancePage() {
                                 status === "P"
                                   ? "bg-emerald-500 text-white shadow-2xs text-[10px]"
                                   : status === "1H"
-                                  ? "bg-sky-500 text-white shadow-2xs text-[9px] font-extrabold tracking-tight"
+                                  ? isEve
+                                    ? "bg-cyan-600 text-white shadow-2xs text-[8.5px] font-extrabold tracking-tight"
+                                    : "bg-sky-500 text-white shadow-2xs text-[8.5px] font-extrabold tracking-tight"
                                   : status === "H"
                                   ? "bg-amber-400 text-white shadow-2xs text-[10px]"
                                   : status === "PL"
@@ -2341,44 +2475,59 @@ export default function AttendancePage() {
                                   : "bg-slate-100/60 text-slate-300 dark:text-slate-600 border border-dashed border-slate-200 dark:border-slate-700 text-[10px]"
                               }`}
                             >
-                              {status === "1H" ? "P·1H" : status || "—"}
-                              {(att?.permissionNote || att?.workNotes || att?.remarks) && (
+                              {status === "1H" ? (isEve ? "1H·E" : "1H·M") : status || "—"}
+                              {att?.otHours && att.otHours > 0 ? (
+                                <span
+                                  className="absolute -top-1.5 -right-1 px-1 py-0.2 rounded-full bg-amber-500 text-white text-[8px] font-black ring-1 ring-white dark:ring-slate-900 shadow-2xs"
+                                  title={`OT: +${att.otHours}h ${att.otTimeRange ? `(${att.otTimeRange})` : ""}`}
+                                >
+                                  +{att.otHours}h
+                                </span>
+                              ) : (att?.permissionNote || att?.workNotes || att?.remarks) ? (
                                 <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-blue-400 rounded-full ring-1 ring-white dark:ring-slate-900" title={`Note: ${att?.permissionNote || att?.workNotes || att?.remarks}`} />
-                              )}
+                              ) : null}
                             </span>
                           </td>
                         );
                       })}
 
                       {/* Right Sticky Summary Counts */}
-                      <td className="py-2 px-2 text-center font-bold text-emerald-600 tabular-nums bg-emerald-50/30 dark:bg-emerald-950/20 border-l border-slate-200">
+                      <td className="py-1 px-2 text-center font-bold text-emerald-600 tabular-nums bg-emerald-50/30 dark:bg-emerald-950/20 border-l border-slate-200">
                         {pTotal}
                       </td>
-                      <td className="py-2 px-2 text-center font-bold text-sky-600 tabular-nums bg-sky-50/30 dark:bg-sky-950/20">
-                        {p1hTotal}
+                      <td className="py-1 px-2 text-center font-bold text-sky-600 tabular-nums bg-sky-50/30 dark:bg-sky-950/20" title={`Total: ${p1hTotal} (Mrg: ${p1hMorningTotal}, Eve: ${p1hEveningTotal})`}>
+                        <div>{p1hTotal}</div>
+                        {p1hTotal > 0 && (
+                          <div className="text-[8.5px] text-slate-400 font-normal">
+                            {p1hMorningTotal}M/{p1hEveningTotal}E
+                          </div>
+                        )}
                       </td>
-                      <td className="py-2 px-2 text-center font-bold text-amber-500 tabular-nums bg-amber-50/30 dark:bg-amber-950/20">
+                      <td className="py-1 px-2 text-center font-bold text-amber-500 tabular-nums bg-amber-50/30 dark:bg-amber-950/20">
                         {hTotal}
                       </td>
                       {activeTab === "office" && (
-                        <td className="py-2 px-2 text-center font-bold text-teal-600 tabular-nums bg-teal-50/30 dark:bg-teal-950/20">
+                        <td className="py-1 px-2 text-center font-bold text-teal-600 tabular-nums bg-teal-50/30 dark:bg-teal-950/20">
                           {plTotal + halfPaidPlTotal * 0.5}
                         </td>
                       )}
                       {activeTab === "office" && (
-                        <td className="py-2 px-2 text-center font-bold text-slate-500 tabular-nums bg-slate-100/30 dark:bg-slate-800/20">
+                        <td className="py-1 px-2 text-center font-bold text-slate-500 tabular-nums bg-slate-100/30 dark:bg-slate-800/20">
                           {upTotal}
                         </td>
                       )}
-                      <td className="py-2 px-2 text-center font-bold text-rose-500 tabular-nums bg-rose-50/30 dark:bg-rose-950/20">
+                      <td className="py-1 px-2 text-center font-bold text-rose-500 tabular-nums bg-rose-50/30 dark:bg-rose-950/20">
                         {aTotal}
                       </td>
+                      <td className="py-1 px-2 text-center font-bold text-amber-600 tabular-nums bg-amber-50/30 dark:bg-amber-950/20">
+                        {otHoursTotal > 0 ? `${otHoursTotal}h` : "—"}
+                      </td>
                       {activeTab === "office" && (
-                        <td className="py-2 px-2 text-center font-bold text-slate-500 tabular-nums bg-slate-100/40 dark:bg-slate-800/40">
+                        <td className="py-1 px-2 text-center font-bold text-slate-500 tabular-nums bg-slate-100/40 dark:bg-slate-800/40">
                           {lTotal}
                         </td>
                       )}
-                      <td className="py-2 px-3 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-blue-50/70 dark:bg-blue-950/60 sticky right-0 z-10 border-l border-blue-200 shadow-xs">
+                      <td className="py-1 px-3 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-blue-50/70 dark:bg-blue-950/60 sticky right-0 z-10 border-l border-blue-200 shadow-xs">
                         {netPayableDays}
                       </td>
                     </tr>
@@ -2472,6 +2621,102 @@ export default function AttendancePage() {
                 </div>
               )}
 
+              {/* 1-Hour Permission Morning / Evening Slot Toggle */}
+              {cellEditStatus === "1H" && (
+                <div className="p-2.5 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 space-y-2">
+                  <label className="block font-bold text-sky-800 dark:text-sky-300">
+                    1-Hour Permission Slot
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPermSlotInput("MORNING")}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        permSlotInput === "MORNING"
+                          ? "bg-sky-600 text-white shadow-2xs"
+                          : "bg-white dark:bg-slate-800 text-slate-600 border border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      Morning (Mrg 1H·M)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPermSlotInput("EVENING")}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        permSlotInput === "EVENING"
+                          ? "bg-cyan-600 text-white shadow-2xs"
+                          : "bg-white dark:bg-slate-800 text-slate-600 border border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      Evening (Eve 1H·E)
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 font-semibold mb-0.5">Permission Time Range</label>
+                    <input
+                      type="text"
+                      placeholder={permSlotInput === "MORNING" ? "09:30 AM - 10:30 AM" : "05:30 PM - 06:30 PM"}
+                      value={permTimeInput}
+                      onChange={(e) => setPermTimeInput(e.target.value)}
+                      className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Overtime (OT) Section */}
+              <div className="p-2.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1">
+                    <Timer size={13} className="text-amber-600" />
+                    <span>Overtime (OT) Hours</span>
+                  </label>
+                  <span className="font-mono text-xs font-black text-amber-700">
+                    {otHoursInput > 0 ? `+${otHoursInput} Hours` : "No OT"}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {[0, 0.5, 1, 1.5, 2, 2.5, 3, 4].map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => setOtHoursInput(h)}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
+                        otHoursInput === h
+                          ? "bg-amber-500 text-white border-amber-600 shadow-2xs"
+                          : "bg-white dark:bg-slate-800 text-slate-600 border-slate-200 dark:border-slate-700 hover:bg-amber-100/50"
+                      }`}
+                    >
+                      {h === 0 ? "None" : `+${h}h`}
+                    </button>
+                  ))}
+                </div>
+                {otHoursInput > 0 && (
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div>
+                      <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">OT Time Slot</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 7:00 PM - 9:00 PM"
+                        value={otTimeRangeInput}
+                        onChange={(e) => setOtTimeRangeInput(e.target.value)}
+                        className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">OT Reason</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Roof truss welding"
+                        value={otReasonInput}
+                        onChange={(e) => setOtReasonInput(e.target.value)}
+                        className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Permission Note */}
               <div className="pt-1">
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -2495,7 +2740,12 @@ export default function AttendancePage() {
                       cellEditStatus,
                       siteInput,
                       cellEditTarget.date,
-                      permissionInput
+                      permissionInput,
+                      permSlotInput,
+                      permTimeInput,
+                      otHoursInput,
+                      otTimeRangeInput,
+                      otReasonInput
                     );
                     setCellEditTarget(null);
                   }}
@@ -2579,175 +2829,106 @@ export default function AttendancePage() {
         </div>
       )}
 
-      {/* 7. MODAL: EMPLOYEE MULTI-YEAR & LIFETIME ATTENDANCE DOSSIER */}
-      {selectedDossierEmployee && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-5 animate-in fade-in overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-4xl w-full p-6 space-y-5 my-8 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-base shadow-md">
-                  {selectedDossierEmployee.employeeCode.slice(-3)}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-                      {selectedDossierEmployee.name}
-                    </h3>
-                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">
-                      {selectedDossierEmployee.employeeCode}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {selectedDossierEmployee.designation || selectedDossierEmployee.role || "Worker"} •{" "}
-                    {selectedDossierEmployee.companyUnit === "INVI_CREATION" ? "Invi Creation" : "Standard Roofs"} •{" "}
-                    Joined: {new Date(selectedDossierEmployee.dateOfJoining || Date.now()).toLocaleDateString("en-IN")}
-                  </p>
-                </div>
+      {/* 7. MODAL: EMPLOYEE LEAVE REQUESTS DRAWER (FOR HR) */}
+      {showLeaveDrawer && (
+        <div className="fixed inset-0 z-[9999] flex justify-end bg-slate-900/60 backdrop-blur-xs p-0 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg h-full shadow-2xl p-6 flex flex-col space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Calendar className="text-blue-600" size={18} />
+                  Employee Leave Requests
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Office employee self-service leave requests (Auto-marks PL / UP in attendance matrix)
+                </p>
               </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleExportIndividualDossierExcel}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-                >
-                  <FileSpreadsheet size={14} />
-                  <span>Export Card (.xlsx)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDossierEmployee(null)}
-                  className="p-1 rounded-xl text-slate-400 hover:text-slate-600"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowLeaveDrawer(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
             </div>
 
-            {/* Lifetime Summary KPIs */}
-            {dossierData && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Present (P)</span>
-                  <span className="text-lg font-black text-emerald-600 tabular-nums">
-                    {dossierData.lifetimeSummary?.present || 0}
-                  </span>
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {leaveRequests.length === 0 ? (
+                <div className="py-20 text-center text-slate-400 text-xs">
+                  No leave requests submitted yet.
                 </div>
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Half-Days (H)</span>
-                  <span className="text-lg font-black text-amber-500 tabular-nums">
-                    {dossierData.lifetimeSummary?.halfDay || 0}
-                  </span>
-                </div>
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">1-Hr Perm (1H)</span>
-                  <span className="text-lg font-black text-cyan-600 tabular-nums">
-                    {dossierData.lifetimeSummary?.permission || 0}
-                  </span>
-                </div>
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Leaves (L)</span>
-                  <span className="text-lg font-black text-slate-600 dark:text-slate-300 tabular-nums">
-                    {dossierData.lifetimeSummary?.leave || 0}
-                  </span>
-                </div>
-                <div className="p-3 rounded-2xl bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800">
-                  <span className="text-[10px] uppercase font-bold text-blue-600 block">Payable Days</span>
-                  <span className="text-lg font-black text-blue-700 dark:text-blue-300 tabular-nums">
-                    {dossierData.lifetimeSummary?.payableDays || 0}
-                  </span>
-                </div>
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Advances</span>
-                  <span className="text-lg font-black text-slate-800 dark:text-slate-200 tabular-nums">
-                    {formatINR(dossierData.lifetimeSummary?.advances || 0)}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Year Selector Tabs */}
-            {dossierData?.yearsList && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                    {dossierData.yearsList.map((yr: string) => (
-                      <button
-                        key={yr}
-                        type="button"
-                        onClick={() => setDossierActiveYear(yr)}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                          dossierActiveYear === yr
-                            ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs"
-                            : "text-slate-500"
+              ) : (
+                leaveRequests.map((req: any) => (
+                  <div
+                    key={req.id}
+                    className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <strong className="text-sm text-slate-900 dark:text-slate-100">
+                          {req.employee?.name || "Employee"}
+                        </strong>
+                        <span className="text-xs font-mono text-slate-400 ml-2">
+                          ({req.employee?.employeeCode || req.employee?.empCode || "EMP"})
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
+                          req.status === "APPROVED"
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                            : req.status === "REJECTED"
+                            ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                            : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
                         }`}
                       >
-                        FY {yr}
-                      </button>
-                    ))}
-                  </div>
+                        {req.status}
+                      </span>
+                    </div>
 
-                  <span className="text-xs text-slate-400 font-semibold">
-                    12-Month Performance Matrix
-                  </span>
-                </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-bold uppercase">Leave Type</span>
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {req.leaveType === "PAID" ? "Paid Leave [PL]" : req.leaveType === "HALF_DAY" ? "Half-Day [H]" : "Unpaid Leave [UP]"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-bold uppercase">Dates / Days</span>
+                        <strong className="text-slate-800 dark:text-slate-200 font-mono">
+                          {req.startDate?.split("T")[0]} to {req.endDate?.split("T")[0]} ({req.daysCount}d)
+                        </strong>
+                      </div>
+                    </div>
 
-                {/* 12-Month Detailed Grid for Active Year */}
-                {dossierData.yearlyData?.[dossierActiveYear] && (
-                  <div className="overflow-x-auto border border-slate-100 dark:border-slate-800 rounded-2xl">
-                    <table className="w-full text-left text-xs whitespace-nowrap">
-                      <thead>
-                        <tr className="border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase font-bold text-slate-400 bg-slate-50 dark:bg-slate-800/40">
-                          <th className="py-2.5 px-3">Month</th>
-                          <th className="py-2.5 px-2 text-center">P (1.0)</th>
-                          <th className="py-2.5 px-2 text-center">H (0.5)</th>
-                          <th className="py-2.5 px-2 text-center">1H (1.0)</th>
-                          <th className="py-2.5 px-2 text-center">A (0.0)</th>
-                          <th className="py-2.5 px-2 text-center">L (Sun)</th>
-                          <th className="py-2.5 px-2 text-center font-black text-blue-600">Net Payable</th>
-                          <th className="py-2.5 px-2 text-right">Advances (₹)</th>
-                          <th className="py-2.5 px-3">Deployed Site Projects</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {dossierData.yearlyData[dossierActiveYear].months.map((m: any) => (
-                          <tr key={m.monthIndex} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                            <td className="py-2.5 px-3 font-bold text-slate-800 dark:text-slate-200">
-                              {m.monthName} {dossierActiveYear}
-                            </td>
-                            <td className="py-2.5 px-2 text-center font-bold text-emerald-600 tabular-nums">
-                              {m.present}
-                            </td>
-                            <td className="py-2.5 px-2 text-center font-bold text-amber-500 tabular-nums">
-                              {m.halfDay}
-                            </td>
-                            <td className="py-2.5 px-2 text-center font-bold text-cyan-600 tabular-nums">
-                              {m.permission}
-                            </td>
-                            <td className="py-2.5 px-2 text-center font-bold text-rose-500 tabular-nums">
-                              {m.absent}
-                            </td>
-                            <td className="py-2.5 px-2 text-center font-bold text-slate-400 tabular-nums">
-                              {m.leave}
-                            </td>
-                            <td className="py-2.5 px-2 text-center font-black text-blue-600 tabular-nums">
-                              {m.payableDays}
-                            </td>
-                            <td className="py-2.5 px-2 text-right font-mono text-slate-600 tabular-nums">
-                              {m.advances > 0 ? `₹${m.advances}` : "—"}
-                            </td>
-                            <td className="py-2.5 px-3 text-slate-500 text-[11px] truncate max-w-[200px]">
-                              {m.sites?.join(", ") || (m.present > 0 ? "Office / Base" : "—")}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <div className="text-xs">
+                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Reason</span>
+                      <p className="text-slate-600 dark:text-slate-300 italic bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                        "{req.reason || "Personal work"}"
+                      </p>
+                    </div>
+
+                    {req.status === "PENDING" && (
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => handleRejectLeave(req.id)}
+                          className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition cursor-pointer"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApproveLeave(req.id)}
+                          className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer shadow-xs"
+                        >
+                          Approve & Mark Matrix
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -3134,6 +3315,43 @@ export default function AttendancePage() {
                 </select>
               </div>
 
+              {/* Overtime (OT) */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">OT Hours</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="12"
+                    placeholder="0"
+                    value={selectedContractorCell.otHours || ""}
+                    onChange={(e) =>
+                      setSelectedContractorCell({
+                        ...selectedContractorCell,
+                        otHours: Number(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-xs focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">OT Time Slot</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 7 PM - 10 PM"
+                    value={selectedContractorCell.otTimeRange || ""}
+                    onChange={(e) =>
+                      setSelectedContractorCell({
+                        ...selectedContractorCell,
+                        otTimeRange: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
               {/* Worker Breakdown / Notes */}
               <div>
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -3173,7 +3391,10 @@ export default function AttendancePage() {
                       selectedContractorCell.siteName,
                       selectedContractorCell.siteWorkStatus,
                       selectedContractorCell.workerBreakdown || undefined,
-                      selectedContractorCell.remarks || undefined
+                      selectedContractorCell.remarks || undefined,
+                      selectedContractorCell.otHours || undefined,
+                      selectedContractorCell.otTimeRange || undefined,
+                      selectedContractorCell.otReason || undefined
                     );
                   }}
                   className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-xs cursor-pointer"
@@ -3200,6 +3421,19 @@ export default function AttendancePage() {
         onClose={() => setSelectedDossierEmployee(null)}
         employee={selectedDossierEmployee}
         isContractorTeam={isContractorDossier}
+      />
+
+      {/* 14. UNIVERSAL ATTENDANCE EXPORT MODAL */}
+      <UniversalAttendanceExportModal
+        isOpen={showUniversalExportModal}
+        onClose={() => setShowUniversalExportModal(false)}
+        activeTab={activeTab}
+        employees={employees}
+        contractors={contractorsFromDb}
+        contractorLogs={contractorLogs}
+        holidays={holidays}
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
       />
     </div>
   );

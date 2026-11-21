@@ -21,6 +21,7 @@ enum UserRole {
   PROJECT_MANAGER
   SITE_SUPERVISOR
   VIEWER
+  EMPLOYEE
 }
 
 enum AccountType {
@@ -144,6 +145,7 @@ model User {
   role                   UserRole          @default(VIEWER)
   phone                  String?
   permissions            Json?
+  employeeId             String?
   active                 Boolean           @default(true)
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
@@ -841,6 +843,7 @@ model EmployeeOrLabour {
   advances           LabourAdvance[]
   payrolls           StaffPayroll[]
   attendances        AttendanceRecord[]
+  leaveRequests      LeaveRequest[]
 }
 
 model AttendanceRecord {
@@ -854,6 +857,11 @@ model AttendanceRecord {
   dailyAdvance    Decimal          @default(0.00) @db.Decimal(15, 2) // Optional ₹ petty advance on site
   permissionNote  String?          // Reason for 1H permission or work notes
   permissionHours Decimal?         @default(1.0) @db.Decimal(5, 2)
+  permissionSlot  String?          // "MORNING" | "EVENING"
+  permissionTime  String?          // e.g. "09:00 AM - 10:00 AM" or "06:30 PM - 07:30 PM"
+  otHours         Float            @default(0) // Overtime hours (0.5, 1, 1.5, 2, etc.)
+  otTimeRange     String?          // e.g. "07:30 PM - 09:30 PM"
+  otReason        String?          // Overtime reason / site description
   workNotes       String?          // Remarks, work notes
   category        String?          // OFFICE_STAFF, TAMIL_LABOUR, HINDI_LABOUR
   companyUnit     String?          // STANDARD_ROOFS, INVI_CREATION
@@ -864,7 +872,9 @@ model AttendanceRecord {
 
   @@unique([employeeId, date])
   @@index([date])
+  @@index([employeeId, date])
   @@index([category])
+  @@index([category, date])
 }
 
 model CompanyHoliday {
@@ -891,6 +901,9 @@ model ContractorDailyLog {
   headcount          Int         @default(0) // Number of labours working
   workerBreakdown    String?     // "Rajkumar-F, Mani-H, Selvam-H"
   siteWorkStatus     String?     // "Fabrication Work", "Purlin Work Welding", "Sheeting", "Rain season", "Absent/No Work"
+  otHours            Float       @default(0) // Overtime hours for team
+  otTimeRange        String?     // e.g. "07:00 PM - 09:00 PM"
+  otReason           String?
   remarks            String?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
@@ -899,6 +912,30 @@ model ContractorDailyLog {
 
   @@index([date])
   @@index([contractorTeamName])
+  @@index([contractorTeamName, date])
+}
+
+model LeaveRequest {
+  id            String           @id @default(cuid())
+  employeeId    String
+  leaveCategory String           @default("PLANNED") // PLANNED, UNPLANNED, SICK, EMERGENCY
+  dayType       String           @default("FULL_DAY") // FULL_DAY, HALF_DAY
+  startDate     DateTime         @db.Date
+  endDate       DateTime         @db.Date
+  totalDays     Decimal          @default(1.0) @db.Decimal(5, 2)
+  reason        String
+  status        String           @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  rejectionNote String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  employee      EmployeeOrLabour @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([startDate, endDate])
 }
 
 model LabourMuster {

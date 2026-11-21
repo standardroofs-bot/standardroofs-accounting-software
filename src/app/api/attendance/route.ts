@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     if (category) whereEmployee.category = category;
     if (companyUnit) whereEmployee.companyUnit = companyUnit;
 
-    const [employees, targetDateAttendance, contractorLogs, holidays, contractorList] = await Promise.all([
+    const [employees, targetDateAttendance, contractorLogs, holidays, contractorList, leaveRequests] = await Promise.all([
       prisma.employeeOrLabour.findMany({
         where: whereEmployee,
         orderBy: [
@@ -72,6 +72,27 @@ export async function GET(request: Request) {
           status: "ACTIVE",
         },
         orderBy: { code: "asc" },
+      }),
+      prisma.leaveRequest.findMany({
+        where: {
+          OR: [
+            { startDate: { gte: startOfMonth, lte: endOfMonth } },
+            { endDate: { gte: startOfMonth, lte: endOfMonth } },
+            { status: "PENDING" },
+          ],
+        },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              name: true,
+              employeeCode: true,
+              category: true,
+              companyUnit: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
       }),
     ]);
 
@@ -131,6 +152,7 @@ export async function GET(request: Request) {
       contractors: contractorList,
       contractorLogs,
       holidays,
+      leaveRequests,
       kpis: {
         totalOfficeStaff: officeStaff.length || 13,
         presentOfficeToday: presentOffice || (isSunday ? 0 : 12),
@@ -171,6 +193,11 @@ export async function POST(request: Request) {
         dailyAdvance,
         permissionNote,
         permissionHours,
+        permissionSlot,
+        permissionTime,
+        otHours,
+        otTimeRange,
+        otReason,
         workNotes,
       } = record;
       const targetDate = new Date(`${rDate}T00:00:00.000Z`);
@@ -196,6 +223,11 @@ export async function POST(request: Request) {
           dailyAdvance: dailyAdvance ? Number(dailyAdvance) : 0,
           permissionNote: savedNote,
           permissionHours: permissionHours ? Number(permissionHours) : status === "1H" ? 1.0 : null,
+          permissionSlot: permissionSlot ?? null,
+          permissionTime: permissionTime ?? null,
+          otHours: otHours !== undefined ? Number(otHours) : 0,
+          otTimeRange: otTimeRange ?? null,
+          otReason: otReason ?? null,
           workNotes: savedNote,
           category: emp?.category,
           companyUnit: emp?.companyUnit,
@@ -210,6 +242,11 @@ export async function POST(request: Request) {
           dailyAdvance: dailyAdvance ? Number(dailyAdvance) : 0,
           permissionNote: savedNote,
           permissionHours: permissionHours ? Number(permissionHours) : status === "1H" ? 1.0 : null,
+          permissionSlot: permissionSlot ?? null,
+          permissionTime: permissionTime ?? null,
+          otHours: otHours !== undefined ? Number(otHours) : 0,
+          otTimeRange: otTimeRange ?? null,
+          otReason: otReason ?? null,
           workNotes: savedNote,
           category: emp?.category,
           companyUnit: emp?.companyUnit,
@@ -217,6 +254,90 @@ export async function POST(request: Request) {
       });
 
       return NextResponse.json({ success: true, updated });
+    }
+
+    // 1.5 Approve Employee Leave Request
+    if (action === "approve-leave" && body.requestId) {
+      const leave = await prisma.leaveRequest.findUnique({
+        where: { id: body.requestId },
+        include: { employee: true },
+      });
+      if (!leave) {
+        return NextResponse.json({ success: false, error: "Leave request not found." }, { status: 404 });
+      }
+
+      await prisma.leaveRequest.update({
+        where: { id: body.requestId },
+        data: {
+          status: "APPROVED",
+          reviewedBy: body.reviewedBy || "HR Admin",
+          reviewedAt: new Date(),
+        },
+      });
+
+      // Synchronously mark dates on Employee's Attendance Matrix
+      const start = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+      const curr = new Date(start);
+
+      while (curr <= end) {
+        const isSun = curr.getUTCDay() === 0;
+        let dayStatus = "PL";
+        if (isSun) {
+          dayStatus = "L";
+        } else if (leave.leaveCategory === "PLANNED" || leave.leaveCategory === "SICK") {
+          dayStatus = leave.dayType === "HALF_DAY" ? "H" : "PL";
+        } else {
+          dayStatus = leave.dayType === "HALF_DAY" ? "H" : "UP";
+        }
+
+        const note = `${leave.leaveCategory} LEAVE: ${leave.reason}`;
+
+        await prisma.attendanceRecord.upsert({
+          where: {
+            employeeId_date: {
+              employeeId: leave.employeeId,
+              date: new Date(curr),
+            },
+          },
+          update: {
+            status: dayStatus,
+            workNotes: note,
+            permissionNote: note,
+            permissionHours: leave.dayType === "HALF_DAY" ? 0.5 : 1.0,
+            category: leave.employee.category,
+            companyUnit: leave.employee.companyUnit,
+          },
+          create: {
+            employeeId: leave.employeeId,
+            date: new Date(curr),
+            status: dayStatus,
+            workNotes: note,
+            permissionNote: note,
+            permissionHours: leave.dayType === "HALF_DAY" ? 0.5 : 1.0,
+            category: leave.employee.category,
+            companyUnit: leave.employee.companyUnit,
+          },
+        });
+
+        curr.setUTCDate(curr.getUTCDate() + 1);
+      }
+
+      return NextResponse.json({ success: true, message: "Leave approved and attendance matrix updated." });
+    }
+
+    // 1.6 Reject Employee Leave Request
+    if (action === "reject-leave" && body.requestId) {
+      await prisma.leaveRequest.update({
+        where: { id: body.requestId },
+        data: {
+          status: "REJECTED",
+          rejectionNote: body.rejectionNote || "Leave rejected by HR",
+          reviewedBy: body.reviewedBy || "HR Admin",
+          reviewedAt: new Date(),
+        },
+      });
+      return NextResponse.json({ success: true, message: "Leave request rejected." });
     }
 
     // 2. Bulk Mark

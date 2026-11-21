@@ -21,6 +21,8 @@ export async function GET(request: Request) {
       const sitesWorkedSet = new Set<string>();
       let lifetimeHeadcount = 0;
       let totalLogs = logs.length;
+      let lifetimeOtHours = 0;
+      const overtimeLog: any[] = [];
 
       logs.forEach((log) => {
         const d = new Date(log.date);
@@ -30,15 +32,28 @@ export async function GET(request: Request) {
         if (log.siteName) sitesWorkedSet.add(log.siteName.trim());
         lifetimeHeadcount += log.headcount;
 
+        const ot = (log as any).otHours ? Number((log as any).otHours) : 0;
+        lifetimeOtHours += ot;
+
+        if (ot > 0) {
+          overtimeLog.push({
+            date: log.date.toISOString().split("T")[0],
+            otHours: ot,
+            otTimeRange: (log as any).otTimeRange || null,
+            otReason: (log as any).otReason || null,
+          });
+        }
+
         if (!yearlyMap[year]) {
           yearlyMap[year] = {
             year,
-            totals: { headcount: 0, logsCount: 0, sites: [] },
+            totals: { headcount: 0, logsCount: 0, otHours: 0, sites: [] },
             months: Array.from({ length: 12 }, (_, i) => ({
               monthIndex: i,
               monthName: new Date(2026, i, 1).toLocaleString("en-US", { month: "short" }),
               headcount: 0,
               logsCount: 0,
+              otHours: 0,
               sites: new Set<string>(),
               records: [] as any[],
             })),
@@ -49,8 +64,10 @@ export async function GET(request: Request) {
         const mData = yData.months[month];
         yData.totals.headcount += log.headcount;
         yData.totals.logsCount++;
+        yData.totals.otHours = (yData.totals.otHours || 0) + ot;
         mData.headcount += log.headcount;
         mData.logsCount++;
+        mData.otHours = (mData.otHours || 0) + ot;
         if (log.siteName) mData.sites.add(log.siteName.trim());
         mData.records.push(log);
       });
@@ -60,12 +77,13 @@ export async function GET(request: Request) {
         if (!yearlyMap[y]) {
           yearlyMap[y] = {
             year: y,
-            totals: { headcount: 0, logsCount: 0, sites: [] },
+            totals: { headcount: 0, logsCount: 0, otHours: 0, sites: [] },
             months: Array.from({ length: 12 }, (_, i) => ({
               monthIndex: i,
               monthName: new Date(2026, i, 1).toLocaleString("en-US", { month: "short" }),
               headcount: 0,
               logsCount: 0,
+              otHours: 0,
               sites: [],
               records: [],
             })),
@@ -84,9 +102,11 @@ export async function GET(request: Request) {
         contractorTeamName,
         yearsList,
         yearlyData: yearlyMap,
+        overtimeLog,
         lifetimeSummary: {
           totalLogs,
           lifetimeHeadcount,
+          lifetimeOtHours,
           sitesWorked: Array.from(sitesWorkedSet),
         },
       });
@@ -117,13 +137,17 @@ export async function GET(request: Request) {
     let lifetimePresent = 0;
     let lifetimeHalfDay = 0;
     let lifetimePermission = 0;
+    let lifetimePermissionMorning = 0;
+    let lifetimePermissionEvening = 0;
     let lifetimePaidLeave = 0;
     let lifetimeHalfPaidHoliday = 0;
     let lifetimeUnpaidLeave = 0;
     let lifetimeAbsent = 0;
     let lifetimeLeave = 0;
     let lifetimeAdvance = 0;
+    let lifetimeOtHours = 0;
     const permissionsLog: any[] = [];
+    const overtimeLog: any[] = [];
 
     const supportedYears = ["2025", "2026", "2027", "2028", "2029", "2030"];
     supportedYears.forEach((y) => {
@@ -133,11 +157,14 @@ export async function GET(request: Request) {
           present: 0,
           halfDay: 0,
           permission: 0,
+          permissionMorning: 0,
+          permissionEvening: 0,
           paidLeave: 0,
           halfPaidHoliday: 0,
           unpaidLeave: 0,
           absent: 0,
           leave: 0,
+          otHours: 0,
           payableDays: 0,
           advances: 0,
         },
@@ -147,11 +174,14 @@ export async function GET(request: Request) {
           present: 0,
           halfDay: 0,
           permission: 0,
+          permissionMorning: 0,
+          permissionEvening: 0,
           paidLeave: 0,
           halfPaidHoliday: 0,
           unpaidLeave: 0,
           absent: 0,
           leave: 0,
+          otHours: 0,
           payableDays: 0,
           advances: 0,
           sites: new Set<string>(),
@@ -176,11 +206,14 @@ export async function GET(request: Request) {
             present: 0,
             halfDay: 0,
             permission: 0,
+            permissionMorning: 0,
+            permissionEvening: 0,
             paidLeave: 0,
             halfPaidHoliday: 0,
             unpaidLeave: 0,
             absent: 0,
             leave: 0,
+            otHours: 0,
             payableDays: 0,
             advances: 0,
           },
@@ -190,11 +223,14 @@ export async function GET(request: Request) {
             present: 0,
             halfDay: 0,
             permission: 0,
+            permissionMorning: 0,
+            permissionEvening: 0,
             paidLeave: 0,
             halfPaidHoliday: 0,
             unpaidLeave: 0,
             absent: 0,
             leave: 0,
+            otHours: 0,
             payableDays: 0,
             advances: 0,
             sites: new Set<string>(),
@@ -206,10 +242,14 @@ export async function GET(request: Request) {
       const yData = yearlyMap[year];
       const mData = yData.months[month];
       const advance = att.dailyAdvance ? Number(att.dailyAdvance) : 0;
+      const ot = att.otHours ? Number(att.otHours) : 0;
 
       lifetimeAdvance += advance;
+      lifetimeOtHours += ot;
       yData.totals.advances += advance;
+      yData.totals.otHours = (yData.totals.otHours || 0) + ot;
       mData.advances += advance;
+      mData.otHours = (mData.otHours || 0) + ot;
 
       if (att.siteName) {
         mData.sites.add(att.siteName.trim());
@@ -224,8 +264,22 @@ export async function GET(request: Request) {
         siteName: att.siteName,
         dailyAdvance: advance,
         permissionNote: att.permissionNote,
+        permissionSlot: att.permissionSlot,
+        permissionTime: att.permissionTime,
+        otHours: ot,
+        otTimeRange: att.otTimeRange,
+        otReason: att.otReason,
         workNotes: att.workNotes,
       });
+
+      if (ot > 0) {
+        overtimeLog.push({
+          date: dateStr,
+          otHours: ot,
+          otTimeRange: att.otTimeRange || null,
+          otReason: att.otReason || null,
+        });
+      }
 
       if (att.status === "P") {
         lifetimePresent++;
@@ -239,10 +293,22 @@ export async function GET(request: Request) {
         lifetimePermission++;
         yData.totals.permission++;
         mData.permission++;
+        const isEve = att.permissionSlot === "EVENING";
+        if (isEve) {
+          lifetimePermissionEvening++;
+          yData.totals.permissionEvening = (yData.totals.permissionEvening || 0) + 1;
+          mData.permissionEvening = (mData.permissionEvening || 0) + 1;
+        } else {
+          lifetimePermissionMorning++;
+          yData.totals.permissionMorning = (yData.totals.permissionMorning || 0) + 1;
+          mData.permissionMorning = (mData.permissionMorning || 0) + 1;
+        }
         permissionsLog.push({
           date: dateStr,
           inTime: att.inTime,
           outTime: att.outTime,
+          slot: att.permissionSlot || "MORNING",
+          time: att.permissionTime || null,
           note: att.permissionNote || att.workNotes || "1-Hour Permission",
         });
       } else if (att.status === "PL") {
@@ -343,16 +409,20 @@ export async function GET(request: Request) {
       yearsList: supportedYears,
       yearlyData: yearlyMap,
       permissionsLog,
+      overtimeLog,
       lifetimeSummary: {
         totalRecords: employee.attendances.length,
         present: lifetimePresent,
         halfDay: lifetimeHalfDay,
         permission: lifetimePermission,
+        permissionMorning: lifetimePermissionMorning,
+        permissionEvening: lifetimePermissionEvening,
         paidLeave: lifetimePaidLeave,
         halfPaidHoliday: lifetimeHalfPaidHoliday,
         unpaidLeave: lifetimeUnpaidLeave,
         absent: lifetimeAbsent,
         leave: lifetimeLeave,
+        otHours: lifetimeOtHours,
         payableDays: lifetimePayableDays,
         advances: lifetimeAdvance,
         sitesWorked: Array.from(sitesWorkedSet),
