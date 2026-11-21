@@ -152,9 +152,37 @@ export default function AttendancePage() {
   // Data state
   const [employees, setEmployees] = useState<EmployeeItem[]>([]);
   const [contractorLogs, setContractorLogs] = useState<ContractorLogItem[]>([]);
+  const [contractorsFromDb, setContractorsFromDb] = useState<any[]>([]);
   const [holidays, setHolidays] = useState<HolidayItem[]>([]);
   const [kpis, setKpis] = useState<any>({});
   const [loading, setLoading] = useState(true);
+
+  // Canonical 6 Contractor Teams + DB Contractors
+  const defaultContractorTeams = [
+    { id: "Nandeeshwaran Team", name: "Nandeeshwaran Team", code: "CONT-001", role: "Fabrication & Erection" },
+    { id: "Contractor Sakthi", name: "Contractor Sakthi", code: "CONT-002", role: "Sheeting & Purlin Crew" },
+    { id: "Prashop Team", name: "Prashop Team", code: "CONT-003", role: "Welding & Site Installation" },
+    { id: "Monier Suresh Team", name: "Monier Suresh Team", code: "CONT-004", role: "Heavy PEB Specialists" },
+    { id: "Suthish Team", name: "Suthish Team", code: "CONT-005", role: "Truss & Fabrication Work" },
+    { id: "Hydarali Team", name: "Hydarali Team", code: "CONT-006", role: "High-Roof Site Installation" },
+  ];
+
+  const contractorTeamList = useMemo(() => {
+    const list = [...defaultContractorTeams];
+    const names = new Set(defaultContractorTeams.map((c) => c.name.toLowerCase()));
+    contractorsFromDb.forEach((c) => {
+      if (!names.has((c.name || "").toLowerCase())) {
+        list.push({
+          id: c.name,
+          name: c.name,
+          code: c.code || "CONT",
+          role: c.specialty || "Contractor Team",
+        });
+        names.add(c.name.toLowerCase());
+      }
+    });
+    return list;
+  }, [contractorsFromDb]);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -164,6 +192,18 @@ export default function AttendancePage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showContractorModal, setShowContractorModal] = useState(false);
   const [showHolidayModal, setShowHolidayModal] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<"personnel" | "holidays" | "rules">("personnel");
+  const [selectedContractorCell, setSelectedContractorCell] = useState<{
+    teamName: string;
+    date: string;
+    dayNum: number;
+    headcount: number;
+    siteName: string;
+    siteWorkStatus: string;
+    workerBreakdown?: string | null;
+    remarks?: string | null;
+    status: "P" | "H" | "A";
+  } | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [holidayForm, setHolidayForm] = useState({ date: "", name: "", markStaff: true });
   
@@ -208,6 +248,48 @@ export default function AttendancePage() {
     remarks: "",
   });
 
+  // Save Contractor Daily Log (Single Cell or Daily Roll-Call)
+  const handleSaveContractorDaily = async (
+    teamName: string,
+    date: string,
+    headcount: number,
+    siteName: string,
+    siteWorkStatus: string,
+    workerBreakdown?: string,
+    remarks?: string
+  ) => {
+    try {
+      const res = await fetch("/api/attendance/contractors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contractorTeamName: teamName,
+          date,
+          headcount: Number(headcount),
+          siteName: siteName || "Site Standby",
+          siteWorkStatus: siteWorkStatus || (Number(headcount) > 0 ? "Active Work" : "No Work / Absent"),
+          workerBreakdown: workerBreakdown || null,
+          remarks: remarks || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.log) {
+        showToast(`Logged ${teamName} (${headcount} labours) on ${date}`);
+        setContractorLogs((prev) => {
+          const filtered = prev.filter(
+            (c) => !(c.contractorTeamName === teamName && c.date.split("T")[0] === date)
+          );
+          return [data.log, ...filtered];
+        });
+        setSelectedContractorCell(null);
+      } else {
+        alert(data.error || "Failed to save contractor log.");
+      }
+    } catch (err) {
+      console.error("Failed to save contractor log:", err);
+    }
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -222,6 +304,7 @@ export default function AttendancePage() {
       if (data.success) {
         setEmployees(data.employees || []);
         setContractorLogs(data.contractorLogs || []);
+        setContractorsFromDb(data.contractors || []);
         setHolidays(data.holidays || []);
         setKpis(data.kpis || {});
       }
@@ -700,7 +783,7 @@ export default function AttendancePage() {
       <ModuleHeaderWithAnalytics
         title="Attendance & Workforce Command Center"
         subtitle="6-day work week engine, auto-Sunday leave, 1-hr permissions, daily deployment, and multi-year records"
-        totalCount={employees.length}
+        totalCount={employees.length + contractorTeamList.length}
         activeCount={
           employees.filter((e) =>
             e.attendances.some(
@@ -711,42 +794,34 @@ export default function AttendancePage() {
           ).length
         }
         archivedCount={employees.filter((e) => e.category === "OFFICE_STAFF").length}
-        primaryAction={{
-          label: "+ Log Contractor Team",
-          onClick: () => {
-            setContractorForm({
-              id: "",
-              contractorTeamName: "Nandeeshwaran Team",
-              date: selectedDate,
-              siteName: "Ravichandran Chennai",
-              headcount: 4,
-              workerBreakdown: "",
-              siteWorkStatus: "Fabrication Work",
-              remarks: "",
-            });
-            setShowContractorModal(true);
-          },
-        }}
         onImportExcel={() => setShowImportModal(true)}
         onExportExcel={handleExportMusterExcel}
         onPrintPDF={() => window.print()}
         extraControls={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 whitespace-nowrap">
             <button
               type="button"
-              onClick={() => setShowSettingsModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 transition cursor-pointer"
-            >
-              <Settings size={14} className="text-slate-600 dark:text-slate-400" />
-              <span>Settings & Rules</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowHolidayModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold text-xs rounded-xl border border-amber-200 dark:border-amber-800 transition cursor-pointer"
+              onClick={() => {
+                setSettingsInitialTab("holidays");
+                setShowSettingsModal(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold text-xs rounded-xl border border-amber-200 dark:border-amber-800 transition cursor-pointer shrink-0"
+              title="Company holidays and leave calendar"
             >
               <Palmtree size={14} className="text-amber-600" />
               <span>Holidays ({holidays.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSettingsInitialTab("personnel");
+                setShowSettingsModal(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 transition cursor-pointer shrink-0"
+              title="Attendance rules, company holidays and directory editor"
+            >
+              <Settings size={14} className="text-slate-600 dark:text-slate-400" />
+              <span>Settings</span>
             </button>
           </div>
         }
@@ -761,7 +836,7 @@ export default function AttendancePage() {
       )}
 
       {/* 2. TOP 4 REAL-TIME ATTENDANCE KPI CARDS (COMPACT SINGLE-LINE) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {/* KPI 1: Office Staff Presence */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-3 shadow-2xs flex flex-col justify-between">
           <div>
@@ -769,7 +844,7 @@ export default function AttendancePage() {
               <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
                 <Building size={13} className="text-emerald-600 shrink-0" /> Office Presence
               </span>
-              <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 whitespace-nowrap shrink-0 inline-flex items-center">
                 {selectedDate}
               </span>
             </div>
@@ -803,7 +878,7 @@ export default function AttendancePage() {
               <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
                 <HardHat size={13} className="text-blue-600 shrink-0" /> Tamil Site Labours
               </span>
-              <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800 whitespace-nowrap shrink-0 inline-flex items-center">
                 On Duty
               </span>
             </div>
@@ -837,7 +912,7 @@ export default function AttendancePage() {
               <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
                 <Truck size={13} className="text-purple-600 shrink-0" /> Hindi Helpers & Crew
               </span>
-              <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800 whitespace-nowrap shrink-0 inline-flex items-center">
                 {employees.filter((e) => e.category === "HINDI_LABOUR").length || 5} Crew
               </span>
             </div>
@@ -864,7 +939,7 @@ export default function AttendancePage() {
               <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
                 <Users2 size={13} className="text-amber-600 shrink-0" /> Contractor Teams
               </span>
-              <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800 whitespace-nowrap shrink-0 inline-flex items-center">
                 6 Teams
               </span>
             </div>
@@ -1128,163 +1203,8 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* 4. MAIN WORKFORCE CONTENT: (A) CONTRACTORS, (B) DAILY SHEET, (C) MONTHLY MATRIX */}
-      {activeTab === "contractor" ? (
-        /* ================= CONTRACTOR TEAMS DAILY SITE LOGS ================= */
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-            <div>
-              <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <Briefcase className="text-amber-500" size={16} />
-                Contractor Teams Daily Site Logs ({selectedMonth})
-              </h3>
-              <p className="text-xs text-slate-500">
-                Log sheets for Nandeeshwaran Team, Contractor Sakthi, Prashop Team, Monier Suresh, Suthish Team, and Hydarali Team
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setContractorForm({
-                  id: "",
-                  contractorTeamName: "Nandeeshwaran Team",
-                  date: selectedDate,
-                  siteName: "Ravichandran Chennai",
-                  headcount: 4,
-                  workerBreakdown: "",
-                  siteWorkStatus: "Fabrication Work",
-                  remarks: "",
-                });
-                setShowContractorModal(true);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-            >
-              <Plus size={14} />
-              <span>+ New Contractor Log</span>
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs whitespace-nowrap">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] uppercase font-bold text-slate-400">
-                  <th className="py-3 px-3">Date</th>
-                  <th className="py-3 px-3">Contractor Team</th>
-                  <th className="py-3 px-3">Site Location</th>
-                  <th className="py-3 px-3 text-center">Headcount</th>
-                  <th className="py-3 px-3">Worker Breakdown</th>
-                  <th className="py-3 px-3">Site Work Status</th>
-                  <th className="py-3 px-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {contractorLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">
-                      No contractor logs found for this period. Click <strong>+ New Contractor Log</strong> to add one.
-                    </td>
-                  </tr>
-                ) : (
-                  contractorLogs.map((log) => {
-                    const logDate = log.date.split("T")[0];
-                    const isToday = logDate === selectedDate;
-                    return (
-                      <tr
-                        key={log.id}
-                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition ${
-                          isToday ? "bg-amber-50/40 dark:bg-amber-950/20" : ""
-                        }`}
-                      >
-                        <td className="py-3 px-3 font-bold text-slate-800 dark:text-slate-200">
-                          {logDate}
-                          {isToday && (
-                            <span className="ml-2 text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold">
-                              Selected
-                            </span>
-                          )}
-                        </td>
-                        <td
-    className="py-3 px-3 font-semibold text-blue-600 dark:text-blue-400 cursor-pointer hover:underline"
-    onClick={() =>
-      handleOpenDossier(
-        {
-          id: log.contractorTeamName,
-          name: log.contractorTeamName,
-          employeeCode: "CONT",
-          category: "CONTRACTOR_TEAM",
-          companyUnit: "STANDARD_ROOFS",
-          attendances: [],
-        },
-        true
-      )
-    }
-  >
-    {log.contractorTeamName}
-  </td>
-                        <td className="py-3 px-3 font-medium flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-                          <MapPin size={13} className="text-slate-400" />
-                          <span>{log.siteName || "Site Standby"}</span>
-                        </td>
-                        <td className="py-3 px-3 text-center tabular-nums">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
-                              log.headcount > 0
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                            }`}
-                          >
-                            {log.headcount} Labours
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-slate-500 font-mono text-[11px] max-w-[200px] truncate">
-                          {log.workerBreakdown || "—"}
-                        </td>
-                        <td className="py-3 px-3">
-                          <span
-                            className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
-                              log.siteWorkStatus?.includes("Fabrication") || log.siteWorkStatus?.includes("Welding")
-                                ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                                : log.siteWorkStatus?.includes("Rain")
-                                ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300"
-                                : log.siteWorkStatus?.includes("No Work") || log.siteWorkStatus?.includes("Absent")
-                                ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                                : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                            }`}
-                          >
-                            {log.siteWorkStatus || "Active"}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setContractorForm({
-                                id: log.id,
-                                contractorTeamName: log.contractorTeamName,
-                                date: logDate,
-                                siteName: log.siteName || "",
-                                headcount: log.headcount,
-                                workerBreakdown: log.workerBreakdown || "",
-                                siteWorkStatus: log.siteWorkStatus || "Active Work",
-                                remarks: log.remarks || "",
-                              });
-                              setShowContractorModal(true);
-                            }}
-                            className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
-                          >
-                            Edit
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : viewMode === "daily" ? (
+      {/* 4. MAIN WORKFORCE CONTENT: UNIFIED DAILY SHEET & MONTHLY MATRIX ACROSS ALL 4 CATEGORIES */}
+      {viewMode === "daily" ? (
         /* ================= DAILY QUICK-MARK TABLE (TABS 1, 2, 3) ================= */
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -1329,7 +1249,203 @@ export default function AttendancePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {tabEmployees.map((emp) => {
+                {activeTab === "contractor" ? (
+                  contractorTeamList.map((team) => {
+                    const log = contractorLogs.find(
+                      (c) => c.contractorTeamName === team.name && c.date.split("T")[0] === selectedDate
+                    );
+                    const headcount = log?.headcount ?? 4;
+                    const siteName = log?.siteName || "Ravichandran Chennai";
+                    const workStatus = log?.siteWorkStatus || "Fabrication Work";
+                    const breakdown = log?.workerBreakdown || "";
+                    const isPresent = log && log.headcount > 0;
+                    const isAbsent = log && (log.headcount === 0 || log.siteWorkStatus?.includes("Absent") || log.siteWorkStatus?.includes("No Work"));
+
+                    return (
+                      <tr key={team.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                        <td className="py-3 px-3">
+                          <div
+                            onClick={() =>
+                              handleOpenDossier(
+                                {
+                                  id: team.name,
+                                  name: team.name,
+                                  employeeCode: team.code,
+                                  category: "CONTRACTOR_TEAM",
+                                  companyUnit: "STANDARD_ROOFS",
+                                  attendances: [],
+                                },
+                                true
+                              )
+                            }
+                            className="font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1.5"
+                          >
+                            <span>{team.name}</span>
+                            <History size={12} className="text-slate-400 shrink-0" />
+                          </div>
+                          <span className="text-[10.5px] font-mono text-slate-400 block">{team.code}</span>
+                        </td>
+
+                        <td className="py-3 px-3 text-slate-600 dark:text-slate-300 font-medium">
+                          {team.role}
+                        </td>
+
+                        {/* Site Location Dropdown */}
+                        <td className="py-3 px-3">
+                          <select
+                            value={siteName}
+                            onChange={(e) =>
+                              handleSaveContractorDaily(
+                                team.name,
+                                selectedDate,
+                                headcount,
+                                e.target.value,
+                                workStatus,
+                                breakdown
+                              )
+                            }
+                            className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium focus:outline-hidden"
+                          >
+                            {COMMON_SITES.map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+
+                        {/* Labours Working (Headcount) */}
+                        <td className="py-3 px-3">
+                          <input
+                            type="number"
+                            min={0}
+                            max={50}
+                            value={headcount}
+                            onChange={(e) =>
+                              handleSaveContractorDaily(
+                                team.name,
+                                selectedDate,
+                                Number(e.target.value),
+                                siteName,
+                                Number(e.target.value) === 0 ? "No Work / Standby" : workStatus,
+                                breakdown
+                              )
+                            }
+                            className="w-16 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono font-bold text-center"
+                          />
+                        </td>
+
+                        {/* Work Status */}
+                        <td className="py-3 px-3">
+                          <select
+                            value={workStatus}
+                            onChange={(e) =>
+                              handleSaveContractorDaily(
+                                team.name,
+                                selectedDate,
+                                headcount,
+                                siteName,
+                                e.target.value,
+                                breakdown
+                              )
+                            }
+                            className="px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-medium focus:outline-hidden"
+                          >
+                            <option value="Fabrication Work">Fabrication Work</option>
+                            <option value="Purlin Work Welding">Purlin Work Welding</option>
+                            <option value="Roof Sheeting">Roof Sheeting</option>
+                            <option value="High-Roof Truss Erection">High-Roof Truss Erection</option>
+                            <option value="Rain season / Standby">Rain season / Standby</option>
+                            <option value="Site Standby / No Work">Site Standby / No Work</option>
+                          </select>
+                        </td>
+
+                        {/* Worker Breakdown */}
+                        <td className="py-3 px-3 font-mono text-xs">
+                          <input
+                            type="text"
+                            placeholder="e.g. Rajkumar-F, Mani-H"
+                            value={breakdown}
+                            onChange={(e) =>
+                              handleSaveContractorDaily(
+                                team.name,
+                                selectedDate,
+                                headcount,
+                                siteName,
+                                workStatus,
+                                e.target.value
+                              )
+                            }
+                            className="w-44 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-mono"
+                          />
+                        </td>
+
+                        {/* Status Action Pills */}
+                        <td className="py-3 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleSaveContractorDaily(
+                                  team.name,
+                                  selectedDate,
+                                  headcount > 0 ? headcount : 4,
+                                  siteName,
+                                  "Active Work",
+                                  breakdown
+                                )
+                              }
+                              className={`px-2.5 py-1 rounded-lg font-black text-xs transition cursor-pointer ${
+                                isPresent
+                                  ? "bg-emerald-600 text-white shadow-2xs"
+                                  : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-500"
+                              }`}
+                            >
+                              P (Active)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleSaveContractorDaily(
+                                  team.name,
+                                  selectedDate,
+                                  headcount > 0 ? headcount : 2,
+                                  siteName,
+                                  "Half-Day Work",
+                                  breakdown
+                                )
+                              }
+                              className="px-2 py-1 rounded-lg font-bold text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-500 transition cursor-pointer"
+                            >
+                              H
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleSaveContractorDaily(
+                                  team.name,
+                                  selectedDate,
+                                  0,
+                                  "Site Standby",
+                                  "No Work / Absent",
+                                  breakdown
+                                )
+                              }
+                              className={`px-2.5 py-1 rounded-lg font-black text-xs transition cursor-pointer ${
+                                isAbsent
+                                  ? "bg-rose-600 text-white shadow-2xs"
+                                  : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-500"
+                              }`}
+                            >
+                              A (No Work)
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  tabEmployees.map((emp) => {
                   const key = `${emp.id}_${selectedDate}`;
                   const att = emp.attendances.find((a) => a.date.split("T")[0] === selectedDate);
                   const draft = attendanceDrafts[key] || {};
@@ -1553,7 +1669,7 @@ export default function AttendancePage() {
                       </td>
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>
@@ -1862,7 +1978,130 @@ export default function AttendancePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {tabEmployees.map((emp) => {
+                {activeTab === "contractor" ? (
+                  contractorTeamList.map((team) => {
+                    let activeDays = 0;
+                    let totalManDays = 0;
+                    const sitesWorked = new Set<string>();
+
+                    daysInMonth.forEach((d) => {
+                      const log = contractorLogs.find(
+                        (c) => c.contractorTeamName === team.name && c.date.split("T")[0] === d.fullDate
+                      );
+                      if (log && log.headcount > 0) {
+                        activeDays++;
+                        totalManDays += log.headcount;
+                        if (log.siteName && !log.siteName.toLowerCase().includes("standby")) {
+                          sitesWorked.add(log.siteName);
+                        }
+                      }
+                    });
+
+                    return (
+                      <tr key={team.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                        {/* Contractor Team Sticky Column */}
+                        <td className="py-2.5 px-3 sticky left-0 bg-white dark:bg-slate-900 z-10 font-bold border-r border-slate-200 dark:border-slate-800">
+                          <div
+                            onClick={() =>
+                              handleOpenDossier(
+                                {
+                                  id: team.name,
+                                  name: team.name,
+                                  employeeCode: team.code,
+                                  category: "CONTRACTOR_TEAM",
+                                  companyUnit: "STANDARD_ROOFS",
+                                  attendances: [],
+                                },
+                                true
+                              )
+                            }
+                            className="truncate max-w-[170px] text-blue-600 dark:text-blue-400 font-bold hover:underline cursor-pointer flex items-center justify-between"
+                            title="Click to view full Contractor Dossier"
+                          >
+                            <span className="truncate">{team.name}</span>
+                            <History size={11} className="text-slate-400 shrink-0 ml-1" />
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-mono block">
+                            {team.code} • {team.role}
+                          </span>
+                        </td>
+
+                        {/* 1..31 Day Columns */}
+                        {daysInMonth.map((d) => {
+                          const log = contractorLogs.find(
+                            (c) => c.contractorTeamName === team.name && c.date.split("T")[0] === d.fullDate
+                          );
+                          const hasWork = log && log.headcount > 0;
+                          const isAbsent =
+                            log &&
+                            (log.headcount === 0 ||
+                              log.siteWorkStatus?.includes("Absent") ||
+                              log.siteWorkStatus?.includes("No Work"));
+                          const isHalf = log && log.siteWorkStatus?.includes("Half");
+
+                          return (
+                            <td
+                              key={d.dayNum}
+                              onClick={() => {
+                                setSelectedContractorCell({
+                                  teamName: team.name,
+                                  date: d.fullDate,
+                                  dayNum: d.dayNum,
+                                  headcount: log?.headcount ?? 4,
+                                  siteName: log?.siteName || "Ravichandran Chennai",
+                                  siteWorkStatus: log?.siteWorkStatus || "Fabrication Work",
+                                  workerBreakdown: log?.workerBreakdown || "",
+                                  remarks: log?.remarks || "",
+                                  status: log ? (log.headcount > 0 ? "P" : "A") : "P",
+                                });
+                              }}
+                              className={`py-1.5 px-0.5 text-center border-r border-slate-100 dark:border-slate-800/40 cursor-pointer hover:ring-2 hover:ring-blue-400 transition ${
+                                d.fullDate === selectedDate ? "bg-blue-50/40 dark:bg-blue-950/20" : ""
+                              }`}
+                              title={
+                                log
+                                  ? `${team.name} • ${d.fullDate}\n${log.siteName || "Site"} (${log.headcount} Labours)\nWork: ${log.siteWorkStatus || "Active"}`
+                                  : `${team.name} • ${d.fullDate} (Unmarked) - Click to log`
+                              }
+                            >
+                              <span
+                                className={`inline-flex items-center justify-center w-7 h-6 rounded-md font-bold transition ${
+                                  hasWork
+                                    ? "bg-emerald-600 text-white shadow-2xs text-[10px] font-extrabold"
+                                    : isAbsent
+                                    ? "bg-rose-500 text-white shadow-2xs text-[10px]"
+                                    : isHalf
+                                    ? "bg-amber-500 text-white shadow-2xs text-[10px]"
+                                    : "bg-slate-100/60 text-slate-300 dark:text-slate-600 border border-dashed border-slate-200 dark:border-slate-700 text-[10px]"
+                                }`}
+                              >
+                                {hasWork ? `${log.headcount}L` : isAbsent ? "A" : isHalf ? "H" : "—"}
+                              </span>
+                            </td>
+                          );
+                        })}
+
+                        {/* Right Summary Columns */}
+                        <td className="py-2 px-2 text-center font-bold text-emerald-600 tabular-nums bg-emerald-50/30 dark:bg-emerald-950/20 border-l border-slate-200">
+                          {activeDays}d
+                        </td>
+                        <td className="py-2 px-2 text-center font-bold text-sky-600 tabular-nums bg-sky-50/30 dark:bg-sky-950/20">
+                          {activeDays}
+                        </td>
+                        <td className="py-2 px-2 text-center font-bold text-amber-500 tabular-nums bg-amber-50/30 dark:bg-amber-950/20">
+                          0
+                        </td>
+                        <td className="py-2 px-2 text-center font-bold text-rose-500 tabular-nums bg-rose-50/30 dark:bg-rose-950/20">
+                          {daysInMonth.length - activeDays}
+                        </td>
+                        <td className="py-2 px-3 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-blue-50/70 dark:bg-blue-950/60 sticky right-0 z-10 border-l border-blue-200 shadow-xs">
+                          {totalManDays}L
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  tabEmployees.map((emp) => {
                   const isOffice = emp.category === "OFFICE_STAFF";
                   let pTotal = 0;
                   let hTotal = 0;
@@ -2007,7 +2246,7 @@ export default function AttendancePage() {
                       </td>
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>

@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     if (category) whereEmployee.category = category;
     if (companyUnit) whereEmployee.companyUnit = companyUnit;
 
-    const [employees, targetDateAttendance, contractorLogs, holidays] = await Promise.all([
+    const [employees, targetDateAttendance, contractorLogs, holidays, contractorList] = await Promise.all([
       prisma.employeeOrLabour.findMany({
         where: whereEmployee,
         orderBy: [
@@ -66,6 +66,12 @@ export async function GET(request: Request) {
           year: year || 2026,
         },
         orderBy: { date: "asc" },
+      }),
+      prisma.contractor.findMany({
+        where: {
+          status: "ACTIVE",
+        },
+        orderBy: { code: "asc" },
       }),
     ]);
 
@@ -122,6 +128,7 @@ export async function GET(request: Request) {
       year: year || 2026,
       isSunday,
       employees,
+      contractors: contractorList,
       contractorLogs,
       holidays,
       kpis: {
