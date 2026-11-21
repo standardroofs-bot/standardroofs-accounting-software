@@ -97,6 +97,7 @@ export async function POST(request: Request) {
       monthlySalary = 0,
       baseWage = 0,
       specialty,
+      dateOfJoining,
     } = body;
 
     if (!name) {
@@ -160,6 +161,7 @@ export async function POST(request: Request) {
         dailyWage: toDecimal(dailyWage || (baseWage ? Number(baseWage) / 15 : 850)).toFixed(2),
         monthlySalary: toDecimal(monthlySalary || (category === "OFFICE_STAFF" ? 15000 : 0)).toFixed(2),
         baseWage: toDecimal(baseWage || (dailyWage ? Number(dailyWage) * 15 : 12750)).toFixed(2),
+        dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
         status: "ACTIVE",
         active: true,
       },
@@ -193,6 +195,7 @@ export async function PUT(request: Request) {
       companyUnit,
       dailyWage,
       monthlySalary,
+      dateOfJoining,
       status,
       isContractor,
     } = body;
@@ -241,6 +244,7 @@ export async function PUT(request: Request) {
         companyUnit: companyUnit || undefined,
         dailyWage: dailyWage !== undefined ? toDecimal(dailyWage).toFixed(2) : undefined,
         monthlySalary: monthlySalary !== undefined ? toDecimal(monthlySalary).toFixed(2) : undefined,
+        dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : undefined,
         status: status || undefined,
         active: status ? status !== "ARCHIVED" : undefined,
       },

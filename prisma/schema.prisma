@@ -831,6 +831,7 @@ model EmployeeOrLabour {
   dailyWage          Decimal            @default(0.00) @db.Decimal(15, 2) // Per day wage for site labours
   monthlySalary      Decimal            @default(0.00) @db.Decimal(15, 2) // Fixed monthly salary for office staff
   cashAdvanceBalance Decimal            @default(0.00) @db.Decimal(15, 2)
+  dateOfJoining      DateTime?
   active             Boolean            @default(true)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -843,25 +844,41 @@ model EmployeeOrLabour {
 }
 
 model AttendanceRecord {
-  id           String           @id @default(cuid())
-  employeeId   String
-  date         DateTime         @db.Date
-  status       String           // P (Present), H (Half-Day), A (Absent), L (Leave/Sunday)
-  inTime       String?          // e.g. "09:05 AM"
-  outTime      String?          // e.g. "07:05 PM"
-  siteName     String?          // e.g. "SSM School", "Kalloviyam Gokul", "Unloading", "Office"
-  dailyAdvance Decimal          @default(0.00) @db.Decimal(15, 2) // Optional ₹ petty advance on site
-  workNotes    String?          // Remarks, work notes
-  category     String?          // OFFICE_STAFF, TAMIL_LABOUR, HINDI_LABOUR
-  companyUnit  String?          // STANDARD_ROOFS, INVI_CREATION
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id              String           @id @default(cuid())
+  employeeId      String
+  date            DateTime         @db.Date
+  status          String           // P (Present), H (Half-Day), 1H (1-Hour Permission), A (Absent), L (Leave/Sunday)
+  inTime          String?          // e.g. "09:05 AM"
+  outTime         String?          // e.g. "07:05 PM"
+  siteName        String?          // e.g. "SSM School", "Kalloviyam Gokul", "Unloading", "Office"
+  dailyAdvance    Decimal          @default(0.00) @db.Decimal(15, 2) // Optional ₹ petty advance on site
+  permissionNote  String?          // Reason for 1H permission or work notes
+  permissionHours Decimal?         @default(1.0) @db.Decimal(5, 2)
+  workNotes       String?          // Remarks, work notes
+  category        String?          // OFFICE_STAFF, TAMIL_LABOUR, HINDI_LABOUR
+  companyUnit     String?          // STANDARD_ROOFS, INVI_CREATION
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  employee     EmployeeOrLabour @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee        EmployeeOrLabour @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([employeeId, date])
   @@index([date])
   @@index([category])
+}
+
+model CompanyHoliday {
+  id          String   @id @default(cuid())
+  date        DateTime @unique @db.Date
+  name        String   // e.g. "Pongal", "Diwali", "May Day", "Tamil New Year", "Independence Day"
+  year        Int      @default(2026)
+  description String?
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+  @@index([year])
 }
 
 model ContractorDailyLog {

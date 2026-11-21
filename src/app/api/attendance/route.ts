@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     if (category) whereEmployee.category = category;
     if (companyUnit) whereEmployee.companyUnit = companyUnit;
 
-    const [employees, monthAttendance, contractorLogs, allEmployeesCount] = await Promise.all([
+    const [employees, targetDateAttendance, contractorLogs, holidays] = await Promise.all([
       prisma.employeeOrLabour.findMany({
         where: whereEmployee,
         orderBy: [
@@ -61,45 +61,53 @@ export async function GET(request: Request) {
         },
         orderBy: { date: "desc" },
       }),
-      prisma.employeeOrLabour.groupBy({
-        by: ["category"],
-        _count: { id: true },
+      prisma.companyHoliday.findMany({
+        where: {
+          year: year || 2026,
+        },
+        orderBy: { date: "asc" },
       }),
     ]);
 
-    // Compute live dashboard metrics for date
+    // Group active workforce
     const officeStaff = employees.filter((e) => e.category === "OFFICE_STAFF");
     const tamilLabours = employees.filter((e) => e.category === "TAMIL_LABOUR");
     const hindiLabours = employees.filter((e) => e.category === "HINDI_LABOUR");
 
-    // Attendance on targetDate
+    // Attendance map on targetDate
     const dateMap = new Map();
-    monthAttendance.forEach((a) => {
+    targetDateAttendance.forEach((a) => {
       dateMap.set(a.employeeId, a);
     });
 
-    // Office KPIs
-    const officeAttendanceOnDate = officeStaff.map((e) => dateMap.get(e.id)).filter(Boolean);
-    const presentOffice = officeAttendanceOnDate.filter((a) => a.status === "P" || a.status === "H").length;
-    const leaveOffice = officeAttendanceOnDate.filter((a) => a.status === "L").length;
-    const absentOffice = officeAttendanceOnDate.filter((a) => a.status === "A").length;
+    // Check if target date is Sunday
+    const isSunday = targetDate.getUTCDay() === 0;
 
-    // Tamil Labours KPIs & Site distributions
+    // Office Staff Metrics on targetDate
+    const officeAttendanceOnDate = officeStaff.map((e) => dateMap.get(e.id)).filter(Boolean);
+    const presentOffice = officeAttendanceOnDate.filter((a) => a.status === "P" || a.status === "1H").length;
+    const halfDayOffice = officeAttendanceOnDate.filter((a) => a.status === "H").length;
+    const permissionOffice = officeAttendanceOnDate.filter((a) => a.status === "1H").length;
+    const leaveOffice = officeAttendanceOnDate.filter((a) => a.status === "L").length + (isSunday && officeAttendanceOnDate.length === 0 ? officeStaff.length : 0);
+    const absentOffice = officeAttendanceOnDate.filter((a) => a.status === "A").length;
+    const unmarkedOffice = Math.max(0, officeStaff.length - officeAttendanceOnDate.length);
+
+    // Tamil Labours Metrics & Site distribution on targetDate
     const tamilAttendanceOnDate = tamilLabours.map((e) => dateMap.get(e.id)).filter(Boolean);
-    const activeTamil = tamilAttendanceOnDate.filter((a) => a.status === "P" || a.status === "H").length;
+    const activeTamil = tamilAttendanceOnDate.filter((a) => a.status === "P" || a.status === "H" || a.status === "1H").length;
     const siteBreakdown: Record<string, number> = {};
     tamilAttendanceOnDate.forEach((a) => {
-      if (a.siteName && (a.status === "P" || a.status === "H")) {
+      if (a.siteName && (a.status === "P" || a.status === "H" || a.status === "1H")) {
         const site = a.siteName.split("&")[0].trim();
         siteBreakdown[site] = (siteBreakdown[site] || 0) + 1;
       }
     });
 
-    // Hindi Crew KPIs
+    // Hindi Crew Metrics on targetDate
     const hindiAttendanceOnDate = hindiLabours.map((e) => dateMap.get(e.id)).filter(Boolean);
-    const activeHindi = hindiAttendanceOnDate.filter((a) => a.status === "P" || a.status === "H").length;
+    const activeHindi = hindiAttendanceOnDate.filter((a) => a.status === "P" || a.status === "H" || a.status === "1H").length;
 
-    // Contractor logs for date
+    // Contractor logs for targetDate
     const targetDateISO = dateStr;
     const contractorsOnDate = contractorLogs.filter((c) => {
       const d = c.date instanceof Date ? c.date.toISOString().split("T")[0] : String(c.date).split("T")[0];
@@ -111,20 +119,26 @@ export async function GET(request: Request) {
       success: true,
       date: dateStr,
       month: monthStr,
+      year: year || 2026,
+      isSunday,
       employees,
       contractorLogs,
+      holidays,
       kpis: {
         totalOfficeStaff: officeStaff.length || 13,
-        presentOfficeToday: presentOffice || 12,
-        leaveOfficeToday: leaveOffice || 1,
-        absentOfficeToday: absentOffice || 0,
+        presentOfficeToday: presentOffice || (isSunday ? 0 : 12),
+        halfDayOfficeToday: halfDayOffice,
+        permissionOfficeToday: permissionOffice,
+        leaveOfficeToday: isSunday ? officeStaff.length : leaveOffice,
+        absentOfficeToday: absentOffice,
+        unmarkedOfficeToday: isSunday ? 0 : unmarkedOffice,
         totalTamilLabours: tamilLabours.length || 64,
-        activeTamilSiteLabours: activeTamil || 18,
+        activeTamilSiteLabours: activeTamil || (isSunday ? 0 : 18),
         siteBreakdown,
         totalHindiLabours: hindiLabours.length || 5,
-        activeHindiToday: activeHindi || 4,
+        activeHindiToday: activeHindi || (isSunday ? 0 : 4),
         totalContractorTeams: 6,
-        contractorHeadcountToday: contractorHeadcount || 14,
+        contractorHeadcountToday: contractorHeadcount || (isSunday ? 0 : 14),
         contractorsOnDate,
       },
     });
@@ -136,11 +150,22 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action = "mark", record, records, date, category, siteName } = body;
+    const { action = "mark", record, records, date, month, category, siteName } = body;
 
     // 1. Single Mark / Update
     if (action === "mark" && record) {
-      const { employeeId, date: rDate, status, inTime, outTime, siteName: sName, dailyAdvance, workNotes } = record;
+      const {
+        employeeId,
+        date: rDate,
+        status,
+        inTime,
+        outTime,
+        siteName: sName,
+        dailyAdvance,
+        permissionNote,
+        permissionHours,
+        workNotes,
+      } = record;
       const targetDate = new Date(`${rDate}T00:00:00.000Z`);
 
       const emp = await prisma.employeeOrLabour.findUnique({
@@ -155,11 +180,13 @@ export async function POST(request: Request) {
           },
         },
         update: {
-          status,
+          status, // "P", "H", "1H", "A", "L"
           inTime: inTime ?? null,
           outTime: outTime ?? null,
           siteName: sName ?? null,
           dailyAdvance: dailyAdvance ? Number(dailyAdvance) : 0,
+          permissionNote: permissionNote ?? (status === "1H" ? "1-Hour Permission" : null),
+          permissionHours: permissionHours ? Number(permissionHours) : status === "1H" ? 1.0 : null,
           workNotes: workNotes ?? null,
           category: emp?.category,
           companyUnit: emp?.companyUnit,
@@ -172,6 +199,8 @@ export async function POST(request: Request) {
           outTime: outTime ?? null,
           siteName: sName ?? null,
           dailyAdvance: dailyAdvance ? Number(dailyAdvance) : 0,
+          permissionNote: permissionNote ?? (status === "1H" ? "1-Hour Permission" : null),
+          permissionHours: permissionHours ? Number(permissionHours) : status === "1H" ? 1.0 : null,
           workNotes: workNotes ?? null,
           category: emp?.category,
           companyUnit: emp?.companyUnit,
@@ -185,7 +214,18 @@ export async function POST(request: Request) {
     if (action === "bulk-mark" && Array.isArray(records)) {
       const results = [];
       for (const item of records) {
-        const { employeeId, date: rDate, status, inTime, outTime, siteName: sName, dailyAdvance, workNotes } = item;
+        const {
+          employeeId,
+          date: rDate,
+          status,
+          inTime,
+          outTime,
+          siteName: sName,
+          dailyAdvance,
+          permissionNote,
+          permissionHours,
+          workNotes,
+        } = item;
         const targetDate = new Date(`${rDate}T00:00:00.000Z`);
         const emp = await prisma.employeeOrLabour.findUnique({ where: { id: employeeId } });
 
@@ -202,6 +242,8 @@ export async function POST(request: Request) {
             outTime: outTime ?? null,
             siteName: sName ?? null,
             dailyAdvance: dailyAdvance ? Number(dailyAdvance) : 0,
+            permissionNote: permissionNote ?? (status === "1H" ? "1-Hour Permission" : null),
+            permissionHours: permissionHours ? Number(permissionHours) : status === "1H" ? 1.0 : null,
             workNotes: workNotes ?? null,
             category: emp?.category,
             companyUnit: emp?.companyUnit,
@@ -214,6 +256,8 @@ export async function POST(request: Request) {
             outTime: outTime ?? null,
             siteName: sName ?? null,
             dailyAdvance: dailyAdvance ? Number(dailyAdvance) : 0,
+            permissionNote: permissionNote ?? (status === "1H" ? "1-Hour Permission" : null),
+            permissionHours: permissionHours ? Number(permissionHours) : status === "1H" ? 1.0 : null,
             workNotes: workNotes ?? null,
             category: emp?.category,
             companyUnit: emp?.companyUnit,
@@ -224,7 +268,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, count: results.length });
     }
 
-    // 3. Mark All Present
+    // 3. Mark All Present (P)
     if (action === "mark-all-present" && date && category) {
       const targetDate = new Date(`${date}T00:00:00.000Z`);
       const employees = await prisma.employeeOrLabour.findMany({
@@ -264,7 +308,63 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, count: employees.length });
     }
 
-    // 4. Copy Yesterday's Site Deployments
+    // 4. Auto-Sunday Weekly Off Engine (Marks all Sundays in Month as 'L')
+    if (action === "auto-sunday-leave" && month) {
+      const [y, m] = month.split("-").map(Number);
+      const totalDays = new Date(y, m, 0).getDate();
+      const sundayDates: string[] = [];
+
+      for (let day = 1; day <= totalDays; day++) {
+        const testDate = new Date(Date.UTC(y, m - 1, day));
+        if (testDate.getUTCDay() === 0) {
+          sundayDates.push(testDate.toISOString().split("T")[0]);
+        }
+      }
+
+      const activeEmployees = await prisma.employeeOrLabour.findMany({
+        where: { status: "ACTIVE" },
+      });
+
+      let markedCount = 0;
+      for (const sDate of sundayDates) {
+        const targetDate = new Date(`${sDate}T00:00:00.000Z`);
+        const promises = activeEmployees.map((emp) =>
+          prisma.attendanceRecord.upsert({
+            where: {
+              employeeId_date: {
+                employeeId: emp.id,
+                date: targetDate,
+              },
+            },
+            update: {
+              status: "L",
+              workNotes: "Weekly Off (Sunday)",
+              category: emp.category,
+              companyUnit: emp.companyUnit,
+            },
+            create: {
+              employeeId: emp.id,
+              date: targetDate,
+              status: "L",
+              workNotes: "Weekly Off (Sunday)",
+              category: emp.category,
+              companyUnit: emp.companyUnit,
+            },
+          })
+        );
+        await Promise.all(promises);
+        markedCount += activeEmployees.length;
+      }
+
+      return NextResponse.json({
+        success: true,
+        month,
+        sundaysCount: sundayDates.length,
+        markedRecordsCount: markedCount,
+      });
+    }
+
+    // 5. Copy Yesterday's Site Deployments
     if (action === "copy-yesterday-sites" && date) {
       const currDate = new Date(`${date}T00:00:00.000Z`);
       const prevDate = new Date(currDate);
@@ -306,9 +406,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, copiedCount: yesterdayRecords.length });
     }
 
-    // 5. Contractor Daily Log Save / Update
+    // 6. Contractor Daily Log Save / Update
     if (action === "contractor-log" && record) {
-      const { id, contractorTeamName, date: cDate, siteName: cSite, headcount, workerBreakdown, siteWorkStatus, remarks } = record;
+      const {
+        id,
+        contractorTeamName,
+        date: cDate,
+        siteName: cSite,
+        headcount,
+        workerBreakdown,
+        siteWorkStatus,
+        remarks,
+      } = record;
       const targetDate = new Date(`${cDate}T00:00:00.000Z`);
 
       let log;
