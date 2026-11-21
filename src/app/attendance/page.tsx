@@ -60,6 +60,7 @@ interface AttendanceRecordItem {
   permissionNote?: string | null;
   permissionHours?: number | null;
   workNotes?: string | null;
+  remarks?: string | null;
 }
 
 interface EmployeeItem {
@@ -215,6 +216,7 @@ export default function AttendancePage() {
   const [dossierActiveYear, setDossierActiveYear] = useState<string>("2026");
 
   // Cell Edit Popover Modal (for Monthly Matrix)
+  const [cellEditStatus, setCellEditStatus] = useState<"P" | "1H" | "H" | "PL" | "UP" | "A" | "L">("P");
   const [cellEditTarget, setCellEditTarget] = useState<{
     employee: EmployeeItem;
     date: string;
@@ -421,6 +423,7 @@ export default function AttendancePage() {
   ) => {
     const markDate = dateOverride || selectedDate;
     const draftKey = `${employeeId}_${markDate}`;
+    const finalNote = permissionNote !== undefined ? permissionNote : (status === "1H" ? "1-Hour Permission" : undefined);
 
     // Optimistic local state update
     setAttendanceDrafts((prev) => ({
@@ -429,7 +432,8 @@ export default function AttendancePage() {
         ...prev[draftKey],
         status,
         siteName,
-        permissionNote: status === "1H" ? permissionNote || "1-Hour Permission" : undefined,
+        permissionNote: finalNote,
+        workNotes: finalNote,
         permissionHours: status === "1H" ? 1.0 : undefined,
       },
     }));
@@ -447,7 +451,8 @@ export default function AttendancePage() {
                   ...a,
                   status,
                   siteName: siteName || a.siteName,
-                  permissionNote: status === "1H" ? permissionNote || "1-Hour Permission" : a.permissionNote,
+                  permissionNote: finalNote !== undefined ? finalNote : a.permissionNote,
+                  workNotes: finalNote !== undefined ? finalNote : a.workNotes,
                 }
               : a
           );
@@ -461,8 +466,9 @@ export default function AttendancePage() {
               status,
               siteName: siteName || (emp.category === "OFFICE_STAFF" ? "Headquarters Office" : "SSM School"),
               dailyAdvance: 0,
-              permissionNote: status === "1H" ? permissionNote || "1-Hour Permission" : null,
+              permissionNote: finalNote || null,
               permissionHours: status === "1H" ? 1.0 : null,
+              workNotes: finalNote || null,
             },
           ];
         }
@@ -481,7 +487,8 @@ export default function AttendancePage() {
             date: markDate,
             status,
             siteName: siteName || undefined,
-            permissionNote: status === "1H" ? permissionNote || "1-Hour Permission" : undefined,
+            permissionNote: finalNote || undefined,
+            workNotes: finalNote || undefined,
             permissionHours: status === "1H" ? 1.0 : undefined,
             inTime: activeTab === "office" ? "09:00 AM" : undefined,
             outTime: activeTab === "office" ? "07:00 PM" : undefined,
@@ -1067,58 +1074,43 @@ export default function AttendancePage() {
             </div>
 
             {/* Toggle Today Roll-Call */}
-            {activeTab !== "contractor" && (
-              <button
-                type="button"
-                onClick={() => setShowTodayRollCall(!showTodayRollCall)}
-                className={`flex items-center gap-1.5 px-3 h-[38px] rounded-xl font-bold text-xs transition cursor-pointer ${
-                  showTodayRollCall
-                    ? "bg-blue-600 text-white shadow-2xs"
-                    : "bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
-                }`}
-                title="Quick mark today's presence"
-              >
-                <Clock size={13} />
-                <span>{showTodayRollCall ? "Hide Roll-Call" : "+ Mark Today"}</span>
-              </button>
-            )}
-
-            {/* View Mode Switcher */}
-            {activeTab !== "contractor" && (
-              <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl h-[38px] text-xs font-bold">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("monthly")}
-                  className={`flex items-center gap-1 px-2.5 h-full rounded-lg transition cursor-pointer ${
-                    viewMode === "monthly" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-500"
-                  }`}
-                >
-                  <CalendarDays size={13} />
-                  <span>Month Matrix</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("daily")}
-                  className={`flex items-center gap-1 px-2.5 h-full rounded-lg transition cursor-pointer ${
-                    viewMode === "daily" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-500"
-                  }`}
-                >
-                  <Clock size={13} />
-                  <span>Daily Sheet</span>
-                </button>
-              </div>
-            )}
-
-            {/* Settings & Customization Button */}
             <button
               type="button"
-              onClick={() => setShowSettingsModal(true)}
-              className="flex items-center gap-1.5 px-3 h-[38px] rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
-              title="Attendance rules, company holidays and directory editor"
+              onClick={() => setShowTodayRollCall(!showTodayRollCall)}
+              className={`flex items-center gap-1.5 px-3 h-[38px] rounded-xl font-bold text-xs transition cursor-pointer ${
+                showTodayRollCall
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+              }`}
+              title="Quick mark today's presence"
             >
-              <Settings size={14} className="text-slate-500" />
-              <span>Settings</span>
+              <Clock size={13} />
+              <span>{showTodayRollCall ? "Hide Roll-Call" : "+ Mark Today"}</span>
             </button>
+
+            {/* View Mode Switcher */}
+            <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl h-[38px] text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setViewMode("monthly")}
+                className={`flex items-center gap-1 px-2.5 h-full rounded-lg transition cursor-pointer ${
+                  viewMode === "monthly" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-500"
+                }`}
+              >
+                <CalendarDays size={13} />
+                <span>Month Matrix</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("daily")}
+                className={`flex items-center gap-1 px-2.5 h-full rounded-lg transition cursor-pointer ${
+                  viewMode === "daily" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs" : "text-slate-500"
+                }`}
+              >
+                <Clock size={13} />
+                <span>Daily Sheet</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1743,7 +1735,146 @@ export default function AttendancePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-blue-100/50 dark:divide-blue-900/30">
-                    {tabEmployees.map((emp) => {
+                    {activeTab === "contractor" ? (
+                      contractorTeamList.map((team) => {
+                        const log = contractorLogs.find(
+                          (c) => c.contractorTeamName === team.name && c.date.split("T")[0] === selectedDate
+                        );
+                        const headcount = log?.headcount ?? 4;
+                        const siteName = log?.siteName || "Ravichandran Chennai";
+                        const workStatus = log?.siteWorkStatus || "Fabrication Work";
+                        const breakdown = log?.workerBreakdown || "";
+                        const isPresent = log && log.headcount > 0;
+                        const isAbsent = log && (log.headcount === 0 || log.siteWorkStatus?.includes("Absent") || log.siteWorkStatus?.includes("No Work"));
+
+                        return (
+                          <tr key={`rc_${team.name}`} className="hover:bg-white/60 dark:hover:bg-slate-800/40">
+                            <td className="py-2 px-3 font-bold text-blue-600 dark:text-blue-400">
+                              <span
+                                onClick={() =>
+                                  handleOpenDossier(
+                                    {
+                                      id: team.name,
+                                      name: team.name,
+                                      employeeCode: team.code,
+                                      category: "CONTRACTOR_TEAM",
+                                      companyUnit: "STANDARD_ROOFS",
+                                      attendances: [],
+                                    },
+                                    true
+                                  )
+                                }
+                                className="cursor-pointer hover:underline"
+                              >
+                                {team.name}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono ml-2">({team.code})</span>
+                            </td>
+                            <td className="py-2 px-3 text-slate-600 dark:text-slate-300">
+                              {team.role}
+                            </td>
+                            <td className="py-2 px-3">
+                              <select
+                                value={siteName}
+                                onChange={(e) =>
+                                  handleSaveContractorDaily(
+                                    team.name,
+                                    selectedDate,
+                                    headcount,
+                                    e.target.value,
+                                    workStatus,
+                                    breakdown
+                                  )
+                                }
+                                className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold focus:outline-hidden"
+                              >
+                                {COMMON_SITES.map((st) => (
+                                  <option key={st} value={st}>
+                                    {st}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              <input
+                                type="number"
+                                min="0"
+                                max="50"
+                                value={headcount}
+                                onChange={(e) =>
+                                  handleSaveContractorDaily(
+                                    team.name,
+                                    selectedDate,
+                                    Number(e.target.value) || 0,
+                                    siteName,
+                                    workStatus,
+                                    breakdown
+                                  )
+                                }
+                                className="w-16 px-1.5 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-right font-mono text-xs focus:outline-hidden"
+                              />
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <div className="inline-flex items-center gap-1 p-0.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleSaveContractorDaily(
+                                      team.name,
+                                      selectedDate,
+                                      headcount > 0 ? headcount : 4,
+                                      siteName,
+                                      "Fabrication Work",
+                                      breakdown
+                                    )
+                                  }
+                                  className={`px-2 py-0.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                                    isPresent ? "bg-emerald-600 text-white scale-105" : "text-slate-600 hover:text-emerald-600"
+                                  }`}
+                                >
+                                  P
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleSaveContractorDaily(
+                                      team.name,
+                                      selectedDate,
+                                      2,
+                                      siteName,
+                                      "Half-Day Site Work",
+                                      breakdown
+                                    )
+                                  }
+                                  className="px-2 py-0.5 rounded-lg text-xs font-black text-slate-600 hover:text-amber-500 transition cursor-pointer"
+                                >
+                                  H
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleSaveContractorDaily(
+                                      team.name,
+                                      selectedDate,
+                                      0,
+                                      siteName,
+                                      "Site Standby / No Work",
+                                      breakdown
+                                    )
+                                  }
+                                  className={`px-2 py-0.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                                    isAbsent ? "bg-rose-600 text-white scale-105" : "text-slate-600 hover:text-rose-600"
+                                  }`}
+                                >
+                                  A
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      tabEmployees.map((emp) => {
                       const key = `${emp.id}_${selectedDate}`;
                       const draft = attendanceDrafts[key];
                       const dbAtt = emp.attendances.find((a) => a.date.split("T")[0] === selectedDate);
@@ -1863,7 +1994,7 @@ export default function AttendancePage() {
                           </td>
                         </tr>
                       );
-                    })}
+                    }))}
                   </tbody>
                 </table>
               </div>
@@ -2164,16 +2295,19 @@ export default function AttendancePage() {
                           <td
                             key={d.dayNum}
                             onClick={() => {
+                              const savedNote = att?.permissionNote || att?.workNotes || att?.remarks || "";
+                              const currentSt = (status as any) || "P";
                               setCellEditTarget({
                                 employee: emp,
                                 date: d.fullDate,
                                 dayNum: d.dayNum,
-                                currentStatus: status as any,
+                                currentStatus: currentSt,
                                 currentSite: att?.siteName,
-                                currentNote: att?.permissionNote || att?.workNotes,
+                                currentNote: savedNote,
                               });
+                              setCellEditStatus(currentSt);
                               setSiteInput(att?.siteName || (isOffice ? "Headquarters Office" : "SSM School"));
-                              setPermissionInput(att?.permissionNote || "");
+                              setPermissionInput(savedNote);
                             }}
                             className={`py-1.5 px-0.5 text-center font-black cursor-pointer transition select-none border-r border-slate-100 dark:border-slate-800/50 hover:bg-blue-50/70 dark:hover:bg-blue-900/30 ${
                               d.isSunday && isOffice
@@ -2189,7 +2323,7 @@ export default function AttendancePage() {
                             }`}
                           >
                             <span
-                              className={`min-w-[26px] h-6 px-1 rounded-md inline-flex items-center justify-center font-black transition ${
+                              className={`relative min-w-[26px] h-6 px-1 rounded-md inline-flex items-center justify-center font-black transition ${
                                 status === "P"
                                   ? "bg-emerald-500 text-white shadow-2xs text-[10px]"
                                   : status === "1H"
@@ -2208,6 +2342,9 @@ export default function AttendancePage() {
                               }`}
                             >
                               {status === "1H" ? "P·1H" : status || "—"}
+                              {(att?.permissionNote || att?.workNotes || att?.remarks) && (
+                                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-blue-400 rounded-full ring-1 ring-white dark:ring-slate-900" title={`Note: ${att?.permissionNote || att?.workNotes || att?.remarks}`} />
+                              )}
                             </span>
                           </td>
                         );
@@ -2291,18 +2428,9 @@ export default function AttendancePage() {
                   <button
                     key={s.key}
                     type="button"
-                    onClick={() => {
-                      handleMarkStatus(
-                        cellEditTarget.employee.id,
-                        s.key as any,
-                        siteInput || undefined,
-                        cellEditTarget.date,
-                        permissionInput || undefined
-                      );
-                      setCellEditTarget(null);
-                    }}
+                    onClick={() => setCellEditStatus(s.key as any)}
                     className={`py-2 rounded-xl font-black text-xs transition cursor-pointer flex flex-col items-center justify-center ${
-                      cellEditTarget.currentStatus === s.key ? s.bg + " ring-2 ring-blue-500" : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800"
+                      cellEditStatus === s.key ? s.bg + " ring-2 ring-blue-500 shadow-sm" : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
                     }`}
                   >
                     <span>{s.label}</span>
@@ -2364,14 +2492,14 @@ export default function AttendancePage() {
                   onClick={() => {
                     handleMarkStatus(
                       cellEditTarget.employee.id,
-                      "P",
+                      cellEditStatus,
                       siteInput,
                       cellEditTarget.date,
                       permissionInput
                     );
                     setCellEditTarget(null);
                   }}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs"
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs"
                 >
                   Save Changes
                 </button>
@@ -2857,6 +2985,221 @@ export default function AttendancePage() {
           showToast("Imported attendance records successfully");
           fetchAttendance();
         }}
+      />
+
+      {/* 11. MODAL: CONTRACTOR DAY CELL EDIT MODAL */}
+      {selectedContractorCell && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Users2 size={16} className="text-amber-500" />
+                  {selectedContractorCell.teamName}
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  Date: <strong>{selectedContractorCell.date}</strong> (Day {selectedContractorCell.dayNum})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedContractorCell(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {/* Quick Status Pills */}
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">Quick Status</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedContractorCell({
+                        ...selectedContractorCell,
+                        status: "P",
+                        headcount: selectedContractorCell.headcount > 0 ? selectedContractorCell.headcount : 4,
+                        siteWorkStatus: "Fabrication Work",
+                      })
+                    }
+                    className={`py-2 px-3 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      selectedContractorCell.headcount > 0 && selectedContractorCell.status === "P"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    <Check size={14} />
+                    <span>P · Active Work</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedContractorCell({
+                        ...selectedContractorCell,
+                        status: "H",
+                        headcount: 2,
+                        siteWorkStatus: "Half-Day Site Work",
+                      })
+                    }
+                    className={`py-2 px-3 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      selectedContractorCell.status === "H" || selectedContractorCell.siteWorkStatus?.includes("Half")
+                        ? "bg-amber-500 text-white shadow-xs"
+                        : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    <span>H · Half-Day</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedContractorCell({
+                        ...selectedContractorCell,
+                        status: "A",
+                        headcount: 0,
+                        siteWorkStatus: "Site Standby / No Work",
+                      })
+                    }
+                    className={`py-2 px-3 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      selectedContractorCell.status === "A" || selectedContractorCell.headcount === 0
+                        ? "bg-rose-600 text-white shadow-xs"
+                        : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    <X size={14} />
+                    <span>A · Standby / Off</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Headcount */}
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Labours Working (Headcount)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="50"
+                  value={selectedContractorCell.headcount}
+                  onChange={(e) =>
+                    setSelectedContractorCell({
+                      ...selectedContractorCell,
+                      headcount: Number(e.target.value) || 0,
+                      status: Number(e.target.value) > 0 ? "P" : "A",
+                    })
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-bold text-sm focus:outline-hidden"
+                />
+              </div>
+
+              {/* Site Location */}
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Site Location</label>
+                <select
+                  value={selectedContractorCell.siteName}
+                  onChange={(e) =>
+                    setSelectedContractorCell({ ...selectedContractorCell, siteName: e.target.value })
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium focus:outline-hidden"
+                >
+                  {COMMON_SITES.map((site) => (
+                    <option key={site} value={site}>
+                      {site}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Site Work Status */}
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Site Work Status</label>
+                <select
+                  value={selectedContractorCell.siteWorkStatus}
+                  onChange={(e) =>
+                    setSelectedContractorCell({ ...selectedContractorCell, siteWorkStatus: e.target.value })
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium focus:outline-hidden"
+                >
+                  <option value="Fabrication Work">Fabrication Work</option>
+                  <option value="Purlin Work Welding">Purlin Work Welding</option>
+                  <option value="Roof Sheeting">Roof Sheeting</option>
+                  <option value="High-Roof Truss Erection">High-Roof Truss Erection</option>
+                  <option value="Rain season / Standby">Rain season / Standby</option>
+                  <option value="Site Standby / No Work">Site Standby / No Work</option>
+                </select>
+              </div>
+
+              {/* Worker Breakdown / Notes */}
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Worker Breakdown / Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Rajkumar-F, Mani-H, Selvam-H"
+                  value={selectedContractorCell.workerBreakdown || selectedContractorCell.remarks || ""}
+                  onChange={(e) =>
+                    setSelectedContractorCell({
+                      ...selectedContractorCell,
+                      workerBreakdown: e.target.value,
+                      remarks: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-xs focus:outline-hidden"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setSelectedContractorCell(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 font-bold transition cursor-pointer hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSaveContractorDaily(
+                      selectedContractorCell.teamName,
+                      selectedContractorCell.date,
+                      selectedContractorCell.headcount,
+                      selectedContractorCell.siteName,
+                      selectedContractorCell.siteWorkStatus,
+                      selectedContractorCell.workerBreakdown || undefined,
+                      selectedContractorCell.remarks || undefined
+                    );
+                  }}
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-xs cursor-pointer"
+                >
+                  Save Contractor Log
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 12. SYSTEM SETTINGS MODAL */}
+      <AttendanceSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        onRefreshData={fetchAttendance}
+        initialTab={settingsInitialTab}
+      />
+
+      {/* 13. MULTI-YEAR ATTENDANCE DOSSIER MODAL */}
+      <EmployeeMultiYearDossierModal
+        isOpen={!!selectedDossierEmployee}
+        onClose={() => setSelectedDossierEmployee(null)}
+        employee={selectedDossierEmployee}
+        isContractorTeam={isContractorDossier}
       />
     </div>
   );

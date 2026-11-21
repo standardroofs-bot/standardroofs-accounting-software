@@ -363,7 +363,7 @@ export default function AttendanceSettingsModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 md:p-4 animate-in fade-in">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 md:p-4 animate-in fade-in">
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-5xl w-full p-4 sm:p-6 space-y-4 max-h-[92vh] flex flex-col">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -960,7 +960,7 @@ export default function AttendanceSettingsModal({
 
       {/* ================= MODAL: ADD NEW PERSONNEL / CONTRACTOR ================= */}
       {showAddModal && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-4 animate-in fade-in">
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-lg w-full p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <h4 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">

@@ -79,15 +79,17 @@ export async function POST(request: Request) {
     });
 
     let log;
+    const combinedNote = workerBreakdown || remarks || null;
+
     if (existing) {
       log = await prisma.contractorDailyLog.update({
         where: { id: existing.id },
         data: {
           siteName: siteName ?? existing.siteName,
           headcount: Number(headcount),
-          workerBreakdown: workerBreakdown !== undefined ? workerBreakdown : existing.workerBreakdown,
+          workerBreakdown: combinedNote !== null ? combinedNote : existing.workerBreakdown,
           siteWorkStatus: siteWorkStatus ?? existing.siteWorkStatus,
-          remarks: remarks !== undefined ? remarks : existing.remarks,
+          remarks: combinedNote !== null ? combinedNote : existing.remarks,
           contractorId: contractor?.id || existing.contractorId,
         },
       });
@@ -98,9 +100,9 @@ export async function POST(request: Request) {
           date: targetDate,
           siteName: siteName || "Site Standby",
           headcount: Number(headcount),
-          workerBreakdown: workerBreakdown || null,
+          workerBreakdown: combinedNote,
           siteWorkStatus: siteWorkStatus || (Number(headcount) > 0 ? "Active Work" : "No Work / Absent"),
-          remarks: remarks || null,
+          remarks: combinedNote,
           contractorId: contractor?.id || null,
         },
       });

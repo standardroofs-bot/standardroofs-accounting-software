@@ -179,6 +179,8 @@ export async function POST(request: Request) {
         where: { id: employeeId },
       });
 
+      const savedNote = permissionNote || workNotes || (status === "1H" ? "1-Hour Permission" : null);
+
       const updated = await prisma.attendanceRecord.upsert({
         where: {
           employeeId_date: {
@@ -192,9 +194,9 @@ export async function POST(request: Request) {
           outTime: outTime ?? null,
           siteName: sName ?? null,
           dailyAdvance: dailyAdvance ? Number(dailyAdvance) : 0,
-          permissionNote: permissionNote ?? (status === "1H" ? "1-Hour Permission" : null),
+          permissionNote: savedNote,
           permissionHours: permissionHours ? Number(permissionHours) : status === "1H" ? 1.0 : null,
-          workNotes: workNotes ?? null,
+          workNotes: savedNote,
           category: emp?.category,
           companyUnit: emp?.companyUnit,
         },
@@ -206,9 +208,9 @@ export async function POST(request: Request) {
           outTime: outTime ?? null,
           siteName: sName ?? null,
           dailyAdvance: dailyAdvance ? Number(dailyAdvance) : 0,
-          permissionNote: permissionNote ?? (status === "1H" ? "1-Hour Permission" : null),
+          permissionNote: savedNote,
           permissionHours: permissionHours ? Number(permissionHours) : status === "1H" ? 1.0 : null,
-          workNotes: workNotes ?? null,
+          workNotes: savedNote,
           category: emp?.category,
           companyUnit: emp?.companyUnit,
         },
