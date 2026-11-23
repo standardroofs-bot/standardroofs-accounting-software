@@ -3,125 +3,151 @@
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import {
-  Users2,
-  Plus,
-  DollarSign,
-  Calendar,
-  AlertCircle,
-  Clock,
-  Wallet,
-  CheckCircle2,
-  Building,
-  HardHat,
-  Receipt,
-  FileSpreadsheet,
-  ArrowRight,
-  ShieldCheck,
-  Trash2,
-  Edit2,
-  Search,
-  Filter,
-  Printer,
-  RotateCcw,
-  UserCheck,
-  UserX,
-  CreditCard,
   Building2,
+  HardHat,
+  Users2,
   Truck,
-  Phone,
-  MapPin,
-  X,
-  FileCheck,
+  Plus,
+  Search,
+  Download,
+  Printer,
   History,
-  CalendarDays,
+  FileSpreadsheet,
+  Edit2,
+  Trash2,
+  CheckCircle2,
+  AlertTriangle,
+  RotateCcw,
+  Clock,
+  Phone,
+  FileCheck,
+  ShieldCheck,
+  CreditCard,
+  Building,
+  GraduationCap,
+  Sparkles,
+  Upload,
+  X,
+  ExternalLink,
+  Loader2,
   Settings,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
 import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
 import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
-import ExcelImportModal from "@/components/common/ExcelImportModal";
-import EmployeeMultiYearDossierModal from "@/components/attendance/EmployeeMultiYearDossierModal";
 import AttendanceSettingsModal from "@/components/attendance/AttendanceSettingsModal";
-import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
+import EmployeeMultiYearDossierModal from "@/components/attendance/EmployeeMultiYearDossierModal";
+import WorkerKycProfileDrawer, { WorkerKycData } from "@/components/labour/WorkerKycProfileDrawer";
+import LabourSmartImportModal from "@/components/labour/LabourSmartImportModal";
+import { exportToExcel } from "@/lib/exportUtils";
 
-interface WorkerItem {
-  id: string;
-  employeeCode: string;
-  empCode?: string | null;
-  name: string;
-  fatherName?: string | null;
-  dateOfJoining?: string | null;
-  phone?: string | null;
-  address?: string | null;
-  aadhaarNumber?: string | null;
-  panNumber?: string | null;
-  bankName?: string | null;
-  bankAccountNo?: string | null;
-  bankIfsc?: string | null;
-  ifscCode?: string | null;
-  designation?: string | null;
-  role?: string | null;
-  category: "OFFICE_STAFF" | "TAMIL_LABOUR" | "HINDI_LABOUR" | "CONTRACTOR_TEAM";
-  companyUnit: "STANDARD_ROOFS" | "INVI_CREATION";
-  status: "ACTIVE" | "ARCHIVED";
-  dailyWage?: number;
-  monthlySalary?: number;
-  baseWage?: number;
-  specialty?: string | null;
-  isContractor?: boolean;
-}
+type SegmentType = "SR_OFFICE" | "INVI_OFFICE" | "TAMIL" | "HINDI" | "CONTRACTOR";
 
-export default function WorkforceKYCDirectoryPage() {
-  const [activeCategory, setActiveCategory] = useState<"OFFICE_STAFF" | "TAMIL_LABOUR" | "HINDI_LABOUR" | "CONTRACTOR_TEAM">("OFFICE_STAFF");
+export default function LabourWorkforceMasterPage() {
+  const [activeSegment, setActiveSegment] = useState<SegmentType>("SR_OFFICE");
   const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
-  const [companyUnitFilter, setCompanyUnitFilter] = useState<"ALL" | "STANDARD_ROOFS" | "INVI_CREATION">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Workforce state
-  const [workers, setWorkers] = useState<WorkerItem[]>([]);
+  // Workforce records from DB
+  const [workers, setWorkers] = useState<any[]>([]);
+  const [segmentCounts, setSegmentCounts] = useState({
+    srOffice: 10,
+    inviOffice: 3,
+    tamil: 71,
+    hindi: 5,
+    contractor: 6,
+    total: 95,
+  });
 
-  // Modals
-  const [showAddEditModal, setShowAddEditModal] = useState(false);
-  const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
+  // Modals state
+  const [showSmartImportModal, setShowSmartImportModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [selectedWorker, setSelectedWorker] = useState<WorkerItem | null>(null);
-  const [dossierWorker, setDossierWorker] = useState<WorkerItem | null>(null);
+  const [showAddEditModal, setShowAddEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Form state
+  // Selected Worker state
+  const [selectedWorkerForKyc, setSelectedWorkerForKyc] = useState<WorkerKycData | null>(null);
+  const [selectedWorkerForDossier, setSelectedWorkerForDossier] = useState<any | null>(null);
+  const [selectedWorkerForAction, setSelectedWorkerForAction] = useState<any | null>(null);
+
+  // Form State for Add / Edit
   const [formData, setFormData] = useState({
     id: "",
     name: "",
-    empCode: "",
     employeeCode: "",
+    empCode: "",
     fatherName: "",
-    dateOfJoining: "",
+    dob: "",
     phone: "",
     address: "",
-    aadhaarNumber: "",
-    panNumber: "",
-    bankName: "",
-    bankAccountNo: "",
-    bankIfsc: "",
-    designation: "",
+    photoUrl: "",
     category: "OFFICE_STAFF",
     companyUnit: "STANDARD_ROOFS",
-    dailyWage: 850,
+    designation: "",
     monthlySalary: 15000,
-    specialty: "",
+    dailyWage: 850,
+    baseWage: 0,
+    tradeSpecialty: "",
+    contractorLeadName: "",
+    defaultHeadcount: 1,
+    dateOfJoining: new Date().toISOString().split("T")[0],
+    aadhaarNumber: "",
+    aadhaarDocUrl: "",
+    panNumber: "",
+    panDocUrl: "",
+    drivingLicenseNumber: "",
+    drivingLicenseDocUrl: "",
+    bankAccountName: "",
+    bankName: "",
+    bankAccountNo: "",
+    bankAccountNumber: "",
+    bankIfsc: "",
+    bankBranch: "",
+    tenthDetails: "",
+    twelfthDetails: "",
+    graduationDetails: "",
+    experienceJson: "",
   });
 
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
+
+  // Fetch Workers based on current segment
   const fetchWorkers = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/labour?category=${activeCategory}&status=${statusFilter}&search=${encodeURIComponent(searchQuery)}`);
+      let url = "/api/labour?";
+      const params = new URLSearchParams();
+      params.set("status", statusFilter);
+
+      if (searchQuery.trim()) {
+        params.set("search", searchQuery.trim());
+      }
+
+      if (activeSegment === "SR_OFFICE") {
+        params.set("category", "OFFICE_STAFF");
+        params.set("companyUnit", "STANDARD_ROOFS");
+      } else if (activeSegment === "INVI_OFFICE") {
+        params.set("category", "OFFICE_STAFF");
+        params.set("companyUnit", "INVI_CREATION");
+      } else if (activeSegment === "TAMIL") {
+        params.set("category", "TAMIL_LABOUR");
+      } else if (activeSegment === "HINDI") {
+        params.set("category", "HINDI_LABOUR");
+      } else if (activeSegment === "CONTRACTOR") {
+        params.set("category", "CONTRACTOR_TEAM");
+      }
+
+      const res = await fetch(`${url}${params.toString()}`);
       const data = await res.json();
       if (data.success) {
         setWorkers(data.labourers || []);
+        if (data.segmentCounts) {
+          setSegmentCounts(data.segmentCounts);
+        }
       }
     } catch (err) {
-      console.error("Failed to load workforce:", err);
+      console.error("Failed to load workforce directory:", err);
     } finally {
       setLoading(false);
     }
@@ -129,77 +155,169 @@ export default function WorkforceKYCDirectoryPage() {
 
   useEffect(() => {
     fetchWorkers();
-  }, [activeCategory, statusFilter, searchQuery]);
+  }, [activeSegment, statusFilter, searchQuery]);
 
-  // Open Add Modal
+  // Handle open Add Modal
   const handleOpenAdd = () => {
+    let cat = "OFFICE_STAFF";
+    let unit = "STANDARD_ROOFS";
+    let desig = "Staff";
+    let mSal = 15000;
+    let dWage = 850;
+
+    if (activeSegment === "INVI_OFFICE") {
+      cat = "OFFICE_STAFF";
+      unit = "INVI_CREATION";
+      desig = ""; // Kept blank for Invi team
+      mSal = 15000;
+      dWage = 0;
+    } else if (activeSegment === "TAMIL") {
+      cat = "TAMIL_LABOUR";
+      desig = "Fitter / Layer";
+      mSal = 0;
+      dWage = 850;
+    } else if (activeSegment === "HINDI") {
+      cat = "HINDI_LABOUR";
+      desig = "Site Helper";
+      mSal = 0;
+      dWage = 750;
+    } else if (activeSegment === "CONTRACTOR") {
+      cat = "CONTRACTOR_TEAM";
+      desig = "Contractor Lead";
+      mSal = 0;
+      dWage = 1200;
+    }
+
     setFormData({
       id: "",
       name: "",
-      empCode: "",
       employeeCode: "",
+      empCode: "",
       fatherName: "",
-      dateOfJoining: new Date().toISOString().split("T")[0],
+      dob: "",
       phone: "",
       address: "",
+      photoUrl: "",
+      category: cat,
+      companyUnit: unit,
+      designation: desig,
+      monthlySalary: mSal,
+      dailyWage: dWage,
+      baseWage: 0,
+      tradeSpecialty: "",
+      contractorLeadName: "",
+      defaultHeadcount: 1,
+      dateOfJoining: new Date().toISOString().split("T")[0],
       aadhaarNumber: "",
+      aadhaarDocUrl: "",
       panNumber: "",
+      panDocUrl: "",
+      drivingLicenseNumber: "",
+      drivingLicenseDocUrl: "",
+      bankAccountName: "",
       bankName: "",
       bankAccountNo: "",
+      bankAccountNumber: "",
       bankIfsc: "",
-      designation: activeCategory === "OFFICE_STAFF" ? "Staff" : activeCategory === "CONTRACTOR_TEAM" ? "Contractor Lead" : "Site Helper",
-      category: activeCategory,
-      companyUnit: "STANDARD_ROOFS",
-      dailyWage: 850,
-      monthlySalary: activeCategory === "OFFICE_STAFF" ? 15000 : 0,
-      specialty: "",
+      bankBranch: "",
+      tenthDetails: "",
+      twelfthDetails: "",
+      graduationDetails: "",
+      experienceJson: "",
     });
-    setSelectedWorker(null);
+    setSelectedWorkerForAction(null);
     setShowAddEditModal(true);
   };
 
-  // Open Edit Modal
-  const handleOpenEdit = (worker: WorkerItem) => {
-    setSelectedWorker(worker);
+  // Handle open Edit Modal
+  const handleOpenEdit = (w: any) => {
+    setSelectedWorkerForAction(w);
     setFormData({
-      id: worker.id,
-      name: worker.name,
-      empCode: worker.empCode || "",
-      employeeCode: worker.employeeCode,
-      fatherName: worker.fatherName || "",
-      dateOfJoining: worker.dateOfJoining ? worker.dateOfJoining.split("T")[0] : "",
-      phone: worker.phone || "",
-      address: worker.address || "",
-      aadhaarNumber: worker.aadhaarNumber || "",
-      panNumber: worker.panNumber || "",
-      bankName: worker.bankName || "",
-      bankAccountNo: worker.bankAccountNo || "",
-      bankIfsc: worker.bankIfsc || worker.ifscCode || "",
-      designation: worker.designation || worker.role || "",
-      category: worker.category,
-      companyUnit: worker.companyUnit || "STANDARD_ROOFS",
-      dailyWage: worker.dailyWage || 850,
-      monthlySalary: worker.monthlySalary || 0,
-      specialty: worker.specialty || "",
+      id: w.id,
+      name: w.name || "",
+      employeeCode: w.employeeCode || w.code || "",
+      empCode: w.empCode || "",
+      fatherName: w.fatherName || "",
+      dob: w.dob || "",
+      phone: w.phone || "",
+      address: w.address || "",
+      photoUrl: w.photoUrl || "",
+      category: w.category || (activeSegment === "CONTRACTOR" ? "CONTRACTOR_TEAM" : "OFFICE_STAFF"),
+      companyUnit: w.companyUnit || "STANDARD_ROOFS",
+      designation: w.designation || w.role || "",
+      monthlySalary: w.monthlySalary ? Number(w.monthlySalary) : 0,
+      dailyWage: w.dailyWage ? Number(w.dailyWage) : w.dailyRate ? Number(w.dailyRate) : 850,
+      baseWage: w.baseWage ? Number(w.baseWage) : 0,
+      tradeSpecialty: w.tradeSpecialty || w.specialty || "",
+      contractorLeadName: w.contractorLeadName || w.fatherName || "",
+      defaultHeadcount: w.defaultHeadcount || 1,
+      dateOfJoining: w.dateOfJoining ? w.dateOfJoining.split("T")[0] : "",
+      aadhaarNumber: w.aadhaarNumber || "",
+      aadhaarDocUrl: w.aadhaarDocUrl || "",
+      panNumber: w.panNumber || "",
+      panDocUrl: w.panDocUrl || "",
+      drivingLicenseNumber: w.drivingLicenseNumber || "",
+      drivingLicenseDocUrl: w.drivingLicenseDocUrl || "",
+      bankAccountName: w.bankAccountName || w.name || "",
+      bankName: w.bankName || "",
+      bankAccountNo: w.bankAccountNo || w.bankAccountNumber || "",
+      bankAccountNumber: w.bankAccountNumber || w.bankAccountNo || "",
+      bankIfsc: w.bankIfsc || w.ifscCode || "",
+      bankBranch: w.bankBranch || "",
+      tenthDetails: w.tenthDetails || "",
+      twelfthDetails: w.twelfthDetails || "",
+      graduationDetails: w.graduationDetails || "",
+      experienceJson: w.experienceJson || "",
     });
     setShowAddEditModal(true);
   };
 
-  // Save / Update Worker
+  // Upload Document / Photo Handler
+  const handleUploadFile = async (field: string, file: File) => {
+    try {
+      setUploadingField(field);
+      const data = new FormData();
+      data.append("file", file);
+      if (formData.id) {
+        data.append("employeeId", formData.id);
+        data.append("documentType", field);
+      }
+
+      const res = await fetch("/api/upload/kyc", {
+        method: "POST",
+        body: data,
+      });
+
+      const json = await res.json();
+      if (json.success && json.url) {
+        setFormData((prev) => ({
+          ...prev,
+          [field]: json.url,
+        }));
+      } else {
+        alert(json.error || "File upload failed.");
+      }
+    } catch (err: any) {
+      alert("Failed to upload: " + err.message);
+    } finally {
+      setUploadingField(null);
+    }
+  };
+
+  // Save Worker
   const handleSaveWorker = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const isEdit = Boolean(formData.id);
-      const url = "/api/labour";
+      const isContractor = activeSegment === "CONTRACTOR" || formData.category === "CONTRACTOR_TEAM";
       const method = isEdit ? "PUT" : "POST";
 
-      const res = await fetch(url, {
+      const res = await fetch("/api/labour", {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          dateOfJoining: formData.dateOfJoining ? new Date(formData.dateOfJoining).toISOString() : null,
-          isContractor: activeCategory === "CONTRACTOR_TEAM",
+          isContractor,
         }),
       });
 
@@ -210,347 +328,438 @@ export default function WorkforceKYCDirectoryPage() {
       } else {
         alert(data.error || "Failed to save record.");
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      alert("Error saving: " + err.message);
     }
   };
 
-  // Archive / Restore Worker
-  const handleToggleArchive = async () => {
-    if (!selectedWorker) return;
+  // Soft Delete Worker to Recycle Bin
+  const handleDeleteWorker = async () => {
+    if (!selectedWorkerForAction) return;
     try {
-      const action = statusFilter === "ACTIVE" ? "archive" : "restore";
-      await fetch("/api/labour", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: selectedWorker.id,
-          action,
-          isContractor: activeCategory === "CONTRACTOR_TEAM",
-        }),
-      });
-      setShowArchiveModal(false);
-      setSelectedWorker(null);
-      fetchWorkers();
-    } catch (err) {
-      console.error(err);
+      const isContractor = activeSegment === "CONTRACTOR" || selectedWorkerForAction.isContractor;
+      const res = await fetch(
+        `/api/labour?id=${selectedWorkerForAction.id}&isContractor=${isContractor ? "true" : "false"}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json();
+      if (data.success) {
+        setShowDeleteModal(false);
+        setSelectedWorkerForAction(null);
+        fetchWorkers();
+      } else {
+        alert(data.error || "Failed to delete record.");
+      }
+    } catch (err: any) {
+      alert("Error deleting: " + err.message);
     }
   };
 
-  // KYC Verification check
-  const getKYCStatus = (w: WorkerItem) => {
-    const hasAadhaar = Boolean(w.aadhaarNumber && w.aadhaarNumber.length >= 12);
-    const hasBank = Boolean(w.bankAccountNo && (w.bankIfsc || w.ifscCode));
+  // Export Table Data to Excel
+  const handleExportExcel = () => {
+    const exportRows = workers.map((w) => ({
+      "Code / ID": w.employeeCode || w.code || "—",
+      "Full Name": w.name,
+      "Father / Lead": w.fatherName || w.contractorLeadName || "—",
+      "Segment / Unit":
+        w.companyUnit === "INVI_CREATION"
+          ? "Invi Creation"
+          : w.category === "OFFICE_STAFF"
+          ? "Standard Roofs Office"
+          : w.category === "TAMIL_LABOUR"
+          ? "Tamil Site Labour"
+          : w.category === "HINDI_LABOUR"
+          ? "Hindi Crew"
+          : "Contractor Team",
+      "Designation / Role": w.designation || w.role || w.tradeSpecialty || w.specialty || "—",
+      "Monthly Salary (₹)": w.monthlySalary ? Number(w.monthlySalary) : "—",
+      "Daily Wage / Rate (₹)": w.dailyWage || w.dailyRate || "—",
+      "Phone": w.phone || "—",
+      "Address / Native": w.address || "—",
+      "Aadhaar Number": w.aadhaarNumber || "—",
+      "PAN Number": w.panNumber || "—",
+      "Driving License": w.drivingLicenseNumber || "—",
+      "Bank Name": w.bankName || "—",
+      "Account Number": w.bankAccountNo || w.bankAccountNumber || "—",
+      "IFSC Code": w.bankIfsc || w.ifscCode || "—",
+      "Branch": w.bankBranch || "—",
+      "10th Standard": w.tenthDetails || "—",
+      "12th Standard": w.twelfthDetails || "—",
+      "Graduation": w.graduationDetails || "—",
+      "Status": w.status,
+    }));
+
+    exportToExcel(exportRows, `SRBooks_Workforce_${activeSegment}_${statusFilter}`, "Workforce");
+  };
+
+  // Compute KYC Verification Badge
+  const getKycBadge = (w: any) => {
+    const hasAadhaar = Boolean(w.aadhaarNumber && w.aadhaarNumber.length >= 10);
+    const hasBank = Boolean((w.bankAccountNo || w.bankAccountNumber) && (w.bankIfsc || w.ifscCode));
     const hasPan = Boolean(w.panNumber && w.panNumber.length >= 10);
 
     if (hasAadhaar && hasBank) {
-      return { status: "Verified", color: "emerald", label: "KYC Verified" };
+      return { label: "Verified", color: "bg-emerald-50 text-emerald-700 border-emerald-200" };
     }
     if (hasAadhaar || hasBank || hasPan) {
-      return { status: "Partial", color: "blue", label: "Partial Docs" };
+      return { label: "Partial", color: "bg-blue-50 text-blue-700 border-blue-200" };
     }
-    return { status: "Pending", color: "amber", label: "Pending KYC" };
-  };
-
-  // Filtered workers by company unit (for Office)
-  const displayedWorkers = useMemo(() => {
-    if (activeCategory === "OFFICE_STAFF" && companyUnitFilter !== "ALL") {
-      return workers.filter((w) => w.companyUnit === companyUnitFilter);
-    }
-    return workers;
-  }, [workers, activeCategory, companyUnitFilter]);
-
-  // Export to Excel
-  const handleExportExcel = () => {
-    const rows = displayedWorkers.map((w) => ({
-      "Employee ID": w.employeeCode,
-      "Code": w.empCode || "-",
-      "Full Name": w.name,
-      "Father's Name": w.fatherName || "-",
-      "Date of Joining": w.dateOfJoining ? new Date(w.dateOfJoining).toLocaleDateString("en-IN") : "-",
-      "Category": w.category,
-      "Company Unit": w.companyUnit === "INVI_CREATION" ? "Invi Creation" : "Standard Roofs",
-      "Designation / Role": w.designation || w.role || "-",
-      "Phone": w.phone || "-",
-      "Address": w.address || "-",
-      "Aadhaar Number": w.aadhaarNumber || "-",
-      "PAN Number": w.panNumber || "-",
-      "Bank Name": w.bankName || "-",
-      "Bank Account No": w.bankAccountNo || "-",
-      "IFSC Code": w.bankIfsc || w.ifscCode || "-",
-      "Daily Wage (₹)": w.dailyWage || "-",
-      "Monthly Salary (₹)": w.monthlySalary || "-",
-      "KYC Status": getKYCStatus(w).label,
-    }));
-
-    exportToExcel(rows, `Workforce_KYC_${activeCategory}_${statusFilter}`, "Workforce");
-  };
-
-  // Print PDF Roster
-  const handlePrintPDF = () => {
-    window.print();
+    return { label: "Pending", color: "bg-amber-50 text-amber-700 border-amber-200" };
   };
 
   return (
-    <div className="max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-7 py-3 space-y-5 select-none font-sans pb-16 text-slate-800 dark:text-slate-100">
-      {/* 1. TOP MODULE HEADER WITH ANALYTICS & TOOLBAR */}
+    <div className="max-w-[1700px] mx-auto px-3 sm:px-6 py-4 space-y-5 select-none font-sans pb-24 text-slate-800 dark:text-slate-100">
+      {/* 1. TOP MODULE HEADER WITH ANALYTICS & QUICK ACTIONS */}
       <ModuleHeaderWithAnalytics
-        title="Workforce & Labour KYC Directory"
-        subtitle="Comprehensive personnel master, banking & Aadhaar records, and salary profiles"
-        totalCount={workers.length}
-        activeCount={workers.filter((w) => w.status === "ACTIVE").length}
-        archivedCount={workers.filter((w) => w.status === "ARCHIVED").length}
+        title="Workforce & Personnel KYC Directory"
+        subtitle="Single Master Source of Truth for Standard Roofs Office, Invi Digital Hub, Tamil Labours, Hindi Crew & Contractors"
+        totalCount={segmentCounts.total}
+        activeCount={segmentCounts.total}
+        archivedCount={0}
         primaryAction={{
-          label: `+ Add ${
-            activeCategory === "OFFICE_STAFF"
-              ? "Office Employee"
-              : activeCategory === "CONTRACTOR_TEAM"
-              ? "Contractor"
-              : activeCategory === "HINDI_LABOUR"
-              ? "Hindi Labourer"
-              : "Tamil Labourer"
+          label: `+ Add to ${
+            activeSegment === "SR_OFFICE"
+              ? "SR Office"
+              : activeSegment === "INVI_OFFICE"
+              ? "Invi Team"
+              : activeSegment === "TAMIL"
+              ? "Tamil Labour"
+              : activeSegment === "HINDI"
+              ? "Hindi Crew"
+              : "Contractor"
           }`,
           onClick: handleOpenAdd,
         }}
-        onImportExcel={() => setShowImportModal(true)}
+        onImportExcel={() => setShowSmartImportModal(true)}
         onExportExcel={handleExportExcel}
-        onPrintPDF={handlePrintPDF}
+        onPrintPDF={() => window.print()}
         extraControls={
-          <button
-            type="button"
-            onClick={() => setShowSettingsModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 transition cursor-pointer"
-          >
-            <Settings size={14} className="text-slate-600 dark:text-slate-400" />
-            <span>⚙️ Settings & Customization</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowSmartImportModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+            >
+              <Sparkles size={14} />
+              <span>Smart Import (.xlsx / .pdf)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSettingsModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 transition cursor-pointer"
+            >
+              <Settings size={14} className="text-slate-600 dark:text-slate-400" />
+              <span>Settings</span>
+            </button>
+          </div>
         }
         charts={[
           {
-            title: "Workforce KYC Verification Status",
-            description: "Aadhaar and bank account documentation rate across all categories",
+            title: "Workforce KYC Documentation Health",
+            description: "Bank details & statutory Aadhaar cards captured across directory",
             type: "donut",
             data: [
-              { name: "Verified Documents", value: 38, color: "#10b981" },
-              { name: "Partial Bank / Aadhaar", value: 24, color: "#2563eb" },
-              { name: "Pending KYC Collection", value: 26, color: "#f59e0b" },
+              { name: "Fully Documented", value: 68, color: "#10b981" },
+              { name: "Partial Records", value: 18, color: "#3b82f6" },
+              { name: "Pending KYC", value: 9, color: "#f59e0b" },
             ],
           },
           {
-            title: "Staff & Labour Monthly Wage Liability (₹)",
-            description: "Fixed monthly payroll + estimated site muster wages",
+            title: "Workforce Headcount Distribution",
+            description: "Breakdown across 5 functional teams",
             type: "bar",
             data: [
-              { name: "Office Staff (SR)", value: 147000, color: "#2563eb" },
-              { name: "Invi Digital Hub", value: 29500, color: "#8b5cf6" },
-              { name: "Tamil Site Muster", value: 185000, color: "#10b981" },
-              { name: "Hindi Crew", value: 24500, color: "#f59e0b" },
-              { name: "Contractor Stage Bills", value: 160000, color: "#ec4899" },
+              { name: "SR Office (10)", value: segmentCounts.srOffice, color: "#2563eb" },
+              { name: "Invi Hub (3)", value: segmentCounts.inviOffice, color: "#8b5cf6" },
+              { name: "Tamil Labours (71)", value: segmentCounts.tamil, color: "#10b981" },
+              { name: "Hindi Crew (5)", value: segmentCounts.hindi, color: "#f59e0b" },
+              { name: "Contractors (6)", value: segmentCounts.contractor, color: "#ec4899" },
             ],
           },
         ]}
       />
 
-      {/* 2. DEDICATED 4-CATEGORY TABS & TOOLBAR */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 shadow-xs space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-3">
-          {/* Category Tabs */}
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl">
-            <button
-              onClick={() => setActiveCategory("OFFICE_STAFF")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
-                activeCategory === "OFFICE_STAFF"
-                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+      {/* 2. THE 5 DISTINCT SEGMENT CARDS / TABS */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {/* Tab 1: Standard Roofs Office */}
+        <button
+          type="button"
+          onClick={() => setActiveSegment("SR_OFFICE")}
+          className={`p-3.5 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between cursor-pointer ${
+            activeSegment === "SR_OFFICE"
+              ? "bg-blue-50/80 border-blue-400 dark:bg-blue-950/40 dark:border-blue-700 shadow-md ring-2 ring-blue-500/20"
+              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                activeSegment === "SR_OFFICE" ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-600"
               }`}
             >
-              <Building size={15} />
-              <span>Office Employees (13)</span>
-            </button>
-
-            <button
-              onClick={() => setActiveCategory("TAMIL_LABOUR")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
-                activeCategory === "TAMIL_LABOUR"
-                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
-              }`}
-            >
-              <HardHat size={15} />
-              <span>Tamil Labours (71)</span>
-            </button>
-
-            <button
-              onClick={() => setActiveCategory("HINDI_LABOUR")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
-                activeCategory === "HINDI_LABOUR"
-                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
-              }`}
-            >
-              <Truck size={15} />
-              <span>Hindi Labours (5)</span>
-            </button>
-
-            <button
-              onClick={() => setActiveCategory("CONTRACTOR_TEAM")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition ${
-                activeCategory === "CONTRACTOR_TEAM"
-                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
-              }`}
-            >
-              <Users2 size={15} />
-              <span>Contractors (6)</span>
-            </button>
-          </div>
-
-          {/* Active / Archived Pill & Quick Links */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
-              <button
-                onClick={() => setStatusFilter("ACTIVE")}
-                className={`px-3 py-1.5 rounded-lg transition ${
-                  statusFilter === "ACTIVE" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs" : "text-slate-500"
-                }`}
-              >
-                Active Roster
-              </button>
-              <button
-                onClick={() => setStatusFilter("ARCHIVED")}
-                className={`px-3 py-1.5 rounded-lg transition ${
-                  statusFilter === "ARCHIVED" ? "bg-white dark:bg-slate-900 text-rose-600 shadow-xs" : "text-slate-500"
-                }`}
-              >
-                Archived
-              </button>
+              <Building2 className="w-5 h-5" />
             </div>
+            <span className="text-xl font-black text-slate-800 dark:text-slate-100">
+              {segmentCounts.srOffice}
+            </span>
+          </div>
+          <div className="mt-2.5">
+            <h4 className="text-xs font-black text-slate-800 dark:text-slate-100">Standard Roofs Office</h4>
+            <p className="text-[10px] text-slate-500">SR001 – SR010 • Core HQ Team</p>
+          </div>
+        </button>
 
-            <Link
-              href="/attendance"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold text-xs hover:bg-blue-100 transition shadow-2xs"
+        {/* Tab 2: Invi Creation Team */}
+        <button
+          type="button"
+          onClick={() => setActiveSegment("INVI_OFFICE")}
+          className={`p-3.5 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between cursor-pointer ${
+            activeSegment === "INVI_OFFICE"
+              ? "bg-purple-50/80 border-purple-400 dark:bg-purple-950/40 dark:border-purple-700 shadow-md ring-2 ring-purple-500/20"
+              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                activeSegment === "INVI_OFFICE" ? "bg-purple-600 text-white" : "bg-purple-50 text-purple-600"
+              }`}
             >
-              <Clock size={13} />
-              <span>Attendance Command Center &rarr;</span>
-            </Link>
+              <Users2 className="w-5 h-5" />
+            </div>
+            <span className="text-xl font-black text-slate-800 dark:text-slate-100">
+              {segmentCounts.inviOffice}
+            </span>
+          </div>
+          <div className="mt-2.5">
+            <h4 className="text-xs font-black text-slate-800 dark:text-slate-100">Invi Creation Team</h4>
+            <p className="text-[10px] text-slate-500">Invi001 – Invi003 • Creative & Tech</p>
+          </div>
+        </button>
+
+        {/* Tab 3: Tamil Site Labours */}
+        <button
+          type="button"
+          onClick={() => setActiveSegment("TAMIL")}
+          className={`p-3.5 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between cursor-pointer ${
+            activeSegment === "TAMIL"
+              ? "bg-emerald-50/80 border-emerald-400 dark:bg-emerald-950/40 dark:border-emerald-700 shadow-md ring-2 ring-emerald-500/20"
+              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                activeSegment === "TAMIL" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-600"
+              }`}
+            >
+              <HardHat className="w-5 h-5" />
+            </div>
+            <span className="text-xl font-black text-slate-800 dark:text-slate-100">
+              {segmentCounts.tamil}
+            </span>
+          </div>
+          <div className="mt-2.5">
+            <h4 className="text-xs font-black text-slate-800 dark:text-slate-100">Tamil Site Labours</h4>
+            <p className="text-[10px] text-slate-500">71 Masons, Fitters & Layers</p>
+          </div>
+        </button>
+
+        {/* Tab 4: Hindi Helpers & Crew */}
+        <button
+          type="button"
+          onClick={() => setActiveSegment("HINDI")}
+          className={`p-3.5 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between cursor-pointer ${
+            activeSegment === "HINDI"
+              ? "bg-amber-50/80 border-amber-400 dark:bg-amber-950/40 dark:border-amber-700 shadow-md ring-2 ring-amber-500/20"
+              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                activeSegment === "HINDI" ? "bg-amber-600 text-white" : "bg-amber-50 text-amber-600"
+              }`}
+            >
+              <Users2 className="w-5 h-5" />
+            </div>
+            <span className="text-xl font-black text-slate-800 dark:text-slate-100">
+              {segmentCounts.hindi}
+            </span>
+          </div>
+          <div className="mt-2.5">
+            <h4 className="text-xs font-black text-slate-800 dark:text-slate-100">Hindi Helpers & Crew</h4>
+            <p className="text-[10px] text-slate-500">5 Dedicated Migrant Crew</p>
+          </div>
+        </button>
+
+        {/* Tab 5: Contractor Teams */}
+        <button
+          type="button"
+          onClick={() => setActiveSegment("CONTRACTOR")}
+          className={`p-3.5 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between cursor-pointer col-span-2 sm:col-span-1 ${
+            activeSegment === "CONTRACTOR"
+              ? "bg-indigo-50/80 border-indigo-400 dark:bg-indigo-950/40 dark:border-indigo-700 shadow-md ring-2 ring-indigo-500/20"
+              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                activeSegment === "CONTRACTOR" ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-600"
+              }`}
+            >
+              <Truck className="w-5 h-5" />
+            </div>
+            <span className="text-xl font-black text-slate-800 dark:text-slate-100">
+              {segmentCounts.contractor}
+            </span>
+          </div>
+          <div className="mt-2.5">
+            <h4 className="text-xs font-black text-slate-800 dark:text-slate-100">Contractor Teams</h4>
+            <p className="text-[10px] text-slate-500">6 Specialized Agencies</p>
+          </div>
+        </button>
+      </div>
+
+      {/* 3. TOOLBAR & INSTANT SEARCH */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-1 max-w-md">
+          <div className="relative w-full">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by name, ID, phone, Aadhaar, PAN, or role..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs focus:outline-none focus:border-blue-500 font-medium"
+            />
           </div>
         </div>
 
-        {/* Sub-Filters & Instant Search */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div className="flex flex-wrap items-center gap-3">
-            {activeCategory === "OFFICE_STAFF" && (
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                <button
-                  onClick={() => setCompanyUnitFilter("ALL")}
-                  className={`px-2.5 py-1 rounded-md font-bold text-[11px] ${
-                    companyUnitFilter === "ALL" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs" : "text-slate-500"
-                  }`}
-                >
-                  All (13)
-                </button>
-                <button
-                  onClick={() => setCompanyUnitFilter("STANDARD_ROOFS")}
-                  className={`px-2.5 py-1 rounded-md font-bold text-[11px] ${
-                    companyUnitFilter === "STANDARD_ROOFS" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs" : "text-slate-500"
-                  }`}
-                >
-                  Standard Roofs (10)
-                </button>
-                <button
-                  onClick={() => setCompanyUnitFilter("INVI_CREATION")}
-                  className={`px-2.5 py-1 rounded-md font-bold text-[11px] ${
-                    companyUnitFilter === "INVI_CREATION" ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs" : "text-slate-500"
-                  }`}
-                >
-                  Invi Creation (3)
-                </button>
-              </div>
-            )}
-
-            {/* Instant Search Bar */}
-            <div className="relative min-w-[260px]">
-              <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search name, ID, role, Aadhaar, PAN..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs focus:outline-hidden focus:border-blue-500"
-              />
-            </div>
+        <div className="flex items-center gap-3">
+          {/* Active / Archived Toggle */}
+          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
+            <button
+              onClick={() => setStatusFilter("ACTIVE")}
+              className={`px-3 py-1 rounded-lg transition ${
+                statusFilter === "ACTIVE"
+                  ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs"
+                  : "text-slate-500"
+              }`}
+            >
+              Active ({workers.length})
+            </button>
+            <button
+              onClick={() => setStatusFilter("ARCHIVED")}
+              className={`px-3 py-1 rounded-lg transition ${
+                statusFilter === "ARCHIVED"
+                  ? "bg-white dark:bg-slate-900 text-rose-600 shadow-xs"
+                  : "text-slate-500"
+              }`}
+            >
+              Archived
+            </button>
           </div>
 
-          <div className="text-xs text-slate-500 font-semibold tabular-nums">
-            Total <strong>{displayedWorkers.length}</strong> personnel in view
-          </div>
+          <Link
+            href="/attendance"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold text-xs hover:bg-blue-100 transition shadow-xs"
+          >
+            <Clock size={13} />
+            <span>Attendance Grid &rarr;</span>
+          </Link>
         </div>
       </div>
 
-      {/* 3. WORKFORCE & KYC MASTER TABLE */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs space-y-4">
+      {/* 4. WORKFORCE & KYC MASTER TABLE */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs whitespace-nowrap">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] uppercase font-bold text-slate-400">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-bold uppercase text-[11px] border-b border-slate-200 dark:border-slate-800">
+              <tr>
                 <th className="py-3 px-3">Personnel Profile</th>
-                <th className="py-3 px-3">Category & Unit</th>
-                <th className="py-3 px-3">Designation / Role</th>
-                <th className="py-3 px-3 text-right">Wage / Salary (₹)</th>
-                <th className="py-3 px-3">Contact & Phone</th>
-                <th className="py-3 px-3">Aadhaar & PAN</th>
-                <th className="py-3 px-3">Bank Details</th>
+                <th className="py-3 px-3">
+                  {activeSegment === "CONTRACTOR" ? "Trade Specialty" : "Designation / Role"}
+                </th>
+                <th className="py-3 px-3 text-right">
+                  {activeSegment === "SR_OFFICE" || activeSegment === "INVI_OFFICE"
+                    ? "Monthly Salary"
+                    : activeSegment === "CONTRACTOR"
+                    ? "Contract / Rate"
+                    : "Daily Wage"}
+                </th>
+                <th className="py-3 px-3">Contact & Location</th>
+                <th className="py-3 px-3">Aadhaar & PAN / DL</th>
+                <th className="py-3 px-3">Bank Remittance</th>
                 <th className="py-3 px-3 text-center">KYC Status</th>
                 <th className="py-3 px-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {displayedWorkers.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-slate-400">
-                    No workforce profiles found matching your search.
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
+                    Loading workforce directory...
+                  </td>
+                </tr>
+              ) : workers.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                    No workforce profiles found matching current filters.
                   </td>
                 </tr>
               ) : (
-                displayedWorkers.map((w) => {
-                  const kyc = getKYCStatus(w);
+                workers.map((w) => {
+                  const kyc = getKycBadge(w);
+                  const isContractor = activeSegment === "CONTRACTOR" || w.category === "CONTRACTOR_TEAM";
+
                   return (
-                    <tr key={w.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
-                      {/* Name & ID */}
+                    <tr
+                      key={w.id}
+                      className="hover:bg-blue-50/30 dark:hover:bg-slate-800/50 transition-colors group"
+                    >
+                      {/* Column 1: Personnel Profile */}
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-2.5">
+                          {/* Avatar / Photo */}
                           <button
                             type="button"
-                            onClick={() => setDossierWorker(w)}
-                            title="Click to view Lifetime Attendance Dossier"
-                            className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 cursor-pointer hover:opacity-80 transition ${
-                              w.category === "OFFICE_STAFF"
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                : w.category === "HINDI_LABOUR"
-                                ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
-                                : w.category === "CONTRACTOR_TEAM"
-                                ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                                : "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                            }`}
+                            onClick={() => setSelectedWorkerForKyc(w)}
+                            className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 cursor-pointer overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 hover:ring-2 hover:ring-blue-500 transition-all shadow-xs"
+                            title="Open Worker KYC Dossier"
                           >
-                            {w.employeeCode.slice(-3)}
+                            {w.photoUrl ? (
+                              <img
+                                src={w.photoUrl}
+                                alt={w.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              (w.employeeCode || w.code || "00").slice(-3)
+                            )}
                           </button>
+
                           <div>
                             <button
                               type="button"
-                              onClick={() => setDossierWorker(w)}
-                              className="font-extrabold text-slate-900 dark:text-slate-100 text-left hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer flex items-center gap-1.5"
-                              title="Click to view Lifetime Attendance Dossier"
+                              onClick={() => setSelectedWorkerForKyc(w)}
+                              className="font-bold text-slate-900 dark:text-slate-100 text-left hover:text-blue-600 transition flex items-center gap-1.5 cursor-pointer"
                             >
                               <span>{w.name}</span>
-                              <History size={11} className="text-blue-500 opacity-60" />
+                              <FileCheck className="w-3 h-3 text-blue-500 opacity-70 group-hover:opacity-100" />
                             </button>
-                            <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                              <span className="font-mono">{w.employeeCode}</span>
-                              {w.fatherName && <span>• S/O {w.fatherName}</span>}
+                            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+                              <span className="font-bold text-slate-600 dark:text-slate-400">
+                                {w.employeeCode || w.code || "—"}
+                              </span>
+                              {(w.fatherName || w.contractorLeadName) && (
+                                <span>• {isContractor ? `Lead: ${w.contractorLeadName || w.fatherName}` : `S/O ${w.fatherName}`}</span>
+                              )}
                               {w.dateOfJoining && (
-                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                                  • Joined {new Date(w.dateOfJoining).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                <span className="text-emerald-600 font-sans">
+                                  • Joined {new Date(w.dateOfJoining).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
                                 </span>
                               )}
                             </div>
@@ -558,44 +767,38 @@ export default function WorkforceKYCDirectoryPage() {
                         </div>
                       </td>
 
-                      {/* Category & Unit */}
-                      <td className="py-3 px-3">
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                            w.companyUnit === "INVI_CREATION"
-                              ? "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
-                              : w.category === "CONTRACTOR_TEAM"
-                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                              : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                          }`}
-                        >
-                          {w.companyUnit === "INVI_CREATION"
-                            ? "Invi Creation"
-                            : w.category === "OFFICE_STAFF"
-                            ? "Standard Roofs (Office)"
-                            : w.category === "HINDI_LABOUR"
-                            ? "Hindi Migrant Crew"
-                            : w.category === "CONTRACTOR_TEAM"
-                            ? "Contractor Team"
-                            : "Standard Roofs (Tamil)"}
-                        </span>
-                      </td>
-
-                      {/* Designation */}
+                      {/* Column 2: Designation / Specialty */}
                       <td className="py-3 px-3 font-semibold text-slate-700 dark:text-slate-300">
-                        {w.designation || w.specialty || w.role || "Worker"}
+                        {isContractor ? (
+                          <div>
+                            <span className="text-slate-800 dark:text-slate-200 font-bold">
+                              {w.tradeSpecialty || w.specialty || "Roofing & Fabrication"}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-normal">
+                              Headcount: {w.defaultHeadcount || 1} Labours
+                            </span>
+                          </div>
+                        ) : activeSegment === "INVI_OFFICE" ? (
+                          <span className="text-slate-500 italic">
+                            {w.designation || w.role || "—"}
+                          </span>
+                        ) : (
+                          <span>{w.designation || w.role || "Workforce"}</span>
+                        )}
                       </td>
 
-                      {/* Wage / Salary */}
+                      {/* Column 3: Wage / Salary */}
                       <td className="py-3 px-3 text-right tabular-nums font-bold">
-                        {w.monthlySalary ? (
+                        {w.monthlySalary && Number(w.monthlySalary) > 0 ? (
                           <div>
-                            <span className="text-slate-900 dark:text-slate-100">{formatINR(w.monthlySalary)}</span>
+                            <span className="text-slate-900 dark:text-slate-100">
+                              {formatINR(Number(w.monthlySalary))}
+                            </span>
                             <span className="text-[10px] text-slate-400 block font-normal">Monthly</span>
                           </div>
-                        ) : w.dailyWage ? (
+                        ) : w.dailyWage || w.dailyRate ? (
                           <div>
-                            <span className="text-blue-600 dark:text-blue-400">₹{w.dailyWage}</span>
+                            <span className="text-blue-600">₹{w.dailyWage || w.dailyRate}</span>
                             <span className="text-[10px] text-slate-400 block font-normal">Per Day</span>
                           </div>
                         ) : (
@@ -603,37 +806,35 @@ export default function WorkforceKYCDirectoryPage() {
                         )}
                       </td>
 
-                      {/* Contact */}
+                      {/* Column 4: Contact & Location */}
                       <td className="py-3 px-3 text-slate-600 dark:text-slate-300">
                         <div className="flex items-center gap-1 font-mono text-[11px]">
-                          <Phone size={12} className="text-slate-400" />
+                          <Phone className="w-3 h-3 text-slate-400" />
                           <span>{w.phone || "—"}</span>
                         </div>
                         {w.address && (
-                          <span className="text-[10px] text-slate-400 block truncate max-w-[140px]" title={w.address}>
+                          <span className="text-[10px] text-slate-400 block truncate max-w-[130px]" title={w.address}>
                             {w.address}
                           </span>
                         )}
                       </td>
 
-                      {/* Aadhaar & PAN */}
+                      {/* Column 5: Aadhaar & PAN / DL */}
                       <td className="py-3 px-3 font-mono text-[11px]">
-                        <div>
-                          <span className="text-slate-800 dark:text-slate-200">
-                            {w.aadhaarNumber ? `XXXX XXXX ${w.aadhaarNumber.slice(-4)}` : "—"}
-                          </span>
-                          <span className="text-[10px] text-slate-400 block uppercase">
-                            {w.panNumber || "No PAN"}
-                          </span>
+                        <div className="text-slate-800 dark:text-slate-200">
+                          {w.aadhaarNumber ? `XXXX ${w.aadhaarNumber.slice(-4)}` : "—"}
+                        </div>
+                        <div className="text-[10px] text-slate-400 uppercase">
+                          {w.panNumber || w.drivingLicenseNumber || "No PAN / DL"}
                         </div>
                       </td>
 
-                      {/* Bank Details */}
+                      {/* Column 6: Bank Remittance */}
                       <td className="py-3 px-3 text-[11px]">
-                        {w.bankAccountNo ? (
+                        {w.bankAccountNo || w.bankAccountNumber ? (
                           <div>
                             <span className="font-bold text-slate-800 dark:text-slate-200">
-                              {w.bankName || "Bank"}: A/C ...{w.bankAccountNo.slice(-4)}
+                              {w.bankName || "Bank"}: ...{(w.bankAccountNo || w.bankAccountNumber).slice(-4)}
                             </span>
                             <span className="text-[10px] text-slate-400 block font-mono">
                               IFSC: {w.bankIfsc || w.ifscCode || "—"}
@@ -644,54 +845,60 @@ export default function WorkforceKYCDirectoryPage() {
                         )}
                       </td>
 
-                      {/* KYC Status Badge */}
+                      {/* Column 7: KYC Badge */}
                       <td className="py-3 px-3 text-center">
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold ${
-                            kyc.color === "emerald"
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                              : kyc.color === "blue"
-                              ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                              : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                          }`}
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border ${kyc.color}`}
                         >
-                          {kyc.color === "emerald" ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
+                          {kyc.label === "Verified" ? (
+                            <CheckCircle2 className="w-3 h-3" />
+                          ) : (
+                            <AlertTriangle className="w-3 h-3" />
+                          )}
                           <span>{kyc.label}</span>
                         </span>
                       </td>
 
-                      {/* Actions */}
+                      {/* Column 8: Actions */}
                       <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => setDossierWorker(w)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition"
+                            type="button"
+                            onClick={() => setSelectedWorkerForKyc(w)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+                            title="View Full KYC Profile Drawer & Print Dossier"
+                          >
+                            <FileCheck className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedWorkerForDossier(w)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition cursor-pointer"
                             title="View Lifetime Multi-Year Attendance Dossier"
                           >
-                            <History size={14} />
+                            <History className="w-4 h-4" />
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => handleOpenEdit(w)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                            title="Edit Profile & KYC"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+                            title="Edit Workforce Details"
                           >
-                            <Edit2 size={14} />
+                            <Edit2 className="w-4 h-4" />
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => {
-                              setSelectedWorker(w);
-                              setShowArchiveModal(true);
+                              setSelectedWorkerForAction(w);
+                              setShowDeleteModal(true);
                             }}
-                            className={`p-1.5 rounded-lg transition ${
-                              statusFilter === "ACTIVE"
-                                ? "text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                                : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                            }`}
-                            title={statusFilter === "ACTIVE" ? "Archive Worker" : "Restore Worker"}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                            title="Soft-Delete to Recycle Bin"
                           >
-                            {statusFilter === "ACTIVE" ? <Trash2 size={14} /> : <RotateCcw size={14} />}
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -704,185 +911,387 @@ export default function WorkforceKYCDirectoryPage() {
         </div>
       </div>
 
-      {/* 4. MODAL: ADD / EDIT WORKER & KYC DETAILS */}
+      {/* 5. WORKER KYC PROFILE DRAWER */}
+      <WorkerKycProfileDrawer
+        isOpen={Boolean(selectedWorkerForKyc)}
+        onClose={() => setSelectedWorkerForKyc(null)}
+        worker={selectedWorkerForKyc}
+        onEdit={(w) => {
+          setSelectedWorkerForKyc(null);
+          handleOpenEdit(w);
+        }}
+        onRefresh={fetchWorkers}
+      />
+
+      {/* 6. LIFETIME ATTENDANCE DOSSIER MODAL */}
+      <EmployeeMultiYearDossierModal
+        isOpen={Boolean(selectedWorkerForDossier)}
+        onClose={() => setSelectedWorkerForDossier(null)}
+        employee={selectedWorkerForDossier}
+        isContractorTeam={activeSegment === "CONTRACTOR"}
+      />
+
+      {/* 7. SMART IMPORT MODAL */}
+      <LabourSmartImportModal
+        isOpen={showSmartImportModal}
+        onClose={() => setShowSmartImportModal(false)}
+        defaultCategory={
+          activeSegment === "TAMIL"
+            ? "TAMIL_LABOUR"
+            : activeSegment === "HINDI"
+            ? "HINDI_LABOUR"
+            : activeSegment === "CONTRACTOR"
+            ? "CONTRACTOR_TEAM"
+            : "OFFICE_STAFF"
+        }
+        defaultCompanyUnit={activeSegment === "INVI_OFFICE" ? "INVI_CREATION" : "STANDARD_ROOFS"}
+        onImportComplete={fetchWorkers}
+      />
+
+      {/* 8. ATTENDANCE & WORKFORCE SETTINGS MODAL */}
+      <AttendanceSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        onRefreshData={fetchWorkers}
+      />
+
+      {/* 9. ADD / EDIT WORKER MODAL WITH FULL KYC & UPLOADS */}
       {showAddEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <UserCheck className="text-blue-600" size={18} />
-                {formData.id ? `Edit Profile: ${formData.name}` : `Add New Workforce Profile`}
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-3xl w-full flex flex-col max-h-[92vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-850">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
+                  <Edit2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                    {formData.id ? `Edit Workforce Profile: ${formData.name}` : `Add New Workforce Profile`}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Complete statutory KYC, banking credentials, identity documents and compensation
+                  </p>
+                </div>
+              </div>
+
+              {/* Standard Circular X Close Button */}
               <button
                 type="button"
                 onClick={() => setShowAddEditModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                className="w-8 h-8 rounded-full border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shadow-sm focus:outline-none"
                 title="Close"
-                aria-label="Close"
               >
-                <X size={16} />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveWorker} className="space-y-4 text-xs">
-              {/* Row 1: Name, Code & Father Name */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Full Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Thennarasu M"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold focus:outline-hidden focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Employee / Labour ID</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 20001, SR011"
-                    value={formData.empCode || formData.employeeCode}
-                    onChange={(e) => setFormData({ ...formData, empCode: e.target.value, employeeCode: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono focus:outline-hidden focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Category, Company Unit & Designation */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Category</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold focus:outline-hidden focus:border-blue-500"
-                  >
-                    <option value="OFFICE_STAFF">Office Staff</option>
-                    <option value="TAMIL_LABOUR">Tamil Site Labour</option>
-                    <option value="HINDI_LABOUR">Hindi Migrant Crew</option>
-                    <option value="CONTRACTOR_TEAM">Contractor Team</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Company Unit</label>
-                  <select
-                    value={formData.companyUnit}
-                    onChange={(e) => setFormData({ ...formData, companyUnit: e.target.value as any })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold focus:outline-hidden focus:border-blue-500"
-                  >
-                    <option value="STANDARD_ROOFS">Standard Roofs</option>
-                    <option value="INVI_CREATION">Invi Creation</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Designation / Role</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Layer, Welder, Helper, HR"
-                    value={formData.designation}
-                    onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold focus:outline-hidden focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Row 3: Daily Wage or Monthly Salary */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
-                {formData.category === "OFFICE_STAFF" ? (
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Fixed Monthly Salary (₹)</label>
-                    <input
-                      type="number"
-                      value={formData.monthlySalary}
-                      onChange={(e) => setFormData({ ...formData, monthlySalary: Number(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold tabular-nums focus:outline-hidden focus:border-blue-500"
-                    />
+            {/* Modal Form Body */}
+            <form onSubmit={handleSaveWorker} className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
+              {/* Photo & Basic Details */}
+              <div className="flex flex-col sm:flex-row gap-5 items-start">
+                {/* Photo Upload Box */}
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center relative group">
+                    {formData.photoUrl ? (
+                      <img
+                        src={formData.photoUrl}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-center p-2">
+                        <Upload className="w-5 h-5 text-slate-400 mx-auto mb-1" />
+                        <span className="text-[10px] text-slate-400 font-semibold block">Photo</span>
+                      </div>
+                    )}
+                    {uploadingField === "photoUrl" && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 text-white animate-spin" />
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Per Day Daily Wage (₹)</label>
+                  <label className="cursor-pointer text-[11px] font-bold text-blue-600 hover:text-blue-700">
+                    Upload Photo
                     <input
-                      type="number"
-                      value={formData.dailyWage}
-                      onChange={(e) => setFormData({ ...formData, dailyWage: Number(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold tabular-nums focus:outline-hidden focus:border-blue-500"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUploadFile("photoUrl", file);
+                      }}
                     />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Contact Phone</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 9876543210"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono focus:outline-hidden focus:border-blue-500"
-                  />
+                  </label>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Date of Joining</label>
-                  <input
-                    type="date"
-                    value={formData.dateOfJoining}
-                    onChange={(e) => setFormData({ ...formData, dateOfJoining: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold focus:outline-hidden focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Row 4: KYC Aadhaar & PAN */}
-              <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
-                <span className="font-extrabold uppercase text-[10.5px] text-blue-600 block mb-2">
-                  Statutory KYC Verification (Aadhaar & PAN)
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Name, Code, Father */}
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
                   <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Aadhaar Number (12 Digits)</label>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Full Name *
+                    </label>
                     <input
                       type="text"
-                      maxLength={14}
-                      placeholder="XXXX XXXX XXXX"
-                      value={formData.aadhaarNumber}
-                      onChange={(e) => setFormData({ ...formData, aadhaarNumber: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono focus:outline-hidden focus:border-blue-500"
+                      required
+                      placeholder="e.g. Senthil Kumar"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold outline-none focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">PAN Number (10 Alphanumeric)</label>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Employee / Contractor ID
+                    </label>
                     <input
                       type="text"
-                      maxLength={10}
-                      placeholder="ABCDE1234F"
-                      value={formData.panNumber}
-                      onChange={(e) => setFormData({ ...formData, panNumber: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono uppercase focus:outline-hidden focus:border-blue-500"
+                      placeholder="e.g. SR011, TL-072, CON-007"
+                      value={formData.employeeCode || formData.empCode}
+                      onChange={(e) =>
+                        setFormData({ ...formData, employeeCode: e.target.value, empCode: e.target.value })
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Father / Team Lead Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Murugesan"
+                      value={formData.fatherName || formData.contractorLeadName}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          fatherName: e.target.value,
+                          contractorLeadName: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Date of Birth
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.dob}
+                      onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:border-blue-500"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Row 5: Bank Details */}
-              <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
-                <span className="font-extrabold uppercase text-[10.5px] text-emerald-600 block mb-2">
-                  Direct Bank Remittance Details
-                </span>
+              {/* Segment, Role & Compensation */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
+                <h4 className="font-bold text-slate-700 dark:text-slate-300 uppercase text-[10.5px] tracking-wider">
+                  Workforce Category & Remuneration
+                </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Category</label>
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
+                    >
+                      <option value="OFFICE_STAFF">Office Staff</option>
+                      <option value="TAMIL_LABOUR">Tamil Site Labour</option>
+                      <option value="HINDI_LABOUR">Hindi Migrant Crew</option>
+                      <option value="CONTRACTOR_TEAM">Contractor Team</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Company Unit</label>
+                    <select
+                      value={formData.companyUnit}
+                      onChange={(e) => setFormData({ ...formData, companyUnit: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
+                    >
+                      <option value="STANDARD_ROOFS">Standard Roofs</option>
+                      <option value="INVI_CREATION">Invi Creation</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Designation / Trade Specialty
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={formData.companyUnit === "INVI_CREATION" ? "(Optional)" : "e.g. Fitter, Welder, HR"}
+                      value={formData.designation || formData.tradeSpecialty}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          designation: e.target.value,
+                          tradeSpecialty: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  {formData.category === "OFFICE_STAFF" ? (
+                    <div>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Fixed Monthly Salary (₹)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.monthlySalary}
+                        onChange={(e) =>
+                          setFormData({ ...formData, monthlySalary: Number(e.target.value) || 0 })
+                        }
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Daily Wage / Rate (₹)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.dailyWage}
+                        onChange={(e) =>
+                          setFormData({ ...formData, dailyWage: Number(e.target.value) || 0 })
+                        }
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 9876543210"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Date of Joining</label>
+                    <input
+                      type="date"
+                      value={formData.dateOfJoining}
+                      onChange={(e) => setFormData({ ...formData, dateOfJoining: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Statutory Identity & Document Uploads */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
+                <h4 className="font-bold text-blue-700 dark:text-blue-400 uppercase text-[10.5px] tracking-wider">
+                  Statutory Identity & KYC Documents
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Aadhaar (12 Digits)</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        maxLength={14}
+                        placeholder="1234 5678 9012"
+                        value={formData.aadhaarNumber}
+                        onChange={(e) => setFormData({ ...formData, aadhaarNumber: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono outline-none focus:border-blue-500"
+                      />
+                      <label className="px-2.5 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 cursor-pointer flex items-center justify-center shrink-0">
+                        <Upload className="w-3.5 h-3.5" />
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleUploadFile("aadhaarDocUrl", f);
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">PAN Card</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        maxLength={10}
+                        placeholder="ABCDE1234F"
+                        value={formData.panNumber}
+                        onChange={(e) => setFormData({ ...formData, panNumber: e.target.value.toUpperCase() })}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono uppercase outline-none focus:border-blue-500"
+                      />
+                      <label className="px-2.5 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 cursor-pointer flex items-center justify-center shrink-0">
+                        <Upload className="w-3.5 h-3.5" />
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleUploadFile("panDocUrl", f);
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Driving License</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="TN3320150001234"
+                        value={formData.drivingLicenseNumber}
+                        onChange={(e) => setFormData({ ...formData, drivingLicenseNumber: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono outline-none focus:border-blue-500"
+                      />
+                      <label className="px-2.5 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 cursor-pointer flex items-center justify-center shrink-0">
+                        <Upload className="w-3.5 h-3.5" />
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleUploadFile("drivingLicenseDocUrl", f);
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Direct Banking Remittance */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
+                <h4 className="font-bold text-emerald-700 dark:text-emerald-400 uppercase text-[10.5px] tracking-wider">
+                  Direct Bank Remittance Credentials
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div>
                     <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Bank Name</label>
                     <input
                       type="text"
-                      placeholder="e.g. ICICI Bank, SBI"
+                      placeholder="e.g. State Bank of India"
                       value={formData.bankName}
                       onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-semibold focus:outline-hidden focus:border-blue-500"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
                     />
                   </div>
 
@@ -890,10 +1299,16 @@ export default function WorkforceKYCDirectoryPage() {
                     <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Account Number</label>
                     <input
                       type="text"
-                      placeholder="e.g. 15520500XXXX"
-                      value={formData.bankAccountNo}
-                      onChange={(e) => setFormData({ ...formData, bankAccountNo: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono focus:outline-hidden focus:border-blue-500"
+                      placeholder="e.g. 39281048192"
+                      value={formData.bankAccountNo || formData.bankAccountNumber}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          bankAccountNo: e.target.value,
+                          bankAccountNumber: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono outline-none focus:border-blue-500"
                     />
                   </div>
 
@@ -901,39 +1316,91 @@ export default function WorkforceKYCDirectoryPage() {
                     <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">IFSC Code</label>
                     <input
                       type="text"
-                      maxLength={11}
-                      placeholder="e.g. ICIC0001552"
+                      placeholder="e.g. SBIN0001234"
                       value={formData.bankIfsc}
                       onChange={(e) => setFormData({ ...formData, bankIfsc: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono uppercase focus:outline-hidden focus:border-blue-500"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono uppercase outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Branch Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Erode Main"
+                      value={formData.bankBranch}
+                      onChange={(e) => setFormData({ ...formData, bankBranch: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Residential Address */}
+              {/* Education & Experience Details */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
+                <h4 className="font-bold text-purple-700 dark:text-purple-400 uppercase text-[10.5px] tracking-wider">
+                  Education & Prior Experience
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">10th Standard</label>
+                    <input
+                      type="text"
+                      placeholder="School, Year, Percentage"
+                      value={formData.tenthDetails}
+                      onChange={(e) => setFormData({ ...formData, tenthDetails: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">12th Standard</label>
+                    <input
+                      type="text"
+                      placeholder="School, Year, Percentage"
+                      value={formData.twelfthDetails}
+                      onChange={(e) => setFormData({ ...formData, twelfthDetails: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Degree / Diploma</label>
+                    <input
+                      type="text"
+                      placeholder="College, Degree, Year"
+                      value={formData.graduationDetails}
+                      onChange={(e) => setFormData({ ...formData, graduationDetails: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Full Address */}
               <div>
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Full Residential Address</label>
                 <textarea
                   rows={2}
-                  placeholder="Street, Village / City, District, Pincode"
+                  placeholder="Street, Village / Town, District, State, PIN"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-hidden focus:border-blue-500"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:border-blue-500"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+              {/* Form Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowAddEditModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 font-bold hover:bg-slate-100 transition"
+                  className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition shadow-xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-xs"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-md shadow-blue-500/20"
                 >
                   Save Profile & KYC
                 </button>
@@ -943,65 +1410,20 @@ export default function WorkforceKYCDirectoryPage() {
         </div>
       )}
 
-      {/* 5. MODAL: ARCHIVE / RESTORE CONFIRMATION */}
-      {showArchiveModal && selectedWorker && (
+      {/* 10. ARCHIVE / SOFT-DELETE CONFIRM MODAL */}
+      {showDeleteModal && selectedWorkerForAction && (
         <ArchiveConfirmModal
-          isOpen={showArchiveModal}
+          isOpen={showDeleteModal}
           onClose={() => {
-            setShowArchiveModal(false);
-            setSelectedWorker(null);
+            setShowDeleteModal(false);
+            setSelectedWorkerForAction(null);
           }}
-          onConfirm={handleToggleArchive}
-          title={statusFilter === "ACTIVE" ? `Archive Worker: ${selectedWorker.name}` : `Restore Worker: ${selectedWorker.name}`}
-          message={
-            statusFilter === "ACTIVE"
-              ? `Are you sure you want to archive ${selectedWorker.name} (${selectedWorker.employeeCode})? Their KYC and historical attendance data will remain safely preserved in the database.`
-              : `Restore ${selectedWorker.name} (${selectedWorker.employeeCode}) back to the active workforce roster?`
-          }
-          isRestore={statusFilter === "ARCHIVED"}
+          onConfirm={handleDeleteWorker}
+          title={`Archive ${selectedWorkerForAction.name} (${selectedWorkerForAction.employeeCode || selectedWorkerForAction.code})`}
+          message={`Are you sure you want to move this record to the Recycle Bin? All attendance logs and historical wage entries will remain preserved.`}
+          isRestore={false}
         />
       )}
-
-      {/* 6. UNIVERSAL EXCEL IMPORT MODAL */}
-      {showImportModal && (
-        <ExcelImportModal
-          isOpen={showImportModal}
-          onClose={() => setShowImportModal(false)}
-          moduleName="workforce_master"
-          templateColumns={[
-            { key: "EmpId", label: "Emp ID (e.g. SR011, 20072)", required: true },
-            { key: "Name", label: "Full Name", required: true },
-            { key: "Category", label: "Category (OFFICE_STAFF / TAMIL_LABOUR / HINDI_LABOUR / CONTRACTOR_TEAM)", required: true },
-            { key: "Designation", label: "Designation / Role" },
-            { key: "DailyWage", label: "Daily Wage (₹)" },
-            { key: "MonthlySalary", label: "Monthly Salary (₹)" },
-            { key: "Phone", label: "Phone Number" },
-            { key: "Aadhaar", label: "Aadhaar Number" },
-            { key: "PAN", label: "PAN Number" },
-            { key: "BankName", label: "Bank Name" },
-            { key: "AccountNo", label: "Account Number" },
-            { key: "IFSC", label: "IFSC Code" },
-          ]}
-          onImportComplete={() => {
-            setShowImportModal(false);
-            fetchWorkers();
-          }}
-        />
-      )}
-
-      {/* 7. LIFETIME MULTI-YEAR ATTENDANCE DOSSIER MODAL */}
-      <EmployeeMultiYearDossierModal
-        isOpen={Boolean(dossierWorker)}
-        onClose={() => setDossierWorker(null)}
-        employee={dossierWorker}
-      />
-
-      {/* 8. ATTENDANCE & WORKFORCE SETTINGS MODAL */}
-      <AttendanceSettingsModal
-        isOpen={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
-        onRefreshData={fetchWorkers}
-      />
     </div>
   );
 }

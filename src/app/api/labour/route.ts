@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { toDecimal } from "@/lib/decimal";
-import { RoleType, PayCycle } from "@prisma/client";
+import { getCurrentUserSession } from "@/lib/auth";
+import { serverCache, invalidateRouteCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -14,19 +15,39 @@ export async function GET(request: Request) {
     const companyUnit = searchParams.get("companyUnit");
 
     // Contractors handling
-    if (category === "CONTRACTOR_TEAM") {
-      const contractors = await prisma.contractor.findMany({
-        where: status !== "ALL" ? { status } : undefined,
-        include: {
-          dailyLogs: {
-            orderBy: { date: "desc" },
-            take: 10,
+    if (category === "CONTRACTOR_TEAM" || category === "CONTRACTOR") {
+      const [contractors, srOfficeCount, inviOfficeCount, tamilCount, hindiCount, contractorCount] = await Promise.all([
+        prisma.contractor.findMany({
+          where: status !== "ALL" ? { status } : undefined,
+          include: {
+            dailyLogs: {
+              orderBy: { date: "desc" },
+              take: 10,
+            },
+            milestones: true,
           },
-          milestones: true,
+          orderBy: { code: "asc" },
+        }),
+        prisma.employeeOrLabour.count({ where: { status: "ACTIVE", category: "OFFICE_STAFF", companyUnit: "STANDARD_ROOFS" } }),
+        prisma.employeeOrLabour.count({ where: { status: "ACTIVE", category: "OFFICE_STAFF", companyUnit: "INVI_CREATION" } }),
+        prisma.employeeOrLabour.count({ where: { status: "ACTIVE", category: "TAMIL_LABOUR" } }),
+        prisma.employeeOrLabour.count({ where: { status: "ACTIVE", category: "HINDI_LABOUR" } }),
+        prisma.contractor.count({ where: { status: "ACTIVE" } }),
+      ]);
+
+      return NextResponse.json({
+        success: true,
+        labourers: contractors,
+        isContractor: true,
+        segmentCounts: {
+          srOffice: srOfficeCount,
+          inviOffice: inviOfficeCount,
+          tamil: tamilCount,
+          hindi: hindiCount,
+          contractor: contractorCount,
+          total: srOfficeCount + inviOfficeCount + tamilCount + hindiCount + contractorCount,
         },
-        orderBy: { code: "asc" },
       });
-      return NextResponse.json({ success: true, labourers: contractors, isContractor: true });
     }
 
     const where: any = {};
@@ -42,33 +63,55 @@ export async function GET(request: Request) {
         { phone: { contains: search, mode: "insensitive" } },
         { aadhaarNumber: { contains: search, mode: "insensitive" } },
         { panNumber: { contains: search, mode: "insensitive" } },
+        { drivingLicenseNumber: { contains: search, mode: "insensitive" } },
         { designation: { contains: search, mode: "insensitive" } },
+        { role: { contains: search, mode: "insensitive" } },
+        { tradeSpecialty: { contains: search, mode: "insensitive" } },
       ];
     }
 
-    const labourers = await prisma.employeeOrLabour.findMany({
-      where,
-      include: {
-        attendances: {
-          orderBy: { date: "desc" },
-          take: 5,
+    const [labourers, srOfficeCount, inviOfficeCount, tamilCount, hindiCount, contractorCount] = await Promise.all([
+      prisma.employeeOrLabour.findMany({
+        where,
+        include: {
+          attendances: {
+            orderBy: { date: "desc" },
+            take: 5,
+          },
+          advances: {
+            orderBy: { date: "desc" },
+            take: 5,
+          },
+          musters: {
+            orderBy: { periodEnd: "desc" },
+            take: 5,
+          },
         },
-        advances: {
-          orderBy: { date: "desc" },
-          take: 5,
-        },
-        musters: {
-          orderBy: { periodEnd: "desc" },
-          take: 5,
-        },
-      },
-      orderBy: [
-        { companyUnit: "desc" },
-        { employeeCode: "asc" },
-      ],
-    });
+        orderBy: [
+          { companyUnit: "desc" },
+          { employeeCode: "asc" },
+        ],
+      }),
+      prisma.employeeOrLabour.count({ where: { status: "ACTIVE", category: "OFFICE_STAFF", companyUnit: "STANDARD_ROOFS" } }),
+      prisma.employeeOrLabour.count({ where: { status: "ACTIVE", category: "OFFICE_STAFF", companyUnit: "INVI_CREATION" } }),
+      prisma.employeeOrLabour.count({ where: { status: "ACTIVE", category: "TAMIL_LABOUR" } }),
+      prisma.employeeOrLabour.count({ where: { status: "ACTIVE", category: "HINDI_LABOUR" } }),
+      prisma.contractor.count({ where: { status: "ACTIVE" } }),
+    ]);
 
-    return NextResponse.json({ success: true, labourers, isContractor: false });
+    return NextResponse.json({
+      success: true,
+      labourers,
+      isContractor: false,
+      segmentCounts: {
+        srOffice: srOfficeCount,
+        inviOffice: inviOfficeCount,
+        tamil: tamilCount,
+        hindi: hindiCount,
+        contractor: contractorCount,
+        total: srOfficeCount + inviOfficeCount + tamilCount + hindiCount + contractorCount,
+      },
+    });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -76,19 +119,29 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const session = await getCurrentUserSession();
     const body = await request.json();
     const {
       name,
       employeeCode,
       empCode,
       fatherName,
+      dob,
       phone,
       address,
+      photoUrl,
       aadhaarNumber,
+      aadhaarDocUrl,
       panNumber,
+      panDocUrl,
+      drivingLicenseNumber,
+      drivingLicenseDocUrl,
+      bankAccountName,
       bankName,
       bankAccountNo,
+      bankAccountNumber,
       bankIfsc,
+      bankBranch,
       designation,
       role,
       category = "TAMIL_LABOUR",
@@ -97,15 +150,27 @@ export async function POST(request: Request) {
       monthlySalary = 0,
       baseWage = 0,
       specialty,
+      tradeSpecialty,
+      contractorLeadName,
+      defaultHeadcount = 1,
       dateOfJoining,
+      tenthDetails,
+      twelfthDetails,
+      graduationDetails,
+      experienceJson,
     } = body;
 
-    if (!name) {
-      return NextResponse.json({ success: false, error: "Worker / Staff Name is required." }, { status: 400 });
+    if (!name || !name.trim()) {
+      return NextResponse.json({ success: false, error: "Name is required." }, { status: 400 });
     }
 
+    const cleanAccNo = bankAccountNumber || bankAccountNo || null;
+    const cleanIfsc = bankIfsc ? bankIfsc.toUpperCase().trim() : null;
+    const cleanPan = panNumber ? panNumber.toUpperCase().trim() : null;
+    const cleanAadhaar = aadhaarNumber ? aadhaarNumber.replace(/\s+/g, "").trim() : null;
+
     // Handle Contractor creation
-    if (category === "CONTRACTOR_TEAM") {
+    if (category === "CONTRACTOR_TEAM" || category === "CONTRACTOR") {
       let code = employeeCode || empCode;
       if (!code) {
         const count = await prisma.contractor.count();
@@ -114,22 +179,86 @@ export async function POST(request: Request) {
       const contractor = await prisma.contractor.create({
         data: {
           code,
-          name,
-          specialty: specialty || designation || "Roofing Contractor",
+          name: name.trim(),
+          specialty: tradeSpecialty || specialty || designation || "Roofing Contractor",
           fatherName: fatherName || null,
           phone: phone || null,
           address: address || null,
-          aadhaarNumber: aadhaarNumber || null,
-          panNumber: panNumber ? panNumber.toUpperCase() : null,
+          aadhaarNumber: cleanAadhaar,
+          panNumber: cleanPan,
           bankName: bankName || null,
-          bankAccountNo: bankAccountNo || null,
-          bankIfsc: bankIfsc ? bankIfsc.toUpperCase() : null,
+          bankAccountNo: cleanAccNo,
+          bankIfsc: cleanIfsc,
+          ifscCode: cleanIfsc,
           category: "CONTRACTOR_TEAM",
           status: "ACTIVE",
           active: true,
         },
       });
-      return NextResponse.json({ success: true, labourer: contractor });
+
+      // Also create corresponding EmployeeOrLabour entry so it is 100% unified with Attendance & Payroll
+      const empOrLabour = await prisma.employeeOrLabour.upsert({
+        where: { employeeCode: code },
+        update: {
+          name: name.trim(),
+          phone: phone || null,
+          address: address || null,
+          fatherName: fatherName || null,
+          dob: dob || null,
+          photoUrl: photoUrl || null,
+          aadhaarNumber: cleanAadhaar,
+          aadhaarDocUrl: aadhaarDocUrl || null,
+          panNumber: cleanPan,
+          panDocUrl: panDocUrl || null,
+          bankAccountName: bankAccountName || name.trim(),
+          bankName: bankName || null,
+          bankAccountNo: cleanAccNo,
+          bankAccountNumber: cleanAccNo,
+          bankIfsc: cleanIfsc,
+          bankBranch: bankBranch || null,
+          contractorLeadName: contractorLeadName || fatherName || name.trim(),
+          defaultHeadcount: Number(defaultHeadcount) || 1,
+          tradeSpecialty: tradeSpecialty || specialty || designation || "Roofing Contractor",
+          designation: "Contractor Team",
+          role: "Contractor Team",
+          category: "CONTRACTOR_TEAM",
+          companyUnit: "STANDARD_ROOFS",
+          status: "ACTIVE",
+          active: true,
+        },
+        create: {
+          employeeCode: code,
+          empCode: code,
+          name: name.trim(),
+          phone: phone || null,
+          address: address || null,
+          fatherName: fatherName || null,
+          dob: dob || null,
+          photoUrl: photoUrl || null,
+          aadhaarNumber: cleanAadhaar,
+          aadhaarDocUrl: aadhaarDocUrl || null,
+          panNumber: cleanPan,
+          panDocUrl: panDocUrl || null,
+          bankAccountName: bankAccountName || name.trim(),
+          bankName: bankName || null,
+          bankAccountNo: cleanAccNo,
+          bankAccountNumber: cleanAccNo,
+          bankIfsc: cleanIfsc,
+          bankBranch: bankBranch || null,
+          contractorLeadName: contractorLeadName || fatherName || name.trim(),
+          defaultHeadcount: Number(defaultHeadcount) || 1,
+          tradeSpecialty: tradeSpecialty || specialty || designation || "Roofing Contractor",
+          designation: "Contractor Team",
+          role: "Contractor Team",
+          category: "CONTRACTOR_TEAM",
+          companyUnit: "STANDARD_ROOFS",
+          status: "ACTIVE",
+          active: true,
+        },
+      });
+
+      invalidateRouteCache("/api/labour");
+      return NextResponse.json({ success: true, labourer: contractor, unifiedRecord: empOrLabour });
     }
 
     // Handle Employee / Labourer creation
@@ -144,37 +273,54 @@ export async function POST(request: Request) {
       data: {
         employeeCode: code,
         empCode: empCode || code.replace(/^(LAB-|HIN-)/, ""),
-        name,
+        name: name.trim(),
         fatherName: fatherName || null,
+        dob: dob || null,
         phone: phone || null,
         address: address || null,
-        aadhaarNumber: aadhaarNumber || null,
-        panNumber: panNumber ? panNumber.toUpperCase() : null,
+        photoUrl: photoUrl || null,
+        aadhaarNumber: cleanAadhaar,
+        aadhaarDocUrl: aadhaarDocUrl || null,
+        panNumber: cleanPan,
+        panDocUrl: panDocUrl || null,
+        drivingLicenseNumber: drivingLicenseNumber || null,
+        drivingLicenseDocUrl: drivingLicenseDocUrl || null,
+        bankAccountName: bankAccountName || name.trim(),
         bankName: bankName || null,
-        bankAccountNo: bankAccountNo || null,
-        bankIfsc: bankIfsc ? bankIfsc.toUpperCase() : null,
-        ifscCode: bankIfsc ? bankIfsc.toUpperCase() : null,
-        designation: designation || "Site Helper",
-        role: role || designation || "Site Helper",
+        bankAccountNo: cleanAccNo,
+        bankAccountNumber: cleanAccNo,
+        bankIfsc: cleanIfsc,
+        ifscCode: cleanIfsc,
+        bankBranch: bankBranch || null,
+        designation: designation || (category === "OFFICE_STAFF" ? (companyUnit === "INVI_CREATION" ? null : "Staff") : "Site Helper"),
+        role: role || designation || (category === "OFFICE_STAFF" ? (companyUnit === "INVI_CREATION" ? null : "Staff") : "Site Helper"),
         category,
         companyUnit,
-        dailyWage: toDecimal(dailyWage || (baseWage ? Number(baseWage) / 15 : 850)).toFixed(2),
+        dailyWage: toDecimal(dailyWage || (baseWage ? Number(baseWage) / 15 : category === "OFFICE_STAFF" ? 0 : 850)).toFixed(2),
         monthlySalary: toDecimal(monthlySalary || (category === "OFFICE_STAFF" ? 15000 : 0)).toFixed(2),
-        baseWage: toDecimal(baseWage || (dailyWage ? Number(dailyWage) * 15 : 12750)).toFixed(2),
+        baseWage: toDecimal(baseWage || (dailyWage ? Number(dailyWage) * 15 : category === "OFFICE_STAFF" ? 15000 : 12750)).toFixed(2),
         dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : new Date(),
+        tenthDetails: tenthDetails || null,
+        twelfthDetails: twelfthDetails || null,
+        graduationDetails: graduationDetails || null,
+        experienceJson: experienceJson || null,
+        tradeSpecialty: tradeSpecialty || null,
         status: "ACTIVE",
         active: true,
       },
     });
 
+    invalidateRouteCache("/api/labour");
     return NextResponse.json({ success: true, labourer });
   } catch (error: any) {
+    console.error("Labour POST error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
 export async function PUT(request: Request) {
   try {
+    const session = await getCurrentUserSession();
     const body = await request.json();
     const {
       id,
@@ -182,20 +328,38 @@ export async function PUT(request: Request) {
       employeeCode,
       empCode,
       fatherName,
+      dob,
       phone,
       address,
+      photoUrl,
       aadhaarNumber,
+      aadhaarDocUrl,
       panNumber,
+      panDocUrl,
+      drivingLicenseNumber,
+      drivingLicenseDocUrl,
+      bankAccountName,
       bankName,
       bankAccountNo,
+      bankAccountNumber,
       bankIfsc,
+      bankBranch,
       designation,
       role,
       category,
       companyUnit,
       dailyWage,
       monthlySalary,
+      baseWage,
+      specialty,
+      tradeSpecialty,
+      contractorLeadName,
+      defaultHeadcount,
       dateOfJoining,
+      tenthDetails,
+      twelfthDetails,
+      graduationDetails,
+      experienceJson,
       status,
       isContractor,
     } = body;
@@ -204,60 +368,117 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: "Record ID is required." }, { status: 400 });
     }
 
-    if (isContractor || category === "CONTRACTOR_TEAM") {
+    const cleanAccNo = bankAccountNumber || bankAccountNo || undefined;
+    const cleanIfsc = bankIfsc ? bankIfsc.toUpperCase().trim() : undefined;
+    const cleanPan = panNumber ? panNumber.toUpperCase().trim() : undefined;
+    const cleanAadhaar = aadhaarNumber ? aadhaarNumber.replace(/\s+/g, "").trim() : undefined;
+
+    if (isContractor || category === "CONTRACTOR_TEAM" || category === "CONTRACTOR") {
       const contractor = await prisma.contractor.update({
         where: { id },
         data: {
-          name,
-          fatherName: fatherName || null,
-          phone: phone || null,
-          address: address || null,
-          aadhaarNumber: aadhaarNumber || null,
-          panNumber: panNumber ? panNumber.toUpperCase() : null,
-          bankName: bankName || null,
-          bankAccountNo: bankAccountNo || null,
-          bankIfsc: bankIfsc ? bankIfsc.toUpperCase() : null,
-          status: status || "ACTIVE",
-          active: status !== "ARCHIVED",
+          name: name ? name.trim() : undefined,
+          fatherName: fatherName !== undefined ? fatherName : undefined,
+          phone: phone !== undefined ? phone : undefined,
+          address: address !== undefined ? address : undefined,
+          aadhaarNumber: cleanAadhaar,
+          panNumber: cleanPan,
+          bankName: bankName !== undefined ? bankName : undefined,
+          bankAccountNo: cleanAccNo,
+          bankIfsc: cleanIfsc,
+          ifscCode: cleanIfsc,
+          specialty: tradeSpecialty || specialty || designation || undefined,
+          status: status || undefined,
+          active: status ? status !== "ARCHIVED" : undefined,
         },
       });
+
+      // Also sync to EmployeeOrLabour if linked
+      if (contractor.code) {
+        await prisma.employeeOrLabour.updateMany({
+          where: { employeeCode: contractor.code },
+          data: {
+            name: name ? name.trim() : undefined,
+            phone: phone !== undefined ? phone : undefined,
+            address: address !== undefined ? address : undefined,
+            aadhaarNumber: cleanAadhaar,
+            aadhaarDocUrl: aadhaarDocUrl !== undefined ? aadhaarDocUrl : undefined,
+            panNumber: cleanPan,
+            panDocUrl: panDocUrl !== undefined ? panDocUrl : undefined,
+            photoUrl: photoUrl !== undefined ? photoUrl : undefined,
+            bankAccountName: bankAccountName !== undefined ? bankAccountName : undefined,
+            bankName: bankName !== undefined ? bankName : undefined,
+            bankAccountNo: cleanAccNo,
+            bankAccountNumber: cleanAccNo,
+            bankIfsc: cleanIfsc,
+            bankBranch: bankBranch !== undefined ? bankBranch : undefined,
+            tradeSpecialty: tradeSpecialty || specialty || designation || undefined,
+            contractorLeadName: contractorLeadName !== undefined ? contractorLeadName : undefined,
+            defaultHeadcount: defaultHeadcount !== undefined ? Number(defaultHeadcount) : undefined,
+            status: status || undefined,
+            active: status ? status !== "ARCHIVED" : undefined,
+          },
+        });
+      }
+
+      invalidateRouteCache("/api/labour");
       return NextResponse.json({ success: true, labourer: contractor });
     }
 
     const labourer = await prisma.employeeOrLabour.update({
       where: { id },
       data: {
-        name,
+        name: name ? name.trim() : undefined,
         empCode: empCode || undefined,
-        fatherName: fatherName || null,
-        phone: phone || null,
-        address: address || null,
-        aadhaarNumber: aadhaarNumber || null,
-        panNumber: panNumber ? panNumber.toUpperCase() : null,
-        bankName: bankName || null,
-        bankAccountNo: bankAccountNo || null,
-        bankIfsc: bankIfsc ? bankIfsc.toUpperCase() : null,
-        ifscCode: bankIfsc ? bankIfsc.toUpperCase() : null,
-        designation: designation || undefined,
-        role: role || designation || undefined,
+        fatherName: fatherName !== undefined ? fatherName : undefined,
+        dob: dob !== undefined ? dob : undefined,
+        phone: phone !== undefined ? phone : undefined,
+        address: address !== undefined ? address : undefined,
+        photoUrl: photoUrl !== undefined ? photoUrl : undefined,
+        aadhaarNumber: cleanAadhaar,
+        aadhaarDocUrl: aadhaarDocUrl !== undefined ? aadhaarDocUrl : undefined,
+        panNumber: cleanPan,
+        panDocUrl: panDocUrl !== undefined ? panDocUrl : undefined,
+        drivingLicenseNumber: drivingLicenseNumber !== undefined ? drivingLicenseNumber : undefined,
+        drivingLicenseDocUrl: drivingLicenseDocUrl !== undefined ? drivingLicenseDocUrl : undefined,
+        bankAccountName: bankAccountName !== undefined ? bankAccountName : undefined,
+        bankName: bankName !== undefined ? bankName : undefined,
+        bankAccountNo: cleanAccNo,
+        bankAccountNumber: cleanAccNo,
+        bankIfsc: cleanIfsc,
+        ifscCode: cleanIfsc,
+        bankBranch: bankBranch !== undefined ? bankBranch : undefined,
+        designation: designation !== undefined ? designation : undefined,
+        role: role !== undefined ? role : designation !== undefined ? designation : undefined,
         category: category || undefined,
         companyUnit: companyUnit || undefined,
         dailyWage: dailyWage !== undefined ? toDecimal(dailyWage).toFixed(2) : undefined,
         monthlySalary: monthlySalary !== undefined ? toDecimal(monthlySalary).toFixed(2) : undefined,
+        baseWage: baseWage !== undefined ? toDecimal(baseWage).toFixed(2) : undefined,
         dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : undefined,
+        tenthDetails: tenthDetails !== undefined ? tenthDetails : undefined,
+        twelfthDetails: twelfthDetails !== undefined ? twelfthDetails : undefined,
+        graduationDetails: graduationDetails !== undefined ? graduationDetails : undefined,
+        experienceJson: experienceJson !== undefined ? experienceJson : undefined,
+        contractorLeadName: contractorLeadName !== undefined ? contractorLeadName : undefined,
+        defaultHeadcount: defaultHeadcount !== undefined ? Number(defaultHeadcount) : undefined,
+        tradeSpecialty: tradeSpecialty !== undefined ? tradeSpecialty : undefined,
         status: status || undefined,
         active: status ? status !== "ARCHIVED" : undefined,
       },
     });
 
+    invalidateRouteCache("/api/labour");
     return NextResponse.json({ success: true, labourer });
   } catch (error: any) {
+    console.error("Labour PUT error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
 export async function PATCH(request: Request) {
   try {
+    const session = await getCurrentUserSession();
     const body = await request.json();
     const { id, action = "archive", isContractor } = body;
 
@@ -273,6 +494,7 @@ export async function PATCH(request: Request) {
         where: { id },
         data: { status: newStatus, active: newActive },
       });
+      invalidateRouteCache("/api/labour");
       return NextResponse.json({ success: true, labourer: contractor });
     }
 
@@ -281,6 +503,7 @@ export async function PATCH(request: Request) {
       data: { status: newStatus, active: newActive },
     });
 
+    invalidateRouteCache("/api/labour");
     return NextResponse.json({ success: true, labourer });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -289,6 +512,7 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const session = await getCurrentUserSession();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     const isContractor = searchParams.get("isContractor") === "true";
@@ -298,19 +522,60 @@ export async function DELETE(request: Request) {
     }
 
     if (isContractor) {
+      const contractor = await prisma.contractor.findUnique({ where: { id } });
+      if (!contractor) {
+        return NextResponse.json({ success: false, error: "Contractor not found." }, { status: 404 });
+      }
+
+      // Archive record
       await prisma.contractor.update({
         where: { id },
         data: { status: "ARCHIVED", active: false },
       });
-      return NextResponse.json({ success: true, message: "Contractor safely archived." });
+
+      // Soft delete to RecycleBinItem
+      await prisma.recycleBinItem.create({
+        data: {
+          entityType: "EMPLOYEE_LABOUR",
+          entityId: contractor.id,
+          title: `Contractor: ${contractor.name} (${contractor.code || "CON"})`,
+          subtitle: `Specialty: ${contractor.specialty} • Status: ARCHIVED`,
+          payloadJson: JSON.stringify({ ...contractor, isContractor: true }),
+          deletedBy: session?.email || "HR Manager",
+        },
+      });
+
+      invalidateRouteCache("/api/labour");
+      return NextResponse.json({ success: true, message: "Contractor safely moved to Recycle Bin." });
     }
 
+    const labourer = await prisma.employeeOrLabour.findUnique({ where: { id } });
+    if (!labourer) {
+      return NextResponse.json({ success: false, error: "Worker not found." }, { status: 404 });
+    }
+
+    // Archive record
     await prisma.employeeOrLabour.update({
       where: { id },
       data: { status: "ARCHIVED", active: false },
     });
-    return NextResponse.json({ success: true, message: "Worker safely archived." });
+
+    // Soft delete to RecycleBinItem
+    await prisma.recycleBinItem.create({
+      data: {
+        entityType: "EMPLOYEE_LABOUR",
+        entityId: labourer.id,
+        title: `${labourer.name} (${labourer.employeeCode})`,
+        subtitle: `${labourer.category} • ${labourer.designation || labourer.role || "Workforce"} • Unit: ${labourer.companyUnit}`,
+        payloadJson: JSON.stringify(labourer),
+        deletedBy: session?.email || "HR Manager",
+      },
+    });
+
+    invalidateRouteCache("/api/labour");
+    return NextResponse.json({ success: true, message: "Worker safely moved to Recycle Bin." });
   } catch (error: any) {
+    console.error("Labour DELETE error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

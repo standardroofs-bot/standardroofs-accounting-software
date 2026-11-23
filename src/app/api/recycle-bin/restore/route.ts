@@ -104,19 +104,38 @@ export async function POST(request: Request) {
       }
 
       case "EMPLOYEE_LABOUR": {
-        const { id: origId, attendances, contractorLogs, ...dataToRestore } = payload;
-        await prisma.employeeOrLabour.upsert({
-          where: { id: origId },
-          update: {
-            ...dataToRestore,
-            active: true,
-          },
-          create: {
-            id: origId,
-            ...dataToRestore,
-            active: true,
-          },
-        });
+        const { id: origId, attendances, contractorLogs, musters, advances, payrolls, leaveRequests, expenses, dailyLogs, milestones, journalLines, isContractor, ...dataToRestore } = payload;
+        if (isContractor) {
+          await prisma.contractor.upsert({
+            where: { id: origId },
+            update: {
+              ...dataToRestore,
+              status: "ACTIVE",
+              active: true,
+            },
+            create: {
+              id: origId,
+              ...dataToRestore,
+              status: "ACTIVE",
+              active: true,
+            },
+          });
+        } else {
+          await prisma.employeeOrLabour.upsert({
+            where: { id: origId },
+            update: {
+              ...dataToRestore,
+              status: "ACTIVE",
+              active: true,
+            },
+            create: {
+              id: origId,
+              ...dataToRestore,
+              status: "ACTIVE",
+              active: true,
+            },
+          });
+        }
         break;
       }
 

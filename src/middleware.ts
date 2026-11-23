@@ -237,6 +237,7 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/my-attendance/") ||
       pathname.startsWith("/api/attendance") ||
       pathname.startsWith("/api/labour") ||
+      pathname.startsWith("/api/upload") ||
       pathname.startsWith("/api/leave-requests") ||
       pathname.startsWith("/api/recycle-bin") ||
       pathname.startsWith("/api/users/password") ||

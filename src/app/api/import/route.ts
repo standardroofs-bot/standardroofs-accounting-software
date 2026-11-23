@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+// @ts-ignore
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";

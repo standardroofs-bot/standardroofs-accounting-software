@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
 
     // Parse all rows across selected sheets
     let allRawRows: any[] = [];
-    sheetsToProcess.forEach((sheetName) => {
+    sheetsToProcess.forEach((sheetName: string) => {
       const ws = workbook.Sheets[sheetName];
       const rows: any[] = XLSX.utils.sheet_to_json(ws);
       rows.forEach((r) => {

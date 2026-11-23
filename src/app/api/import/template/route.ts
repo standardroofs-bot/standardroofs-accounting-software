@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
     let filename = `SR-Books-Template-${type}.xlsx`;
 
-    const applyHeaderStyle = (sheet: ExcelJS.Worksheet) => {
+    const applyHeaderStyle = (sheet: any) => {
       const headerRow = sheet.getRow(1);
       headerRow.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
       headerRow.fill = {
@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
       sheet.addRow(["MCH-017", "Bosch GWS 600 Angle Grinder 4 inch", "Power Tools", "SRM01", "Perundurai Site", 3500]);
     }
 
-    const buffer = await workbook.xlsx.writeBuffer();
+    const buffer = await (workbook.xlsx as any).writeBuffer();
 
     return new NextResponse(buffer, {
       status: 200,

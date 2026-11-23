@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
     let updatedCount = 0;
 
     // Iterate rows starting after header (row 2)
-    masterSheet.eachRow((row, rowNumber) => {
+    masterSheet.eachRow((row: any, rowNumber: number) => {
       if (rowNumber > 1) {
         const sNo = row.getCell(1).value ? Number(row.getCell(1).value) : rowNumber - 1;
         const name = String(row.getCell(2).value || "").trim();

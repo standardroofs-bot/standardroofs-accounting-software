@@ -224,7 +224,7 @@ export async function GET(req: NextRequest) {
       ]);
     });
 
-    const buffer = await workbook.xlsx.writeBuffer();
+    const buffer = await (workbook.xlsx as any).writeBuffer();
 
     return new NextResponse(buffer, {
       headers: {

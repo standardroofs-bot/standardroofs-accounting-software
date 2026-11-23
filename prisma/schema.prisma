@@ -822,6 +822,22 @@ model EmployeeOrLabour {
   bankAccountNo      String?
   bankIfsc           String?
   ifscCode           String?
+  bankAccountName    String?
+  bankAccountNumber  String?
+  bankBranch         String?
+  dob                String?
+  photoUrl           String?
+  panDocUrl          String?
+  aadhaarDocUrl      String?
+  drivingLicenseNumber String?
+  drivingLicenseDocUrl String?
+  tenthDetails       String?
+  twelfthDetails     String?
+  graduationDetails  String?
+  experienceJson     String?
+  contractorLeadName String?
+  defaultHeadcount   Int?               @default(1)
+  tradeSpecialty     String?
   designation        String?
   role               String?
   roleType           RoleType           @default(DAILY_LABOUR)
