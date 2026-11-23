@@ -231,11 +231,15 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/labour/") ||
       pathname === "/payroll" ||
       pathname.startsWith("/payroll/") ||
+      pathname === "/recycle-bin" ||
+      pathname.startsWith("/recycle-bin/") ||
       pathname === "/my-attendance" ||
       pathname.startsWith("/my-attendance/") ||
       pathname.startsWith("/api/attendance") ||
       pathname.startsWith("/api/labour") ||
       pathname.startsWith("/api/leave-requests") ||
+      pathname.startsWith("/api/recycle-bin") ||
+      pathname.startsWith("/api/users/password") ||
       pathname.startsWith("/api/payroll") ||
       pathname === "/api/auth/me" ||
       pathname === "/api/auth/logout" ||

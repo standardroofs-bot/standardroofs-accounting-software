@@ -43,6 +43,9 @@ import {
   Send,
   CheckCircle2 as CheckCircleIcon,
   XCircle,
+  Edit3,
+  Trash2,
+  KeyRound,
 } from "lucide-react";
 import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
 import ExcelImportModal from "@/components/common/ExcelImportModal";
@@ -258,6 +261,15 @@ export default function AttendancePage() {
   const [applyLeaveSubmitting, setApplyLeaveSubmitting] = useState<boolean>(false);
   const [showUniversalExportModal, setShowUniversalExportModal] = useState<boolean>(false);
 
+  // Leave Edit modal state
+  const [editingLeave, setEditingLeave] = useState<any | null>(null);
+  const [editLeaveCategory, setEditLeaveCategory] = useState<"PLANNED" | "UNPLANNED" | "SICK" | "EMERGENCY">("PLANNED");
+  const [editLeaveDayType, setEditLeaveDayType] = useState<"FULL_DAY" | "HALF_DAY">("FULL_DAY");
+  const [editLeaveStartDate, setEditLeaveStartDate] = useState<string>("");
+  const [editLeaveEndDate, setEditLeaveEndDate] = useState<string>("");
+  const [editLeaveReason, setEditLeaveReason] = useState<string>("");
+  const [editLeaveSubmitting, setEditLeaveSubmitting] = useState<boolean>(false);
+
   // Quick 1H permission prompt in Daily View
   const [permPromptTarget, setPermPromptTarget] = useState<{
     employeeId: string;
@@ -438,6 +450,97 @@ export default function AttendancePage() {
       alert("Error submitting leave request.");
     } finally {
       setApplyLeaveSubmitting(false);
+    }
+  };
+
+  const handleOpenEditLeave = (req: any) => {
+    setEditingLeave(req);
+    setEditLeaveCategory(req.leaveCategory || "PLANNED");
+    setEditLeaveDayType(req.dayType || "FULL_DAY");
+    setEditLeaveStartDate(req.startDate ? req.startDate.split("T")[0] : selectedDate);
+    setEditLeaveEndDate(req.endDate ? req.endDate.split("T")[0] : selectedDate);
+    setEditLeaveReason(req.reason || "");
+  };
+
+  const handleSaveEditLeave = async () => {
+    if (!editingLeave) return;
+    setEditLeaveSubmitting(true);
+    try {
+      const res = await fetch("/api/leave-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingLeave.id,
+          leaveCategory: editLeaveCategory,
+          dayType: editLeaveDayType,
+          startDate: editLeaveStartDate,
+          endDate: editLeaveEndDate,
+          reason: editLeaveReason.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Leave request updated and attendance re-synced!");
+        setEditingLeave(null);
+        fetchAttendance();
+      } else {
+        alert(data.error || "Failed to update leave request.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error updating leave request.");
+    } finally {
+      setEditLeaveSubmitting(false);
+    }
+  };
+
+  const handleDeleteLeave = async (id: string, empName: string) => {
+    if (
+      !confirm(
+        `Move leave request for ${empName} to the Recycle Bin?\n\nIf this leave was approved, the attendance grid records will be automatically reverted.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/leave-requests?id=${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Moved leave for ${empName} to Recycle Bin. Attendance reverted.`);
+        fetchAttendance();
+      } else {
+        alert(data.error || "Failed to delete leave request.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting leave request.");
+    }
+  };
+
+  const handleChangeStaffPassword = async (email: string, name: string) => {
+    const newPass = prompt(`Set new password for ${name} (${email}):\n(Minimum 6 characters)`);
+    if (!newPass) return;
+    if (newPass.length < 6) {
+      alert("Password must be at least 6 characters.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/users/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, newPassword: newPass }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Updated password for ${name}!`);
+      } else {
+        alert(data.error || "Failed to update password.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error updating password.");
     }
   };
 
@@ -2177,26 +2280,38 @@ export default function AttendancePage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Click any cell to edit status: <strong className="text-emerald-600">P (1.0)</strong>, <strong className="text-amber-500">H (0.5)</strong>, <strong className="text-cyan-600">1H (1.0)</strong>, <strong className="text-rose-600">A (0.0)</strong>, <strong className="text-slate-600">L (Weekly Off — Non-Payable)</strong>
+                  Click any cell to edit status: <strong className="text-emerald-600">P (1.0)</strong>, <strong className="text-sky-600">1H-M (1.0)</strong>, <strong className="text-cyan-600">1H-E (1.0)</strong>, <strong className="text-amber-500">H (0.5)</strong>, <strong className="text-teal-600">PL (1.0)</strong>, <strong className="text-slate-600">UP (0.0)</strong>, <strong className="text-rose-600">A (0.0)</strong>, <strong className="text-slate-500">L (Sunday Off)</strong>, <strong className="text-amber-600">OT (Overtime)</strong>
                 </p>
               </div>
 
             <div className="flex items-center gap-3">
-              <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
-                <span className="flex items-center gap-1 text-emerald-600">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> P
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-extrabold bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold" title="Full Day Present (1.0)">
+                  <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P <span className="text-[9px] font-medium text-slate-400">1.0</span>
                 </span>
-                <span className="flex items-center gap-1 text-amber-600">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-amber-400" /> H
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 font-bold" title="1-Hr Morning Permission (1.0)">
+                  <span className="w-2 h-2 rounded-xs bg-sky-500" /> 1H-M <span className="text-[9px] font-medium text-slate-400">1.0</span>
                 </span>
-                <span className="flex items-center gap-1 text-cyan-600">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-cyan-600" /> 1H
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 font-bold" title="1-Hr Evening Permission (1.0)">
+                  <span className="w-2 h-2 rounded-xs bg-cyan-600" /> 1H-E <span className="text-[9px] font-medium text-slate-400">1.0</span>
                 </span>
-                <span className="flex items-center gap-1 text-rose-600">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-rose-500" /> A
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold" title="Half-Day (0.5)">
+                  <span className="w-2 h-2 rounded-xs bg-amber-400" /> H <span className="text-[9px] font-medium text-slate-400">0.5</span>
                 </span>
-                <span className="flex items-center gap-1 text-slate-500">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-slate-300 dark:bg-slate-600" /> L
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 font-bold" title="Paid Holiday (1.0)">
+                  <span className="w-2 h-2 rounded-xs bg-teal-600" /> PL <span className="text-[9px] font-medium text-slate-400">1.0</span>
+                </span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 font-bold" title="Unpaid Leave (0.0)">
+                  <span className="w-2 h-2 rounded-xs bg-slate-600" /> UP <span className="text-[9px] font-medium text-slate-400">0.0</span>
+                </span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold" title="Absent (0.0)">
+                  <span className="w-2 h-2 rounded-xs bg-rose-500" /> A <span className="text-[9px] font-medium text-slate-400">0.0</span>
+                </span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 font-bold" title="Sunday / Weekly Off (0.0)">
+                  <span className="w-2 h-2 rounded-xs bg-slate-300 dark:bg-slate-600" /> L <span className="text-[9px] font-medium text-slate-400">Off</span>
+                </span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-200 font-bold" title="Overtime Hours">
+                  <span className="w-2 h-2 rounded-xs bg-amber-500" /> OT +2h
                 </span>
               </div>
 
@@ -3109,24 +3224,47 @@ export default function AttendancePage() {
                           </p>
                         </div>
 
-                        {req.status === "PENDING" && (
-                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-amber-200 dark:border-amber-800/60">
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                          <div className="flex items-center gap-1.5">
                             <button
                               type="button"
-                              onClick={() => handleRejectLeave(req.id)}
-                              className="px-4 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950 dark:border-rose-800 dark:text-rose-300 text-xs font-bold transition cursor-pointer shadow-2xs"
+                              onClick={() => handleOpenEditLeave(req)}
+                              className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                              title="Edit leave details and re-sync attendance"
                             >
-                              Reject
+                              <Edit3 size={11} className="text-blue-600" />
+                              <span>Edit</span>
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleApproveLeave(req.id)}
-                              className="px-5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer shadow-sm flex items-center gap-1"
+                              onClick={() => handleDeleteLeave(req.id, req.employee?.name || "Employee")}
+                              className="px-2.5 py-1 rounded-lg border border-rose-200 dark:border-rose-900/60 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                              title="Delete leave request and move to Recycle Bin"
                             >
-                              <span>Approve</span>
+                              <Trash2 size={11} className="text-rose-500" />
+                              <span>Delete</span>
                             </button>
                           </div>
-                        )}
+
+                          {req.status === "PENDING" && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleRejectLeave(req.id)}
+                                className="px-3 py-1 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950 dark:border-rose-800 dark:text-rose-300 text-xs font-bold transition cursor-pointer shadow-2xs"
+                              >
+                                Reject
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleApproveLeave(req.id)}
+                                className="px-4 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer shadow-sm flex items-center gap-1"
+                              >
+                                <span>Approve</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
@@ -3294,7 +3432,7 @@ export default function AttendancePage() {
                       <strong className="text-slate-800 dark:text-slate-200 block text-[11px] truncate">
                         SR001 – SR010
                       </strong>
-                      <span className="text-[10px] text-slate-500 font-mono">Password: employee123</span>
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">Unique (SR001@2026…)</span>
                     </div>
                   </div>
 
@@ -3304,7 +3442,7 @@ export default function AttendancePage() {
                         Standard Roofs Employee Self-Service (ESS)
                       </span>
                       <span className="text-[11px] text-indigo-700 dark:text-indigo-300">
-                        Default Password: <code className="bg-indigo-200/60 dark:bg-indigo-900 px-1 py-0.5 rounded font-black text-indigo-950 dark:text-indigo-100">employee123</code> &middot; Restricted to SR001–SR010
+                        Individual Unique Passwords Assigned &middot; Login with Employee ID or Email
                       </span>
                     </div>
                     <a
@@ -3319,18 +3457,18 @@ export default function AttendancePage() {
 
                   <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
                     {[
-                      { code: "SR001", name: "Thiyagu", email: "sr001@standardroofs.com", role: "Supervisor", unit: "Standard Roofs" },
-                      { code: "SR002", name: "Monika", email: "sr002@standardroofs.com", role: "HR", unit: "Standard Roofs" },
-                      { code: "SR003", name: "Periyasamy", email: "sr003@standardroofs.com", role: "Accountant", unit: "Standard Roofs" },
-                      { code: "SR004", name: "Sabari", email: "sr004@standardroofs.com", role: "Marketing Admin", unit: "Standard Roofs" },
-                      { code: "SR005", name: "Sivakumar", email: "sr005@standardroofs.com", role: "Manager", unit: "Standard Roofs" },
-                      { code: "SR006", name: "Sri Manikandan", email: "sr006@standardroofs.com", role: "AI Engineer", unit: "Standard Roofs" },
-                      { code: "SR007", name: "Kavinkumar", email: "sr007@standardroofs.com", role: "AI Prompt Engineer", unit: "Standard Roofs" },
-                      { code: "SR008", name: "Adhi", email: "sr008@standardroofs.com", role: "AI Prompt Engineer", unit: "Standard Roofs" },
-                      { code: "SR009", name: "Gowri", email: "sr009@standardroofs.com", role: "Senior Manager", unit: "Standard Roofs" },
-                      { code: "SR010", name: "Kaviya", email: "sr010@standardroofs.com", role: "Data Ops", unit: "Standard Roofs" },
+                      { code: "SR001", name: "Thiyagu", email: "sr001@standardroofs.com", role: "Supervisor", unit: "Standard Roofs", pass: "SR001@2026" },
+                      { code: "SR002", name: "Monika", email: "sr002@standardroofs.com", role: "HR", unit: "Standard Roofs", pass: "SR002@2026" },
+                      { code: "SR003", name: "Periyasamy", email: "sr003@standardroofs.com", role: "Accountant", unit: "Standard Roofs", pass: "SR003@2026" },
+                      { code: "SR004", name: "Sabari", email: "sr004@standardroofs.com", role: "Marketing Admin", unit: "Standard Roofs", pass: "SR004@2026" },
+                      { code: "SR005", name: "Sivakumar", email: "sr005@standardroofs.com", role: "Manager", unit: "Standard Roofs", pass: "SR005@2026" },
+                      { code: "SR006", name: "Sri Manikandan", email: "sr006@standardroofs.com", role: "AI Engineer", unit: "Standard Roofs", pass: "SR006@2026" },
+                      { code: "SR007", name: "Kavinkumar", email: "sr007@standardroofs.com", role: "AI Prompt Engineer", unit: "Standard Roofs", pass: "SR007@2026" },
+                      { code: "SR008", name: "Adhi", email: "sr008@standardroofs.com", role: "AI Prompt Engineer", unit: "Standard Roofs", pass: "SR008@2026" },
+                      { code: "SR009", name: "Gowri", email: "sr009@standardroofs.com", role: "Senior Manager", unit: "Standard Roofs", pass: "SR009@2026" },
+                      { code: "SR010", name: "Kaviya", email: "sr010@standardroofs.com", role: "Data Ops", unit: "Standard Roofs", pass: "SR010@2026" },
                     ].map((staff) => (
-                      <div key={staff.code} className="p-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                      <div key={staff.code} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-xs text-slate-900 dark:text-slate-100">{staff.name}</span>
@@ -3341,20 +3479,40 @@ export default function AttendancePage() {
                               {staff.unit}
                             </span>
                           </div>
-                          <span className="text-[11px] text-slate-400 font-mono block mt-0.5">
-                            {staff.email} • {staff.role}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] text-slate-500 font-mono">
+                            <span>{staff.email}</span>
+                            <span>&bull;</span>
+                            <span className="font-sans text-slate-600 dark:text-slate-400">{staff.role}</span>
+                            <span>&bull;</span>
+                            <span className="text-slate-400">Password:</span>
+                            <code className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold font-mono">
+                              {staff.pass}
+                            </code>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(`Login: ${staff.email} or ${staff.code}\nPassword: employee123`);
-                            showToast(`Copied credentials for ${staff.name}`);
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold text-[10px] transition cursor-pointer"
-                        >
-                          Copy Login
-                        </button>
+                        <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`Login: ${staff.email} (or ${staff.code})\nPassword: ${staff.pass}`);
+                              showToast(`Copied ID & Password for ${staff.name}`);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold text-[10px] transition cursor-pointer flex items-center gap-1"
+                            title="Copy Login ID and Password"
+                          >
+                            <Copy size={11} />
+                            <span>Copy ID & Password</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleChangeStaffPassword(staff.email, staff.name)}
+                            className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-[10px] transition cursor-pointer flex items-center gap-1"
+                            title="Change password for this staff member"
+                          >
+                            <KeyRound size={11} className="text-amber-500" />
+                            <span>Change</span>
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -3834,6 +3992,128 @@ export default function AttendancePage() {
                   Save Contractor Log
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 11. MODAL: EDIT LEAVE REQUEST */}
+      {editingLeave && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 w-full max-w-lg p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Edit3 size={16} className="text-blue-600" />
+                  Edit Leave Request
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {editingLeave.employee?.name} ({editingLeave.employee?.employeeCode}) &middot; Status: <strong className="text-blue-600">{editingLeave.status}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingLeave(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Leave Category *
+                  </label>
+                  <select
+                    value={editLeaveCategory}
+                    onChange={(e) => setEditLeaveCategory(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold"
+                  >
+                    <option value="PLANNED">Planned Leave</option>
+                    <option value="UNPLANNED">Unplanned Leave</option>
+                    <option value="SICK">Sick Leave</option>
+                    <option value="EMERGENCY">Emergency Leave</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Day Duration *
+                  </label>
+                  <select
+                    value={editLeaveDayType}
+                    onChange={(e) => setEditLeaveDayType(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold"
+                  >
+                    <option value="FULL_DAY">Full-Day (1.0 Day)</option>
+                    <option value="HALF_DAY">Half-Day (0.5 Day)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Start Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={editLeaveStartDate}
+                    onChange={(e) => setEditLeaveStartDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    End Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={editLeaveEndDate}
+                    onChange={(e) => setEditLeaveEndDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Reason / Note
+                </label>
+                <textarea
+                  rows={2}
+                  value={editLeaveReason}
+                  onChange={(e) => setEditLeaveReason(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  placeholder="Reason for leave"
+                />
+              </div>
+
+              {editingLeave.status === "APPROVED" && (
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200">
+                  <strong>Notice:</strong> This leave is currently approved. Saving changes will automatically update the attendance grid matrix for the specified dates.
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setEditingLeave(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-700 dark:text-slate-300 font-bold text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={editLeaveSubmitting}
+                onClick={handleSaveEditLeave}
+                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {editLeaveSubmitting ? "Saving..." : "Save Changes & Re-sync"}
+              </button>
             </div>
           </div>
         </div>

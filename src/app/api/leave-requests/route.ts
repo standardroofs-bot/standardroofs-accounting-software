@@ -159,3 +159,172 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const session = await getCurrentUserSession();
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { id, leaveCategory, dayType, startDate, endDate, reason } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Leave ID is required." }, { status: 400 });
+    }
+
+    const existing = await prisma.leaveRequest.findUnique({
+      where: { id },
+      include: { employee: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ success: false, error: "Leave request not found." }, { status: 404 });
+    }
+
+    const start = startDate ? new Date(`${startDate}T00:00:00.000Z`) : existing.startDate;
+    const end = endDate ? new Date(`${endDate}T00:00:00.000Z`) : existing.endDate;
+
+    let totalDays = 0;
+    const cat = leaveCategory || existing.leaveCategory;
+    const dt = dayType || existing.dayType;
+
+    if (cat === "PERMISSION_1H" || cat === "GENERAL_REQUEST") {
+      totalDays = 1.0;
+    } else {
+      const curr = new Date(start);
+      while (curr <= end) {
+        if (curr.getUTCDay() !== 0) {
+          totalDays += dt === "HALF_DAY" ? 0.5 : 1.0;
+        }
+        curr.setUTCDate(curr.getUTCDate() + 1);
+      }
+      if (totalDays === 0) totalDays = dt === "HALF_DAY" ? 0.5 : 1.0;
+    }
+
+    const updated = await prisma.leaveRequest.update({
+      where: { id },
+      data: {
+        leaveCategory: cat,
+        dayType: dt,
+        startDate: start,
+        endDate: end,
+        totalDays,
+        reason: reason !== undefined ? String(reason).trim() : existing.reason,
+      },
+      include: {
+        employee: true,
+      },
+    });
+
+    // If leave was APPROVED, re-sync dates on attendance grid
+    if (updated.status === "APPROVED") {
+      const catLabel =
+        cat === "PLANNED"
+          ? "Planned Leave"
+          : cat === "UNPLANNED"
+          ? "Unplanned Leave"
+          : cat === "SICK"
+          ? "Sick Leave"
+          : cat === "EMERGENCY"
+          ? "Emergency Leave"
+          : `${cat} Leave`;
+
+      const note = updated.reason ? `Approved ${catLabel}: ${updated.reason}` : `Approved ${catLabel}`;
+      const curr = new Date(start);
+      while (curr <= end) {
+        const isSun = curr.getUTCDay() === 0;
+        if (!isSun) {
+          await prisma.attendanceRecord.upsert({
+            where: {
+              employeeId_date: {
+                employeeId: updated.employeeId,
+                date: new Date(curr),
+              },
+            },
+            update: { status: "A", workNotes: note },
+            create: { employeeId: updated.employeeId, date: new Date(curr), status: "A", workNotes: note },
+          });
+        }
+        curr.setUTCDate(curr.getUTCDate() + 1);
+      }
+    }
+
+    return NextResponse.json({ success: true, leaveRequest: updated });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await getCurrentUserSession();
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Leave ID is required." }, { status: 400 });
+    }
+
+    const leave = await prisma.leaveRequest.findUnique({
+      where: { id },
+      include: { employee: true },
+    });
+
+    if (!leave) {
+      return NextResponse.json({ success: false, error: "Leave request not found." }, { status: 404 });
+    }
+
+    // 1. Move to RecycleBinItem
+    await prisma.recycleBinItem.create({
+      data: {
+        entityType: "LEAVE_REQUEST",
+        entityId: leave.id,
+        title: `Leave: ${leave.employee?.name || "Employee"} (${leave.startDate.toISOString().split("T")[0]} to ${leave.endDate.toISOString().split("T")[0]})`,
+        subtitle: `${leave.leaveCategory} • ${leave.totalDays} day(s) • Status: ${leave.status}`,
+        payloadJson: JSON.stringify(leave),
+        deletedBy: session.email || "HR Manager",
+      },
+    });
+
+    // 2. If leave was APPROVED, revert the "A" mark on the attendance matrix for this range
+    if (leave.status === "APPROVED") {
+      const start = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+      const curr = new Date(start);
+
+      while (curr <= end) {
+        const isSun = curr.getUTCDay() === 0;
+        if (!isSun) {
+          // Delete or revert to unmarked
+          await prisma.attendanceRecord.deleteMany({
+            where: {
+              employeeId: leave.employeeId,
+              date: new Date(curr),
+              status: "A",
+            },
+          });
+        }
+        curr.setUTCDate(curr.getUTCDate() + 1);
+      }
+    }
+
+    // 3. Remove from LeaveRequest table
+    await prisma.leaveRequest.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Leave request moved to Recycle Bin (and attendance grid synced).",
+    });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+

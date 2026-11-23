@@ -37,6 +37,7 @@ import {
   Shield,
   X,
   Search,
+  Trash2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSidebar } from "./AppShell";
@@ -145,6 +146,7 @@ const WORKSPACES: WorkspaceConfig[] = [
           { name: "Attendance Tracker", href: "/attendance", icon: Clock, badge: "Live", moduleKey: "attendance" },
           { name: "Employees, Labours & Contractors", href: "/labour", icon: Users2, badge: "Directory", moduleKey: "labour" },
           { name: "Salary & Wage Payroll", href: "/payroll", icon: Coins, moduleKey: "payroll" },
+          { name: "Recycle Bin", href: "/recycle-bin", icon: Trash2, badge: "Restore", moduleKey: "recycle_bin" },
         ],
       },
     ],
@@ -163,6 +165,7 @@ const WORKSPACES: WorkspaceConfig[] = [
           { name: "Approvals Queue", href: "/approvals", icon: CheckSquare, badge: "MD", moduleKey: "approvals" },
           { name: "Team Permissions & RBAC", href: "/users", icon: Users, badge: "Super Admin", moduleKey: "users" },
           { name: "Company Settings", href: "/settings", icon: Settings, moduleKey: "settings" },
+          { name: "Recycle Bin", href: "/recycle-bin", icon: Trash2, badge: "Restore", moduleKey: "recycle_bin" },
           { name: "Excel Bulk Importer", href: "/import", icon: Upload, moduleKey: "import" },
           { name: "Security Audit Trail", href: "/audit", icon: ShieldCheck, moduleKey: "audit" },
         ],
@@ -250,7 +253,7 @@ export function Sidebar() {
     if (role === "SUPER_ADMIN" || role === "MANAGING_DIRECTOR") return true;
 
     if (role === "HR_MANAGER") {
-      return ["labour", "attendance", "payroll"].includes(item.moduleKey);
+      return ["labour", "attendance", "payroll", "recycle_bin"].includes(item.moduleKey);
     }
     if (role === "EMPLOYEE") {
       return false;

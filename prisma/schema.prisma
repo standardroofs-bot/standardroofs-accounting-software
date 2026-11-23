@@ -1813,6 +1813,22 @@ model SalesOrderItem {
   salesOrder    SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 }
 
+model RecycleBinItem {
+  id          String   @id @default(cuid())
+  entityType  String   // EMPLOYEE_LABOUR, LEAVE_REQUEST, ATTENDANCE_RECORD, COMPANY_HOLIDAY, INVOICE, EXPENSE
+  entityId    String
+  title       String
+  subtitle    String?
+  payloadJson String   @db.Text
+  deletedBy   String?
+  deletedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([entityType])
+  @@index([deletedAt])
+}
+
 
 
 
