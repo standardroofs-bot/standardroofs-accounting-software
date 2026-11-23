@@ -102,14 +102,22 @@ export async function POST(request: Request) {
 
     // Calculate total days (excluding Sundays)
     let totalDays = 0;
-    const curr = new Date(start);
-    while (curr <= end) {
-      if (curr.getUTCDay() !== 0) {
-        totalDays += dayType === "HALF_DAY" ? 0.5 : 1.0;
+    if (leaveCategory === "PERMISSION_1H") {
+      totalDays = 1.0;
+      // Default dayType to MORNING if not EVENING
+      if (dayType !== "EVENING") dayType = "MORNING";
+    } else if (leaveCategory === "GENERAL_REQUEST") {
+      totalDays = 1.0;
+    } else {
+      const curr = new Date(start);
+      while (curr <= end) {
+        if (curr.getUTCDay() !== 0) {
+          totalDays += dayType === "HALF_DAY" ? 0.5 : 1.0;
+        }
+        curr.setUTCDate(curr.getUTCDate() + 1);
       }
-      curr.setUTCDate(curr.getUTCDate() + 1);
+      if (totalDays === 0) totalDays = dayType === "HALF_DAY" ? 0.5 : 1.0;
     }
-    if (totalDays === 0) totalDays = dayType === "HALF_DAY" ? 0.5 : 1.0;
 
     const leaveRequest = await prisma.leaveRequest.create({
       data: {

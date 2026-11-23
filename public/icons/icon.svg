@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="50%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <linearGradient id="roofGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- App Rounded Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- Inner Subtle Glow Ring -->
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="4" />
+
+  <!-- Roof Peak Graphic (Standard Roofs Architecture) -->
+  <g filter="url(#dropShadow)" transform="translate(0, 10)">
+    <!-- Main Triangular Truss / Roof Silhouette -->
+    <path d="M256 120 L400 240 L360 240 L256 155 L152 240 L112 240 Z" fill="url(#roofGrad)" />
+    <path d="M256 180 L360 268 L330 268 L256 205 L182 268 L152 268 Z" fill="#ffffff" fill-opacity="0.9" />
+
+    <!-- Building Pillar Bars -->
+    <rect x="175" y="275" width="28" height="95" rx="6" fill="#ffffff" fill-opacity="0.95" />
+    <rect x="242" y="275" width="28" height="95" rx="6" fill="#ffffff" fill-opacity="0.95" />
+    <rect x="309" y="275" width="28" height="95" rx="6" fill="#ffffff" fill-opacity="0.95" />
+
+    <!-- Foundation Platform -->
+    <rect x="140" y="375" width="232" height="20" rx="6" fill="url(#roofGrad)" />
+  </g>
+
+  <!-- SR Monogram Badge -->
+  <text x="256" y="445" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="34" font-weight="900" fill="#ffffff" letter-spacing="4" text-anchor="middle">
+    STANDARD ROOFS
+  </text>
+  <text x="256" y="475" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="700" fill="#93c5fd" letter-spacing="3" text-anchor="middle">
+    HR &amp; WORKFORCE
+  </text>
+</svg>

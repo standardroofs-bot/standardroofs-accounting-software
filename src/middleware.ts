@@ -10,6 +10,8 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/auth/logout",
   "/api/health",
+  "/manifest.webmanifest",
+  "/sw.js",
   "/favicon.ico",
 ];
 
@@ -116,6 +118,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/public") ||
     pathname.startsWith("/uploads") ||
     pathname.startsWith("/images") ||
+    pathname.startsWith("/icons") ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/sw.js" ||
     pathname.includes("/print") ||
     pathname === "/favicon.ico"
   ) {

@@ -2267,7 +2267,7 @@ export default function AttendancePage() {
                       UP (0.0)
                     </th>
                   )}
-                  <th className="w-14 min-w-[56px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-rose-800 dark:text-rose-300 font-black">
+                  <th className="w-16 min-w-[60px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-rose-800 dark:text-rose-300 font-black">
                     A (0.0)
                   </th>
                   <th className="w-16 min-w-[64px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-300 font-black">
@@ -2397,7 +2397,7 @@ export default function AttendancePage() {
                         <td className="w-14 min-w-[56px] py-2 px-1 text-center font-bold text-amber-500 tabular-nums bg-white dark:bg-slate-900">
                           0
                         </td>
-                        <td className="w-14 min-w-[56px] py-2 px-1 text-center font-bold text-rose-500 tabular-nums bg-white dark:bg-slate-900">
+                        <td className="w-16 min-w-[60px] py-2 px-1 text-center font-bold text-rose-500 tabular-nums bg-white dark:bg-slate-900">
                           {daysInMonth.length - activeDays}
                         </td>
                         <td className="w-16 min-w-[64px] py-2 px-1 text-center font-bold text-amber-600 tabular-nums bg-white dark:bg-slate-900">
@@ -2576,7 +2576,7 @@ export default function AttendancePage() {
                           {upTotal}
                         </td>
                       )}
-                      <td className="w-14 min-w-[56px] py-1 px-1 text-center font-bold text-rose-500 tabular-nums bg-white dark:bg-slate-900">
+                      <td className="w-16 min-w-[60px] py-1 px-1 text-center font-bold text-rose-500 tabular-nums bg-white dark:bg-slate-900">
                         {aTotal}
                       </td>
                       <td className="w-16 min-w-[64px] py-1 px-1 text-center font-bold text-amber-600 tabular-nums bg-white dark:bg-slate-900">
@@ -3075,15 +3075,29 @@ export default function AttendancePage() {
 
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div>
-                            <span className="text-[10px] text-slate-400 block font-bold uppercase">Leave Type</span>
+                            <span className="text-[10px] text-slate-400 block font-bold uppercase">Leave / Request Type</span>
                             <strong className="text-slate-800 dark:text-slate-200">
-                              {req.leaveType === "PAID" ? "Paid Leave [PL]" : req.leaveType === "HALF_DAY" ? "Half-Day [H]" : "Unpaid Leave [UP]"}
+                              {req.leaveCategory === "PERMISSION_1H"
+                                ? `1-Hr Permission (${req.dayType === "EVENING" ? "Evening" : "Morning"})`
+                                : req.leaveCategory === "GENERAL_REQUEST"
+                                ? "General / Shift Request"
+                                : req.leaveCategory === "PLANNED"
+                                ? "Planned Paid Leave [PL]"
+                                : req.leaveCategory === "SICK"
+                                ? "Sick Leave [PL]"
+                                : req.leaveCategory === "UNPLANNED"
+                                ? "Unplanned Leave [UP]"
+                                : req.leaveType === "PAID"
+                                ? "Paid Leave [PL]"
+                                : req.leaveType === "HALF_DAY"
+                                ? "Half-Day [H]"
+                                : "Unpaid Leave [UP]"}
                             </strong>
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-400 block font-bold uppercase">Dates / Days</span>
                             <strong className="text-slate-800 dark:text-slate-200 font-mono">
-                              {req.startDate?.split("T")[0]} to {req.endDate?.split("T")[0]} ({req.daysCount || req.totalDays || 1}d)
+                              {req.startDate?.split("T")[0]} {req.startDate?.split("T")[0] !== req.endDate?.split("T")[0] ? `to ${req.endDate?.split("T")[0]}` : ""} ({req.leaveCategory === "PERMISSION_1H" ? "1-Hour" : `${req.daysCount || req.totalDays || 1}d`})
                             </strong>
                           </div>
                         </div>

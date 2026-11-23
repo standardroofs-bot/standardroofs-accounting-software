@@ -283,15 +283,29 @@ export async function POST(request: Request) {
       while (curr <= end) {
         const isSun = curr.getUTCDay() === 0;
         let dayStatus = "PL";
+        let slot: string | null = null;
+        let pTime: string | null = null;
+        let pHours: number | null = null;
+        let note = `${leave.leaveCategory} LEAVE: ${leave.reason}`;
+
         if (isSun) {
           dayStatus = "L";
+        } else if (leave.leaveCategory === "PERMISSION_1H") {
+          dayStatus = "1H";
+          slot = leave.dayType === "EVENING" ? "EVENING" : "MORNING";
+          pTime = slot === "EVENING" ? "06:30 PM - 07:30 PM" : "09:00 AM - 10:00 AM";
+          pHours = 1.0;
+          note = `1-Hr Permission (${slot === "EVENING" ? "Evening" : "Morning"}): ${leave.reason}`;
+        } else if (leave.leaveCategory === "GENERAL_REQUEST") {
+          dayStatus = "P";
+          note = `General / Shift Request: ${leave.reason}`;
         } else if (leave.leaveCategory === "PLANNED" || leave.leaveCategory === "SICK") {
           dayStatus = leave.dayType === "HALF_DAY" ? "H" : "PL";
+          pHours = leave.dayType === "HALF_DAY" ? 0.5 : 1.0;
         } else {
           dayStatus = leave.dayType === "HALF_DAY" ? "H" : "UP";
+          pHours = leave.dayType === "HALF_DAY" ? 0.5 : 1.0;
         }
-
-        const note = `${leave.leaveCategory} LEAVE: ${leave.reason}`;
 
         await prisma.attendanceRecord.upsert({
           where: {
@@ -304,7 +318,9 @@ export async function POST(request: Request) {
             status: dayStatus,
             workNotes: note,
             permissionNote: note,
-            permissionHours: leave.dayType === "HALF_DAY" ? 0.5 : 1.0,
+            permissionSlot: slot,
+            permissionTime: pTime,
+            permissionHours: pHours,
             category: leave.employee.category,
             companyUnit: leave.employee.companyUnit,
           },
@@ -314,7 +330,9 @@ export async function POST(request: Request) {
             status: dayStatus,
             workNotes: note,
             permissionNote: note,
-            permissionHours: leave.dayType === "HALF_DAY" ? 0.5 : 1.0,
+            permissionSlot: slot,
+            permissionTime: pTime,
+            permissionHours: pHours,
             category: leave.employee.category,
             companyUnit: leave.employee.companyUnit,
           },

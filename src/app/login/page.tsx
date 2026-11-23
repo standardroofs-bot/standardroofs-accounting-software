@@ -15,7 +15,9 @@ import {
   Calculator,
   Wrench,
   FileCheck,
+  Smartphone,
 } from "lucide-react";
+import PwaInstallPrompt from "@/components/pwa/PwaInstallPrompt";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -239,7 +241,10 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="pt-4 text-center">
+          <div className="pt-4 text-center space-y-3">
+            <div className="flex justify-center">
+              <PwaInstallPrompt variant="compact" label="Install Mobile App" />
+            </div>
             <p className="text-[11px] text-slate-500">
               Protected by Standard Roofs Books Enterprise Security &middot; Encrypted Session
             </p>
