@@ -17,6 +17,7 @@ import {
   Clock,
   CheckCircle2,
   Trash2,
+  X,
 } from "lucide-react";
 import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
 import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
@@ -533,10 +534,13 @@ export default function FleetPage() {
                 <Navigation className="h-5 w-5 text-amber-500" /> Log Daily Cargo Trip & Fuel
               </h3>
               <button
+                type="button"
                 onClick={() => setShowTripModal(false)}
-                className="text-muted-foreground hover:text-foreground text-sm font-semibold"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                title="Close"
+                aria-label="Close"
               >
-                ✕
+                <X size={16} />
               </button>
             </div>
 
@@ -756,9 +760,20 @@ export default function FleetPage() {
       {showVehicleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-card border border-border w-full max-w-md rounded-xl shadow-xl overflow-hidden p-6 space-y-4">
-            <h3 className="font-bold text-base text-foreground flex items-center gap-2">
-              <Truck className="h-5 w-5 text-amber-500" /> Register Company Cargo Vehicle
-            </h3>
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+                <Truck className="h-5 w-5 text-amber-500" /> Register Company Cargo Vehicle
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowVehicleModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                title="Close"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
             <form onSubmit={handleVehicleSubmit} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground mb-1">Registration No *</label>
@@ -839,9 +854,20 @@ export default function FleetPage() {
       {showDriverModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-card border border-border w-full max-w-md rounded-xl shadow-xl overflow-hidden p-6 space-y-4">
-            <h3 className="font-bold text-base text-foreground flex items-center gap-2">
-              <User className="h-5 w-5 text-amber-500" /> Add Dedicated Driver
-            </h3>
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+                <User className="h-5 w-5 text-amber-500" /> Add Dedicated Driver
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowDriverModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                title="Close"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
             <form onSubmit={handleDriverSubmit} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground mb-1">Full Name *</label>

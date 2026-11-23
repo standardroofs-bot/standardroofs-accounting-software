@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Eye,
   RefreshCw,
+  X,
 } from "lucide-react";
 
 interface RecycleItem {
@@ -405,9 +406,11 @@ export default function RecycleBinPage() {
               <button
                 type="button"
                 onClick={() => setPreviewPayload(null)}
-                className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-black flex items-center justify-center hover:bg-slate-200 cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                title="Close"
+                aria-label="Close"
               >
-                &times;
+                <X size={16} />
               </button>
             </div>
             <pre className="p-4 rounded-2xl bg-slate-950 text-emerald-400 font-mono text-xs overflow-x-auto max-h-[50vh]">

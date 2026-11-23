@@ -18,6 +18,7 @@ import {
   ArrowRight,
   Receipt,
   Trash2,
+  X,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
 import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
@@ -469,12 +470,25 @@ export default function ProjectsPage() {
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6">
-            <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-              <Briefcase className="text-blue-600" /> Register Roofing Project Site
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Creates a dedicated project cost center for multi-team billing and site expenditure tracking
-            </p>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <Briefcase className="text-blue-600" /> Register Roofing Project Site
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Creates a dedicated project cost center for multi-team billing and site expenditure tracking
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60"
+                title="Close"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
 
             {errorMsg && (
               <div className="mt-3 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">

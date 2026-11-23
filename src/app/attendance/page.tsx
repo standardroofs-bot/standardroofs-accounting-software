@@ -1978,10 +1978,11 @@ export default function AttendancePage() {
                   <button
                     type="button"
                     onClick={() => setShowTodayRollCall(false)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
                     title="Close Roll-Call Panel"
+                    aria-label="Close"
                   >
-                    <X size={18} />
+                    <X size={16} />
                   </button>
                 </div>
               </div>
@@ -2722,7 +2723,9 @@ export default function AttendancePage() {
               <button
                 type="button"
                 onClick={() => setCellEditTarget(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                title="Close"
+                aria-label="Close"
               >
                 <X size={16} />
               </button>
@@ -3027,7 +3030,9 @@ export default function AttendancePage() {
               <button
                 type="button"
                 onClick={() => setPermPromptTarget(null)}
-                className="p-1 text-slate-400 hover:text-slate-600"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                title="Close"
+                aria-label="Close"
               >
                 <X size={16} />
               </button>
@@ -3095,9 +3100,11 @@ export default function AttendancePage() {
               <button
                 type="button"
                 onClick={() => setShowLeaveDrawer(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                title="Close Drawer"
+                aria-label="Close"
               >
-                <X size={20} />
+                <X size={16} />
               </button>
             </div>
 
@@ -3540,9 +3547,11 @@ export default function AttendancePage() {
               <button
                 type="button"
                 onClick={() => setShowHolidayModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                title="Close"
+                aria-label="Close"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
@@ -3630,9 +3639,11 @@ export default function AttendancePage() {
               <button
                 type="button"
                 onClick={() => setShowContractorModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                title="Close"
+                aria-label="Close"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
@@ -3775,7 +3786,9 @@ export default function AttendancePage() {
               <button
                 type="button"
                 onClick={() => setSelectedContractorCell(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                title="Close"
+                aria-label="Close"
               >
                 <X size={16} />
               </button>
@@ -4014,9 +4027,11 @@ export default function AttendancePage() {
               <button
                 type="button"
                 onClick={() => setEditingLeave(null)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                title="Close"
+                aria-label="Close"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 

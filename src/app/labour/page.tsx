@@ -714,10 +714,13 @@ export default function WorkforceKYCDirectoryPage() {
                 {formData.id ? `Edit Profile: ${formData.name}` : `Add New Workforce Profile`}
               </h3>
               <button
+                type="button"
                 onClick={() => setShowAddEditModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
+                title="Close"
+                aria-label="Close"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
