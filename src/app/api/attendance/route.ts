@@ -282,29 +282,38 @@ export async function POST(request: Request) {
 
       while (curr <= end) {
         const isSun = curr.getUTCDay() === 0;
-        let dayStatus = "PL";
+        let dayStatus = "A";
         let slot: string | null = null;
         let pTime: string | null = null;
         let pHours: number | null = null;
-        let note = `${leave.leaveCategory} LEAVE: ${leave.reason}`;
+        let note = `Approved Leave: ${leave.reason}`;
 
         if (isSun) {
           dayStatus = "L";
+          note = "Sunday (Weekly Off)";
         } else if (leave.leaveCategory === "PERMISSION_1H") {
           dayStatus = "1H";
           slot = leave.dayType === "EVENING" ? "EVENING" : "MORNING";
           pTime = slot === "EVENING" ? "06:30 PM - 07:30 PM" : "09:00 AM - 10:00 AM";
           pHours = 1.0;
-          note = `1-Hr Permission (${slot === "EVENING" ? "Evening" : "Morning"}): ${leave.reason}`;
+          note = `Approved 1-Hr Permission (${slot === "EVENING" ? "Evening" : "Morning"}): ${leave.reason}`;
         } else if (leave.leaveCategory === "GENERAL_REQUEST") {
           dayStatus = "P";
-          note = `General / Shift Request: ${leave.reason}`;
-        } else if (leave.leaveCategory === "PLANNED" || leave.leaveCategory === "SICK") {
-          dayStatus = leave.dayType === "HALF_DAY" ? "H" : "PL";
-          pHours = leave.dayType === "HALF_DAY" ? 0.5 : 1.0;
+          note = `Approved General / Shift Request: ${leave.reason}`;
         } else {
-          dayStatus = leave.dayType === "HALF_DAY" ? "H" : "UP";
-          pHours = leave.dayType === "HALF_DAY" ? 0.5 : 1.0;
+          // Planned, Unplanned, Sick, Emergency Leaves: ALWAYS MARK AS "A" (Absent - Non-Payable)
+          dayStatus = "A";
+          const catLabel =
+            leave.leaveCategory === "PLANNED"
+              ? "Planned Leave"
+              : leave.leaveCategory === "UNPLANNED"
+              ? "Unplanned Leave"
+              : leave.leaveCategory === "SICK"
+              ? "Sick Leave"
+              : leave.leaveCategory === "EMERGENCY"
+              ? "Emergency Leave"
+              : `${leave.leaveCategory} Leave`;
+          note = `Approved ${catLabel}: ${leave.reason}`;
         }
 
         await prisma.attendanceRecord.upsert({

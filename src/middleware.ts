@@ -191,7 +191,7 @@ export async function middleware(request: NextRequest) {
     return applyGatewayHeaders(NextResponse.redirect(loginUrl), requestId, startTime);
   }
 
-  // 5.1 Strict Role Isolation for EMPLOYEE (Self-Service Portal Only)
+  // 5.1 Strict Role Isolation for EMPLOYEE (Tier 3: Read-Only Self-Service Portal Only)
   if (session.role === "EMPLOYEE") {
     const isEmployeeAllowed =
       pathname === "/my-attendance" ||
@@ -200,6 +200,7 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/api/my-attendance/") ||
       pathname === "/api/leave-requests" ||
       pathname.startsWith("/api/leave-requests/") ||
+      pathname === "/api/attendance/holidays" ||
       pathname === "/api/auth/me" ||
       pathname === "/api/auth/logout" ||
       pathname === "/api/health";
@@ -217,6 +218,42 @@ export async function middleware(request: NextRequest) {
         );
       }
       return applyGatewayHeaders(NextResponse.redirect(new URL("/my-attendance", request.url)), requestId, startTime);
+    }
+    return applyGatewayHeaders(NextResponse.next(), requestId, startTime, rateLimitInfo);
+  }
+
+  // 5.2 Strict Role Isolation for HR_MANAGER (Tier 2: HR, Attendance & Payroll Workspace Only)
+  if (session.role === "HR_MANAGER") {
+    const isHrAllowed =
+      pathname === "/attendance" ||
+      pathname.startsWith("/attendance/") ||
+      pathname === "/labour" ||
+      pathname.startsWith("/labour/") ||
+      pathname === "/payroll" ||
+      pathname.startsWith("/payroll/") ||
+      pathname === "/my-attendance" ||
+      pathname.startsWith("/my-attendance/") ||
+      pathname.startsWith("/api/attendance") ||
+      pathname.startsWith("/api/labour") ||
+      pathname.startsWith("/api/leave-requests") ||
+      pathname.startsWith("/api/payroll") ||
+      pathname === "/api/auth/me" ||
+      pathname === "/api/auth/logout" ||
+      pathname === "/api/health";
+
+    if (!isHrAllowed) {
+      if (pathname.startsWith("/api/")) {
+        return applyGatewayHeaders(
+          NextResponse.json(
+            { success: false, error: "Access Denied: HR Department accounts are restricted to HR, Attendance & Payroll." },
+            { status: 403 }
+          ),
+          requestId,
+          startTime,
+          rateLimitInfo
+        );
+      }
+      return applyGatewayHeaders(NextResponse.redirect(new URL("/attendance", request.url)), requestId, startTime);
     }
     return applyGatewayHeaders(NextResponse.next(), requestId, startTime, rateLimitInfo);
   }
@@ -243,9 +280,6 @@ export async function middleware(request: NextRequest) {
         // Redirect unauthorized page access to allowed landing page
         if (session.role === "SITE_SUPERVISOR") {
           return applyGatewayHeaders(NextResponse.redirect(new URL("/expenses", request.url)), requestId, startTime);
-        }
-        if (session.role === "HR_MANAGER") {
-          return applyGatewayHeaders(NextResponse.redirect(new URL("/labour", request.url)), requestId, startTime);
         }
         return applyGatewayHeaders(NextResponse.redirect(new URL("/", request.url)), requestId, startTime);
       }

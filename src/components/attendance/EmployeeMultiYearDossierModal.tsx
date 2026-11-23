@@ -125,6 +125,205 @@ export default function EmployeeMultiYearDossierModal({
   const monthDaysWorked = activeMonthData?.payableDays || 0;
   const monthAttendancePercentage = monthOrgWorkingDays > 0 ? Math.min(100, Math.round((monthDaysWorked / monthOrgWorkingDays) * 100)) : 0;
 
+  const handlePrintPDF = () => {
+    if (!dossierData || !employee) return;
+    const yearData = dossierData.yearlyData?.[activeYear];
+    const isMonthly = downloadPeriod === "SELECTED_MONTH" && activeMonthData;
+    const periodLabel = isMonthly
+      ? `${activeMonthData.monthName} ${activeYear}`
+      : downloadPeriod === "FISCAL_YEAR"
+      ? `FY ${activeYear}-${Number(activeYear) + 1}`
+      : `Calendar Year ${activeYear}`;
+
+    const scheduledDays = isMonthly ? monthOrgWorkingDays : scheduledOrgWorkingDays;
+    const daysWorked = isMonthly ? monthDaysWorked : actualDaysWorked;
+    const eff = isMonthly ? monthAttendancePercentage : attendancePercentage;
+    const otHrs = isMonthly ? (activeMonthData.otHours || 0) : (yearTotals.otHours || 0);
+    const p1h = isMonthly
+      ? `${activeMonthData.permission || 0} (${activeMonthData.permissionMorning || 0}M / ${activeMonthData.permissionEvening || 0}E)`
+      : `${yearTotals.permission || 0} (${yearTotals.permissionMorning || 0}M / ${yearTotals.permissionEvening || 0}E)`;
+
+    // Calculate leaves breakdown
+    let plCount = 0;
+    let upCount = 0;
+    let aCount = 0;
+    if (isMonthly) {
+      plCount = activeMonthData.paidLeave || 0;
+      upCount = activeMonthData.unpaidLeave || 0;
+      aCount = activeMonthData.absent || 0;
+    } else {
+      yearData?.months?.forEach((m: any) => {
+        plCount += m.paidLeave || 0;
+        upCount += m.unpaidLeave || 0;
+        aCount += m.absent || 0;
+      });
+    }
+
+    const printWin = window.open("", "_blank");
+    if (!printWin) {
+      window.print();
+      return;
+    }
+
+    const dailyRowsHtml = (isMonthly ? (activeMonthData.dailyRecords || []) : []).map((r: any) => `
+      <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+        <td style="padding: 6px 8px; font-weight: bold; font-family: monospace;">${r.date}</td>
+        <td style="padding: 6px 8px; text-align: center;">
+          <span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-weight: bold; background: ${
+            r.status === 'P' ? '#dcfce7; color: #166534;' :
+            r.status === '1H' ? '#e0f2fe; color: #0369a1;' :
+            r.status === 'H' ? '#fef3c7; color: #92400e;' :
+            r.status === 'L' ? '#f1f5f9; color: #475569;' :
+            '#fee2e2; color: #991b1b;'
+          }">${r.status}</span>
+        </td>
+        <td style="padding: 6px 8px; text-align: center; font-family: monospace;">${r.inTime || '09:00 AM'} - ${r.outTime || '07:00 PM'}</td>
+        <td style="padding: 6px 8px; text-align: center;">${r.otHours ? '+' + r.otHours + 'h' : '—'}</td>
+        <td style="padding: 6px 8px;">${r.permissionNote || r.workNotes || r.otReason || '—'}</td>
+      </tr>
+    `).join("");
+
+    const monthRowsHtml = (!isMonthly ? (yearData?.months || []) : []).map((m: any) => `
+      <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+        <td style="padding: 6px 8px; font-weight: bold;">${m.monthName}</td>
+        <td style="padding: 6px 8px; text-align: center; color: #166534; font-weight: bold;">${m.present}</td>
+        <td style="padding: 6px 8px; text-align: center; color: #0284c7;">${m.permission}</td>
+        <td style="padding: 6px 8px; text-align: center; color: #d97706;">${m.halfDay}</td>
+        <td style="padding: 6px 8px; text-align: center; color: #0d9488;">${m.paidLeave || 0}</td>
+        <td style="padding: 6px 8px; text-align: center; color: #64748b;">${m.unpaidLeave || 0}</td>
+        <td style="padding: 6px 8px; text-align: center; color: #e11d48; font-weight: bold;">${m.absent}</td>
+        <td style="padding: 6px 8px; text-align: center; color: #b45309;">${m.otHours || 0}h</td>
+        <td style="padding: 6px 8px; text-align: center; color: #64748b;">${m.leave}</td>
+        <td style="padding: 6px 8px; text-align: center; font-weight: 900; color: #1d4ed8; background: #eff6ff;">${m.payableDays}</td>
+      </tr>
+    `).join("");
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Attendance Dossier - ${employee.employeeCode} ${employee.name}</title>
+          <style>
+            @page { size: A4 portrait; margin: 12mm; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 12px; }
+            .header-table { width: 100%; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 14px; }
+            .meta-box { width: 100%; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 14px; font-size: 11px; }
+            .kpi-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; text-align: center; font-size: 11px; }
+            .kpi-table th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px; }
+            .kpi-table td { border: 1px solid #cbd5e1; padding: 8px; font-weight: bold; }
+            .data-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }
+            .data-table th { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 10px; text-transform: uppercase; }
+            .footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid #cbd5e1; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; }
+          </style>
+        </head>
+        <body>
+          <table class="header-table">
+            <tr>
+              <td style="width: 80px; vertical-align: middle;">
+                <img src="/images/standard-roofs-logo.png" style="height: 52px; width: auto; object-fit: contain;" alt="Logo" onerror="this.style.display='none'" />
+              </td>
+              <td style="vertical-align: middle; padding-left: 10px;">
+                <h1 style="margin: 0; font-size: 16px; font-weight: 900; letter-spacing: -0.5px; color: #0f172a;">STANDARD ROOFS</h1>
+                <p style="margin: 2px 0 0 0; font-size: 10px; font-weight: bold; color: #2563eb; letter-spacing: 0.5px;">HIGH QUALITY ROOFING SOLUTIONS • HRIS & ATTENDANCE DOSSIER</p>
+                <p style="margin: 2px 0 0 0; font-size: 9.5px; color: #64748b;">144, Vellakkal Medu, Nasiyanur Post, Erode 638107, Tamil Nadu &middot; State Code: 33</p>
+              </td>
+              <td style="text-align: right; vertical-align: middle; font-size: 10px; color: #475569;">
+                <p style="margin: 0; font-weight: bold; font-size: 11px; color: #0f172a;">Report Period: ${periodLabel}</p>
+                <p style="margin: 2px 0 0 0;">Generated: ${new Date().toLocaleDateString('en-IN', { dateStyle: 'medium' })}</p>
+              </td>
+            </tr>
+          </table>
+
+          <table class="meta-box">
+            <tr>
+              <td style="width: 25%;"><strong>Employee:</strong> ${employee.name}</td>
+              <td style="width: 25%;"><strong>Code:</strong> <span style="font-family: monospace; font-weight: bold;">${employee.employeeCode}</span></td>
+              <td style="width: 25%;"><strong>Role / Designation:</strong> ${employee.designation || employee.role || 'Workforce'}</td>
+              <td style="width: 25%;"><strong>Company Unit:</strong> ${employee.companyUnit === 'INVI_CREATION' ? 'Invi Creation' : 'Standard Roofs'}</td>
+            </tr>
+          </table>
+
+          <h3 style="font-size: 11px; text-transform: uppercase; margin: 0 0 6px 0; color: #0f172a;">1. Verified Performance & Attendance Metrics</h3>
+          <table class="kpi-table">
+            <thead>
+              <tr>
+                <th>Total Real Working Days</th>
+                <th>Days Present & Worked</th>
+                <th>Efficiency %</th>
+                <th>Leaves / Absents (PL/UP/A)</th>
+                <th>1-Hr Permissions</th>
+                <th>Overtime (OT)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="color: #1d4ed8; font-size: 14px;">${scheduledDays}</td>
+                <td style="color: #166534; font-size: 14px;">${daysWorked}</td>
+                <td style="color: #0f172a; font-size: 14px;">${eff}%</td>
+                <td style="color: #e11d48;">PL: ${plCount} &middot; UP: ${upCount} &middot; A: ${aCount}</td>
+                <td style="color: #0284c7;">${p1h}</td>
+                <td style="color: #b45309;">${otHrs}h</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 style="font-size: 11px; text-transform: uppercase; margin: 10px 0 6px 0; color: #0f172a;">
+            ${isMonthly ? '2. Day-by-Day Attendance Matrix Log' : '2. 12-Month Muster Roll Breakdown'}
+          </h3>
+
+          ${isMonthly ? `
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="text-align: left;">Date</th>
+                  <th>Status</th>
+                  <th>In / Out Time</th>
+                  <th>OT Hours</th>
+                  <th style="text-align: left;">Notes / Approvals</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${dailyRowsHtml}
+              </tbody>
+            </table>
+          ` : `
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="text-align: left;">Month</th>
+                  <th>P (1.0)</th>
+                  <th>1H (1.0)</th>
+                  <th>H (0.5)</th>
+                  <th>PL (1.0)</th>
+                  <th>UP (0.0)</th>
+                  <th>A (0.0)</th>
+                  <th>OT</th>
+                  <th>L (Sun)</th>
+                  <th style="background: #dbeafe;">Net Payable</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${monthRowsHtml}
+              </tbody>
+            </table>
+          `}
+
+          <div class="footer">
+            <span>Standard Roofs Books &middot; Official HRIS Report</span>
+            <span>Verified By HR & Accounts: _______________________</span>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWin.document.close();
+  };
+
   const handleExportExcel = (mode: "FULL_YEAR" | "SELECTED_MONTH" | "FISCAL_YEAR") => {
     if (!dossierData || !employee) return;
     const yearData = dossierData.yearlyData?.[activeYear];
@@ -132,6 +331,9 @@ export default function EmployeeMultiYearDossierModal({
 
     if (isContractorTeam) {
       const exportRows = yearData.months.map((m: any) => ({
+        Company: "STANDARD ROOFS — HIGH QUALITY ROOFING SOLUTIONS",
+        Address: "144, Vellakkal Medu, Nasiyanur Post, Erode 638107, Tamil Nadu",
+        Team: employee.name,
         Year: activeYear,
         Month: m.monthName,
         "Total Labours (Headcount)": m.headcount,
@@ -149,6 +351,16 @@ export default function EmployeeMultiYearDossierModal({
 
     if (mode === "SELECTED_MONTH" && activeMonthData) {
       const exportRows: any[] = [
+        {
+          "Section / Record": "COMPANY HEADER",
+          Date: "STANDARD ROOFS — HIGH QUALITY ROOFING SOLUTIONS",
+          Status: "ERODE HQ",
+          "In / Out Time": "144, Vellakkal Medu, Nasiyanur Post, Erode 638107, Tamil Nadu",
+          "Location / Deployed Site": `Employee: ${employee.name} (${employee.employeeCode})`,
+          "1H Permission": `Role: ${employee.designation || employee.role || "Workforce"}`,
+          "OT Hours": `Period: ${activeMonthData.monthName} ${activeYear}`,
+          "Remarks / Notes": `Scheduled Days: ${monthOrgWorkingDays} | Days Worked: ${monthDaysWorked} | Efficiency: ${monthAttendancePercentage}%`,
+        },
         {
           "Section / Record": "--- MONTHLY SCORECARD ---",
           Date: `${activeMonthData.monthName} ${activeYear}`,
@@ -173,7 +385,7 @@ export default function EmployeeMultiYearDossierModal({
 
       exportToExcel(
         exportRows,
-        `${employee.employeeCode}_${employee.name}_${activeMonthData.monthName}_${activeYear}`,
+        `StandardRoofs_${employee.employeeCode}_${employee.name}_${activeMonthData.monthName}_${activeYear}`,
         "MonthAttendance"
       );
       return;
@@ -181,6 +393,16 @@ export default function EmployeeMultiYearDossierModal({
 
     // Comprehensive 3-Section Annual or Fiscal Year Report
     const exportRows: any[] = [];
+
+    // SECTION 0: BRANDED COMPANY & EMPLOYEE IDENTIFIER
+    exportRows.push({
+      "Report Type": "STANDARD ROOFS — HIGH QUALITY ROOFING SOLUTIONS",
+      "Field / Month": "144, Vellakkal Medu, Nasiyanur Post, Erode 638107, Tamil Nadu",
+      "Metric / Value": `Employee: ${employee.name} (${employee.employeeCode})`,
+      "Payable / Status": `Role: ${employee.designation || employee.role || "Workforce"}`,
+      "Overtime / Hours": `Company Unit: ${employee.companyUnit === "INVI_CREATION" ? "Invi Creation" : "Standard Roofs"}`,
+      Details: `Report Period: Annual ${activeYear}`,
+    });
 
     // SECTION 1: ANNUAL SCORECARD
     exportRows.push({
@@ -213,7 +435,7 @@ export default function EmployeeMultiYearDossierModal({
       "Metric / Value": actualDaysWorked,
       "Payable / Status": "-",
       "Overtime / Hours": "-",
-      Details: `P(1.0) + 1H(1.0) + H(0.5) + PL(1.0)`,
+      Details: `P(1.0) + 1H(1.0) + H(0.5)`,
     });
     exportRows.push({
       "Report Type": "SECTION 1: ANNUAL HRIS SCORECARD",
@@ -314,8 +536,12 @@ export default function EmployeeMultiYearDossierModal({
               </h3>
               <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
                 <Briefcase size={12} />
-                <span>{employee.designation || employee.role || (isContractorTeam ? "Contractor Team" : "Workforce")}</span>
-                <span>•</span>
+                {(employee.designation || employee.role) ? (
+                  <>
+                    <span>{employee.designation || employee.role}</span>
+                    <span>•</span>
+                  </>
+                ) : null}
                 <span className="capitalize">{employee.category.replace(/_/g, " ").toLowerCase()}</span>
                 <span>•</span>
                 <span className="text-slate-400">Tenure Attendance Record (Pure HRIS)</span>
@@ -373,7 +599,7 @@ export default function EmployeeMultiYearDossierModal({
             </button>
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={handlePrintPDF}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 font-bold text-xs transition cursor-pointer shadow-xs"
               title="Print standard A4 Attendance Dossier"
             >
@@ -855,11 +1081,17 @@ export default function EmployeeMultiYearDossierModal({
         <div className="hidden print:block p-4 space-y-4 text-black bg-white">
           <div className="border-b-2 border-slate-800 pb-3">
             <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-xl font-black tracking-tight text-slate-900">STANDARD ROOFS BOOKS</h1>
-                <h2 className="text-xs font-bold text-slate-600 uppercase tracking-wider mt-0.5">
-                  Official Workforce Attendance & HRIS Dossier
-                </h2>
+              <div className="flex items-center gap-3">
+                <img src="/images/standard-roofs-logo.png" className="h-12 w-auto object-contain" alt="Standard Roofs" />
+                <div>
+                  <h1 className="text-xl font-black tracking-tight text-slate-900">STANDARD ROOFS</h1>
+                  <h2 className="text-xs font-bold text-blue-600 uppercase tracking-wider mt-0.5">
+                    HIGH QUALITY ROOFING SOLUTIONS • HRIS ATTENDANCE DOSSIER
+                  </h2>
+                  <p className="text-[10px] text-slate-500">
+                    144, Vellakkal Medu, Nasiyanur Post, Erode 638107, Tamil Nadu &middot; State Code: 33
+                  </p>
+                </div>
               </div>
               <div className="text-right text-[11px] text-slate-600">
                 <p className="font-bold">Period: {downloadPeriod === "SELECTED_MONTH" ? `${activeMonthData?.monthName} ${activeYear}` : downloadPeriod === "FISCAL_YEAR" ? `FY ${activeYear}-${Number(activeYear) + 1}` : `Annual Jan–Dec ${activeYear}`}</p>

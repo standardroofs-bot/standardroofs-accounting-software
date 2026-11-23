@@ -93,6 +93,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Employee ID is required." }, { status: 400 });
     }
 
+    const emp = await prisma.employeeOrLabour.findUnique({
+      where: { id: employeeId },
+      select: { companyUnit: true, employeeCode: true },
+    });
+    if (emp?.companyUnit !== "STANDARD_ROOFS") {
+      return NextResponse.json(
+        { success: false, error: "Leave requests are restricted to Standard Roofs employees (SR001–SR010)." },
+        { status: 403 }
+      );
+    }
+
     const start = new Date(`${startDate}T00:00:00.000Z`);
     const end = new Date(`${endDate}T00:00:00.000Z`);
 

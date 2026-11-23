@@ -79,6 +79,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: "Employee record not found." }, { status: 404 });
     }
 
+    if (employee.companyUnit !== "STANDARD_ROOFS") {
+      return NextResponse.json(
+        { success: false, error: "Access Denied: ESS Portal is restricted to Standard Roofs employees (SR001–SR010)." },
+        { status: 403 }
+      );
+    }
+
     // Days in Month
     const daysInMonthCount = new Date(year, month, 0).getDate();
     const attendanceMap = new Map();

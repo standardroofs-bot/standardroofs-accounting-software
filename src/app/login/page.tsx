@@ -43,8 +43,16 @@ export default function LoginPage() {
       const data = await res.json();
       if (data.success) {
         const searchParams = new URLSearchParams(window.location.search);
-        const from = searchParams.get("from") || "/";
-        router.push(from);
+        const from = searchParams.get("from");
+        if (from && from !== "/login" && from !== "/") {
+          router.push(from);
+        } else if (data.user?.role === "EMPLOYEE") {
+          router.push("/my-attendance");
+        } else if (data.user?.role === "HR_MANAGER") {
+          router.push("/attendance");
+        } else {
+          router.push("/");
+        }
         router.refresh();
       } else {
         setErrorMsg(data.error || "Invalid email or password. Please verify your credentials.");

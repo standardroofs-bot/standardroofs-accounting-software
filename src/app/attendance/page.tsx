@@ -3033,7 +3033,7 @@ export default function AttendancePage() {
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
                 }`}
               >
-                <span>ESS Logins (13)</span>
+                <span>ESS & Role Logins (10)</span>
               </button>
             </div>
 
@@ -3151,10 +3151,10 @@ export default function AttendancePage() {
                     >
                       <option value="">-- Choose Employee --</option>
                       {employees
-                        .filter((e) => e.category === "OFFICE_STAFF")
+                        .filter((e) => e.category === "OFFICE_STAFF" && e.companyUnit === "STANDARD_ROOFS")
                         .map((emp) => (
                           <option key={emp.id} value={emp.id}>
-                            {emp.employeeCode} • {emp.name} ({emp.role || emp.designation || "Staff"}) - {emp.companyUnit === "INVI_CREATION" ? "Invi" : "Standard Roofs"}
+                            {emp.employeeCode} • {emp.name} {emp.designation || emp.role ? `(${emp.designation || emp.role})` : ""} - Standard Roofs
                           </option>
                         ))}
                     </select>
@@ -3170,9 +3170,10 @@ export default function AttendancePage() {
                         onChange={(e) => setApplyLeaveCategory(e.target.value as any)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
                       >
-                        <option value="PLANNED">Planned Paid Leave (PL - 1.0 Day)</option>
-                        <option value="UNPLANNED">Unplanned Unpaid Leave (UP - 0.0 Day)</option>
-                        <option value="SICK">Sick Leave (Emergency PL)</option>
+                        <option value="PLANNED">Planned Leave (PLANNED)</option>
+                        <option value="UNPLANNED">Unplanned Leave (UNPLANNED)</option>
+                        <option value="SICK">Sick Leave (SICK)</option>
+                        <option value="EMERGENCY">Emergency Leave (EMERGENCY)</option>
                       </select>
                     </div>
 
@@ -3250,16 +3251,49 @@ export default function AttendancePage() {
                 </div>
               )}
 
-              {/* TAB 3: ESS PORTAL LOGINS & CREDENTIALS */}
+              {/* TAB 3: ESS PORTAL LOGINS & ROLE CREDENTIALS (3-TIER RBAC) */}
               {leaveDrawerTab === "ess" && (
-                <div className="space-y-3">
+                <div className="space-y-3.5">
+                  {/* 3-Tier RBAC Reference Banner */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-300 block">
+                        Tier 1: Super Admin
+                      </span>
+                      <strong className="text-slate-800 dark:text-slate-200 block text-[11px] truncate">
+                        admin@standardroofs.com
+                      </strong>
+                      <span className="text-[10px] text-slate-500 font-mono">Password: admin123</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300 block">
+                        Tier 2: HR Dept (Monika)
+                      </span>
+                      <strong className="text-slate-800 dark:text-slate-200 block text-[11px] truncate">
+                        sr002 / hr@standardroofs.com
+                      </strong>
+                      <span className="text-[10px] text-slate-500 font-mono">Password: employee123</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-300 block">
+                        Tier 3: Office ESS (10)
+                      </span>
+                      <strong className="text-slate-800 dark:text-slate-200 block text-[11px] truncate">
+                        SR001 – SR010
+                      </strong>
+                      <span className="text-[10px] text-slate-500 font-mono">Password: employee123</span>
+                    </div>
+                  </div>
+
                   <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
                     <div>
                       <span className="text-xs font-black text-indigo-900 dark:text-indigo-200 block">
-                        Employee Self-Service (ESS) Portal
+                        Standard Roofs Employee Self-Service (ESS)
                       </span>
                       <span className="text-[11px] text-indigo-700 dark:text-indigo-300">
-                        Default Password: <code className="bg-indigo-200/60 dark:bg-indigo-900 px-1 py-0.5 rounded font-black text-indigo-950 dark:text-indigo-100">employee123</code>
+                        Default Password: <code className="bg-indigo-200/60 dark:bg-indigo-900 px-1 py-0.5 rounded font-black text-indigo-950 dark:text-indigo-100">employee123</code> &middot; Restricted to SR001–SR010
                       </span>
                     </div>
                     <a
@@ -3274,19 +3308,16 @@ export default function AttendancePage() {
 
                   <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
                     {[
-                      { code: "SR001", name: "Thiyagu", email: "thiyagu@standardroofs.com", role: "Supervisor", unit: "Standard Roofs" },
-                      { code: "SR002", name: "Monika", email: "monika@standardroofs.com", role: "HR", unit: "Standard Roofs" },
-                      { code: "SR003", name: "Periyasamy", email: "periyasamy@standardroofs.com", role: "Accountant", unit: "Standard Roofs" },
-                      { code: "SR004", name: "Sabari", email: "sabari@standardroofs.com", role: "Marketing Admin", unit: "Standard Roofs" },
-                      { code: "SR005", name: "Sivakumar", email: "sivakumar@standardroofs.com", role: "Manager", unit: "Standard Roofs" },
-                      { code: "SR006", name: "Sri Manikandan", email: "srimanikandan@standardroofs.com", role: "AI Engineer", unit: "Standard Roofs" },
-                      { code: "SR007", name: "Kavinkumar", email: "kavinkumar@standardroofs.com", role: "AI Prompt Engineer", unit: "Standard Roofs" },
-                      { code: "SR008", name: "Adhi", email: "adhi@standardroofs.com", role: "AI Prompt Engineer", unit: "Standard Roofs" },
-                      { code: "SR009", name: "Gowri", email: "gowri@standardroofs.com", role: "Senior Manager", unit: "Standard Roofs" },
-                      { code: "SR010", name: "Kaviya", email: "kaviya@standardroofs.com", role: "Data Ops", unit: "Standard Roofs" },
-                      { code: "Invi001", name: "Indhu", email: "indhu@invicreation.com", role: "UI/UX Designer", unit: "Invi Creation" },
-                      { code: "Invi002", name: "Malar", email: "malar@invicreation.com", role: "Full-Stack Developer", unit: "Invi Creation" },
-                      { code: "Invi003", name: "Keerthika", email: "keerthika@invicreation.com", role: "Operations Specialist", unit: "Invi Creation" },
+                      { code: "SR001", name: "Thiyagu", email: "sr001@standardroofs.com", role: "Supervisor", unit: "Standard Roofs" },
+                      { code: "SR002", name: "Monika", email: "sr002@standardroofs.com", role: "HR", unit: "Standard Roofs" },
+                      { code: "SR003", name: "Periyasamy", email: "sr003@standardroofs.com", role: "Accountant", unit: "Standard Roofs" },
+                      { code: "SR004", name: "Sabari", email: "sr004@standardroofs.com", role: "Marketing Admin", unit: "Standard Roofs" },
+                      { code: "SR005", name: "Sivakumar", email: "sr005@standardroofs.com", role: "Manager", unit: "Standard Roofs" },
+                      { code: "SR006", name: "Sri Manikandan", email: "sr006@standardroofs.com", role: "AI Engineer", unit: "Standard Roofs" },
+                      { code: "SR007", name: "Kavinkumar", email: "sr007@standardroofs.com", role: "AI Prompt Engineer", unit: "Standard Roofs" },
+                      { code: "SR008", name: "Adhi", email: "sr008@standardroofs.com", role: "AI Prompt Engineer", unit: "Standard Roofs" },
+                      { code: "SR009", name: "Gowri", email: "sr009@standardroofs.com", role: "Senior Manager", unit: "Standard Roofs" },
+                      { code: "SR010", name: "Kaviya", email: "sr010@standardroofs.com", role: "Data Ops", unit: "Standard Roofs" },
                     ].map((staff) => (
                       <div key={staff.code} className="p-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
                         <div>

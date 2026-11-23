@@ -275,6 +275,30 @@ export default function MyAttendancePage() {
     return r.status === requestFilter;
   });
 
+  if (emp && emp.companyUnit === "INVI_CREATION") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 text-white text-center">
+        <div className="max-w-md p-6 bg-slate-900 rounded-3xl border border-slate-800 shadow-2xl space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 mx-auto flex items-center justify-center">
+            <AlertCircle size={28} />
+          </div>
+          <div>
+            <h2 className="text-base font-extrabold text-white">Access Restricted</h2>
+            <p className="text-xs text-slate-400 mt-1">
+              The Employee Self-Service (ESS) Portal is exclusively reserved for Standard Roofs office employees (SR001–SR010).
+            </p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans pb-24">
       {/* 1. Mobile-First Top Header */}
@@ -661,7 +685,31 @@ export default function MyAttendancePage() {
                   const isRejected = req.status === "REJECTED";
                   const isPending = req.status === "PENDING";
 
-                  return (
+                  if (emp && emp.companyUnit === "INVI_CREATION") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 text-white text-center">
+        <div className="max-w-md p-6 bg-slate-900 rounded-3xl border border-slate-800 shadow-2xl space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 mx-auto flex items-center justify-center">
+            <AlertCircle size={28} />
+          </div>
+          <div>
+            <h2 className="text-base font-extrabold text-white">Access Restricted</h2>
+            <p className="text-xs text-slate-400 mt-1">
+              The Employee Self-Service (ESS) Portal is exclusively reserved for Standard Roofs office employees (SR001–SR010).
+            </p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
                     <div
                       key={req.id}
                       className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border transition shadow-2xs space-y-3 ${
@@ -681,11 +729,13 @@ export default function MyAttendancePage() {
                                 : req.leaveCategory === "GENERAL_REQUEST"
                                 ? "General / Shift Request"
                                 : req.leaveCategory === "PLANNED"
-                                ? "Planned Paid Leave (PL)"
-                                : req.leaveCategory === "SICK"
-                                ? "Sick Leave (Emergency PL)"
+                                ? "Planned Leave [PLANNED]"
                                 : req.leaveCategory === "UNPLANNED"
-                                ? "Unplanned Unpaid Leave (UP)"
+                                ? "Unplanned Leave [UNPLANNED]"
+                                : req.leaveCategory === "SICK"
+                                ? "Sick Leave [SICK]"
+                                : req.leaveCategory === "EMERGENCY"
+                                ? "Emergency Leave [EMERGENCY]"
                                 : "Leave Request"}
                             </strong>
                           </div>
@@ -874,7 +924,31 @@ export default function MyAttendancePage() {
                     statusLabel = "L";
                   }
 
-                  return (
+                  if (emp && emp.companyUnit === "INVI_CREATION") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 text-white text-center">
+        <div className="max-w-md p-6 bg-slate-900 rounded-3xl border border-slate-800 shadow-2xl space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 mx-auto flex items-center justify-center">
+            <AlertCircle size={28} />
+          </div>
+          <div>
+            <h2 className="text-base font-extrabold text-white">Access Restricted</h2>
+            <p className="text-xs text-slate-400 mt-1">
+              The Employee Self-Service (ESS) Portal is exclusively reserved for Standard Roofs office employees (SR001–SR010).
+            </p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
                     <div
                       key={d.dayNum}
                       onClick={() => setSelectedDayDetail(d)}
@@ -971,9 +1045,10 @@ export default function MyAttendancePage() {
                         onChange={(e) => setLeaveCategory(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
                       >
-                        <option value="PLANNED">Planned Paid Leave (PL)</option>
-                        <option value="SICK">Sick Leave (Emergency PL)</option>
-                        <option value="UNPLANNED">Unplanned Unpaid Leave (UP)</option>
+                        <option value="PLANNED">Planned Leave (PLANNED)</option>
+                        <option value="UNPLANNED">Unplanned Leave (UNPLANNED)</option>
+                        <option value="SICK">Sick Leave (SICK)</option>
+                        <option value="EMERGENCY">Emergency Leave (EMERGENCY)</option>
                       </select>
                     </div>
 
@@ -1095,6 +1170,7 @@ export default function MyAttendancePage() {
                         onChange={(e) => setGeneralCategory(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
                       >
+                        <option value="Work Handover Note">Submit Work Handover Note</option>
                         <option value="Late Login Notice">Late Login Notice</option>
                         <option value="Overtime (OT) Log">Overtime (OT) Log</option>
                         <option value="Site Duty / WFH Request">Site Duty / WFH Request</option>

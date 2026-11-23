@@ -1,8 +1,8 @@
 {
-  "name": "Standard Roofs Books — HR & ERP",
-  "short_name": "SR-Books HR",
-  "description": "Enterprise Employee Self-Service, Attendance, Payroll & ERP System",
-  "start_url": "/my-attendance",
+  "name": "Standard Roofs Books (SR-Books)",
+  "short_name": "SR-Books",
+  "description": "Enterprise Financial, HRIS, Attendance & Site Operations System",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

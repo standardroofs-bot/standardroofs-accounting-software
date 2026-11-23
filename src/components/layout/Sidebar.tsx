@@ -205,6 +205,13 @@ export function Sidebar() {
 
   // Automatic Workspace Detection based on route
   useEffect(() => {
+    if (currentUser?.role === "HR_MANAGER") {
+      if (currentWorkspace !== "hr_payroll") {
+        setCurrentWorkspace("hr_payroll");
+      }
+      return;
+    }
+
     if (
       pathname.startsWith("/projects") ||
       pathname.startsWith("/machines") ||
@@ -216,7 +223,7 @@ export function Sidebar() {
       if (currentWorkspace !== "site_fleet" && currentWorkspace !== "all") {
         setCurrentWorkspace("site_fleet");
       }
-    } else if (pathname.startsWith("/labour") || pathname.startsWith("/attendance")) {
+    } else if (pathname.startsWith("/labour") || pathname.startsWith("/attendance") || pathname.startsWith("/payroll")) {
       if (currentWorkspace !== "hr_payroll" && currentWorkspace !== "all") {
         setCurrentWorkspace("hr_payroll");
       }
@@ -231,7 +238,7 @@ export function Sidebar() {
         setCurrentWorkspace("admin_control");
       }
     }
-  }, [pathname]);
+  }, [pathname, currentUser]);
 
   const toggleSection = (id: string) => {
     setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -242,13 +249,17 @@ export function Sidebar() {
     const role = currentUser.role;
     if (role === "SUPER_ADMIN" || role === "MANAGING_DIRECTOR") return true;
 
+    if (role === "HR_MANAGER") {
+      return ["labour", "attendance", "payroll"].includes(item.moduleKey);
+    }
+    if (role === "EMPLOYEE") {
+      return false;
+    }
+
     if (currentUser.permissions && currentUser.permissions[item.moduleKey] !== undefined) {
       return !!currentUser.permissions[item.moduleKey]?.view;
     }
 
-    if (role === "HR_MANAGER") {
-      return ["labour", "expenses", "machines", "approvals"].includes(item.moduleKey);
-    }
     if (role === "SITE_SUPERVISOR") {
       return ["expenses", "machines", "fleet"].includes(item.moduleKey);
     }
@@ -259,12 +270,17 @@ export function Sidebar() {
     return true;
   };
 
+  const isHr = currentUser?.role === "HR_MANAGER";
+  const accessibleWorkspaces = isHr
+    ? WORKSPACES.filter((w) => w.id === "hr_payroll")
+    : WORKSPACES;
+
   const activeWsConfig =
-    WORKSPACES.find((w) => w.id === currentWorkspace) || WORKSPACES[0];
+    accessibleWorkspaces.find((w) => w.id === currentWorkspace) || accessibleWorkspaces[0];
 
   const displayedGroups =
-    currentWorkspace === "all"
-      ? WORKSPACES.flatMap((w) => w.groups)
+    !isHr && currentWorkspace === "all"
+      ? accessibleWorkspaces.flatMap((w) => w.groups)
       : activeWsConfig.groups;
 
   return (
@@ -370,7 +386,7 @@ export function Sidebar() {
               <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 Select Workspace
               </div>
-              {WORKSPACES.map((ws) => {
+              {accessibleWorkspaces.map((ws) => {
                 const WsIcon = ws.icon;
                 const isSelected = currentWorkspace === ws.id;
                 return (
@@ -395,24 +411,26 @@ export function Sidebar() {
                 );
               })}
 
-              <div className="border-t border-slate-800 my-1 pt-1">
-                <button
-                  onClick={() => {
-                    setCurrentWorkspace("all");
-                    setShowWorkspaceMenu(false);
-                  }}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition ${
-                    currentWorkspace === "all"
-                      ? "bg-blue-600 text-white font-bold"
-                      : "text-slate-400 hover:bg-slate-800 hover:text-white"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Layers size={14} />
-                    <span>View All Workspaces</span>
-                  </div>
-                </button>
-              </div>
+              {!isHr && (
+                <div className="border-t border-slate-800 my-1 pt-1">
+                  <button
+                    onClick={() => {
+                      setCurrentWorkspace("all");
+                      setShowWorkspaceMenu(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition ${
+                      currentWorkspace === "all"
+                        ? "bg-blue-600 text-white font-bold"
+                        : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Layers size={14} />
+                      <span>View All Workspaces</span>
+                    </div>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
