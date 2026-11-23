@@ -286,7 +286,7 @@ export async function POST(request: Request) {
         let slot: string | null = null;
         let pTime: string | null = null;
         let pHours: number | null = null;
-        let note = `Approved Leave: ${leave.reason}`;
+        let note = leave.reason ? `Approved Leave: ${leave.reason}` : "Approved Leave";
 
         if (isSun) {
           dayStatus = "L";
@@ -296,10 +296,12 @@ export async function POST(request: Request) {
           slot = leave.dayType === "EVENING" ? "EVENING" : "MORNING";
           pTime = slot === "EVENING" ? "06:30 PM - 07:30 PM" : "09:00 AM - 10:00 AM";
           pHours = 1.0;
-          note = `Approved 1-Hr Permission (${slot === "EVENING" ? "Evening" : "Morning"}): ${leave.reason}`;
+          note = leave.reason
+            ? `Approved 1-Hr Permission (${slot === "EVENING" ? "Evening" : "Morning"}): ${leave.reason}`
+            : `Approved 1-Hr Permission (${slot === "EVENING" ? "Evening" : "Morning"})`;
         } else if (leave.leaveCategory === "GENERAL_REQUEST") {
           dayStatus = "P";
-          note = `Approved General / Shift Request: ${leave.reason}`;
+          note = leave.reason ? `Approved General / Shift Request: ${leave.reason}` : "Approved General / Shift Request";
         } else {
           // Planned, Unplanned, Sick, Emergency Leaves: ALWAYS MARK AS "A" (Absent - Non-Payable)
           dayStatus = "A";
@@ -313,7 +315,7 @@ export async function POST(request: Request) {
               : leave.leaveCategory === "EMERGENCY"
               ? "Emergency Leave"
               : `${leave.leaveCategory} Leave`;
-          note = `Approved ${catLabel}: ${leave.reason}`;
+          note = leave.reason ? `Approved ${catLabel}: ${leave.reason}` : `Approved ${catLabel}`;
         }
 
         await prisma.attendanceRecord.upsert({

@@ -191,10 +191,6 @@ export default function MyAttendancePage() {
 
   const handleSubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reason.trim()) {
-      alert("Please enter a note or reason.");
-      return;
-    }
 
     setSubmittingRequest(true);
     try {
@@ -213,7 +209,7 @@ export default function MyAttendancePage() {
       } else {
         payload.leaveCategory = "GENERAL_REQUEST";
         payload.dayType = "FULL_DAY";
-        payload.reason = `[${generalCategory}] ${reason.trim()}`;
+        payload.reason = reason.trim() ? `[${generalCategory}] ${reason.trim()}` : `[${generalCategory}]`;
       }
 
       const res = await fetch("/api/leave-requests", {
@@ -605,11 +601,17 @@ export default function MyAttendancePage() {
                               : req.leaveCategory === "GENERAL_REQUEST"
                               ? "General / Shift Request"
                               : req.leaveCategory === "PLANNED"
-                              ? "Planned Paid Leave (PL)"
+                              ? "Planned Leave"
+                              : req.leaveCategory === "UNPLANNED"
+                              ? "Unplanned Leave"
+                              : req.leaveCategory === "SICK"
+                              ? "Sick Leave"
+                              : req.leaveCategory === "EMERGENCY"
+                              ? "Emergency Leave"
                               : "Leave Request"}
                           </strong>
                           <p className="text-[11px] text-slate-500 italic truncate max-w-xs sm:max-w-md">
-                            "{req.reason}"
+                            {req.reason ? `"${req.reason}"` : <span className="text-slate-400 not-italic">No reason provided (Optional)</span>}
                           </p>
                         </div>
                         <span className="font-mono text-[10.5px] text-slate-500 shrink-0">
@@ -729,13 +731,13 @@ export default function MyAttendancePage() {
                                 : req.leaveCategory === "GENERAL_REQUEST"
                                 ? "General / Shift Request"
                                 : req.leaveCategory === "PLANNED"
-                                ? "Planned Leave [PLANNED]"
+                                ? "Planned Leave"
                                 : req.leaveCategory === "UNPLANNED"
-                                ? "Unplanned Leave [UNPLANNED]"
+                                ? "Unplanned Leave"
                                 : req.leaveCategory === "SICK"
-                                ? "Sick Leave [SICK]"
+                                ? "Sick Leave"
                                 : req.leaveCategory === "EMERGENCY"
-                                ? "Emergency Leave [EMERGENCY]"
+                                ? "Emergency Leave"
                                 : "Leave Request"}
                             </strong>
                           </div>
@@ -1045,10 +1047,10 @@ export default function MyAttendancePage() {
                         onChange={(e) => setLeaveCategory(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
                       >
-                        <option value="PLANNED">Planned Leave (PLANNED)</option>
-                        <option value="UNPLANNED">Unplanned Leave (UNPLANNED)</option>
-                        <option value="SICK">Sick Leave (SICK)</option>
-                        <option value="EMERGENCY">Emergency Leave (EMERGENCY)</option>
+                        <option value="PLANNED">Planned Leave</option>
+                        <option value="UNPLANNED">Unplanned Leave</option>
+                        <option value="SICK">Sick Leave</option>
+                        <option value="EMERGENCY">Emergency Leave</option>
                       </select>
                     </div>
 
@@ -1197,15 +1199,14 @@ export default function MyAttendancePage() {
               {/* Common Reason Input */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Reason / Explanation *
+                  Reason / Explanation (Optional)
                 </label>
                 <textarea
                   rows={2}
-                  required
                   placeholder={
                     requestModalType === "permission"
-                      ? "e.g. Doctor appointment, family errand"
-                      : "e.g. Family function, medical checkup, site visit"
+                      ? "e.g. Doctor appointment, family errand (optional)"
+                      : "e.g. Family function, medical checkup, personal travel (optional)"
                   }
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}

@@ -363,7 +363,7 @@ export default function AttendancePage() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast("Leave approved and marked on attendance grid.");
+        showToast("Leave approved and automatically marked as 'A' (Absent) on Attendance Grid!");
         fetchAttendance();
       } else {
         alert(data.error || "Failed to approve leave.");
@@ -405,10 +405,6 @@ export default function AttendancePage() {
       alert("Please select start and end dates.");
       return;
     }
-    if (!applyLeaveReason.trim()) {
-      alert("Please enter a reason for the leave.");
-      return;
-    }
 
     setApplyLeaveSubmitting(true);
     try {
@@ -431,13 +427,8 @@ export default function AttendancePage() {
         return;
       }
 
-      if (autoApprove && data.leaveRequest?.id) {
-        await handleApproveLeave(data.leaveRequest.id);
-        showToast("Leave created, approved, and marked on attendance grid!");
-      } else {
-        showToast("Leave request submitted successfully.");
-        fetchAttendance();
-      }
+      showToast("Leave request submitted! Awaiting HR approval.");
+      fetchAttendance();
 
       // Reset form
       setApplyLeaveReason("");
@@ -3046,10 +3037,21 @@ export default function AttendancePage() {
                       No leave requests submitted yet.
                     </div>
                   ) : (
-                    leaveRequests.map((req: any) => (
+                    leaveRequests
+                      .slice()
+                      .sort((a: any, b: any) => {
+                        if (a.status === "PENDING" && b.status !== "PENDING") return -1;
+                        if (a.status !== "PENDING" && b.status === "PENDING") return 1;
+                        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+                      })
+                      .map((req: any) => (
                       <div
                         key={req.id}
-                        className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2.5"
+                        className={`p-4 rounded-2xl border transition ${
+                          req.status === "PENDING"
+                            ? "border-amber-300 dark:border-amber-700 bg-amber-50/40 dark:bg-amber-950/20 ring-1 ring-amber-300/60 shadow-xs"
+                            : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40"
+                        } space-y-2.5`}
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -3066,10 +3068,10 @@ export default function AttendancePage() {
                                 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                                 : req.status === "REJECTED"
                                 ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                                : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 animate-pulse"
                             }`}
                           >
-                            {req.status}
+                            {req.status === "PENDING" ? "Waiting for Approval" : req.status}
                           </span>
                         </div>
 
@@ -3082,16 +3084,14 @@ export default function AttendancePage() {
                                 : req.leaveCategory === "GENERAL_REQUEST"
                                 ? "General / Shift Request"
                                 : req.leaveCategory === "PLANNED"
-                                ? "Planned Paid Leave [PL]"
+                                ? "Planned Leave"
                                 : req.leaveCategory === "SICK"
-                                ? "Sick Leave [PL]"
+                                ? "Sick Leave"
                                 : req.leaveCategory === "UNPLANNED"
-                                ? "Unplanned Leave [UP]"
-                                : req.leaveType === "PAID"
-                                ? "Paid Leave [PL]"
-                                : req.leaveType === "HALF_DAY"
-                                ? "Half-Day [H]"
-                                : "Unpaid Leave [UP]"}
+                                ? "Unplanned Leave"
+                                : req.leaveCategory === "EMERGENCY"
+                                ? "Emergency Leave"
+                                : "Leave Request"}
                             </strong>
                           </div>
                           <div>
@@ -3103,27 +3103,27 @@ export default function AttendancePage() {
                         </div>
 
                         <div className="text-xs">
-                          <span className="text-[10px] text-slate-400 block font-bold uppercase">Reason</span>
+                          <span className="text-[10px] text-slate-400 block font-bold uppercase">Reason / Note</span>
                           <p className="text-slate-600 dark:text-slate-300 italic bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
-                            "{req.reason || "Personal work"}"
+                            {req.reason ? `"${req.reason}"` : <span className="text-slate-400 not-italic">No reason provided (Optional)</span>}
                           </p>
                         </div>
 
                         {req.status === "PENDING" && (
-                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-amber-200 dark:border-amber-800/60">
                             <button
                               type="button"
                               onClick={() => handleRejectLeave(req.id)}
-                              className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition cursor-pointer"
+                              className="px-4 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950 dark:border-rose-800 dark:text-rose-300 text-xs font-bold transition cursor-pointer shadow-2xs"
                             >
                               Reject
                             </button>
                             <button
                               type="button"
                               onClick={() => handleApproveLeave(req.id)}
-                              className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer shadow-xs"
+                              className="px-5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer shadow-sm flex items-center gap-1"
                             >
-                              Approve & Mark Matrix
+                              <span>Approve</span>
                             </button>
                           </div>
                         )}
@@ -3151,12 +3151,21 @@ export default function AttendancePage() {
                     >
                       <option value="">-- Choose Employee --</option>
                       {employees
-                        .filter((e) => e.category === "OFFICE_STAFF" && e.companyUnit === "STANDARD_ROOFS")
-                        .map((emp) => (
-                          <option key={emp.id} value={emp.id}>
-                            {emp.employeeCode} • {emp.name} {emp.designation || emp.role ? `(${emp.designation || emp.role})` : ""} - Standard Roofs
-                          </option>
-                        ))}
+                        .filter((e) => e.category === "OFFICE_STAFF")
+                        .map((emp) => {
+                          const isInvi =
+                            emp.companyUnit === "INVI_CREATION" ||
+                            (emp.employeeCode && emp.employeeCode.toLowerCase().startsWith("invi"));
+                          return (
+                            <option key={emp.id} value={emp.id}>
+                              {isInvi
+                                ? `${emp.employeeCode} • ${emp.name}`
+                                : `${emp.employeeCode} • ${emp.name}${
+                                    emp.designation || emp.role ? ` (${emp.designation || emp.role})` : ""
+                                  } - Standard Roofs`}
+                            </option>
+                          );
+                        })}
                     </select>
                   </div>
 
@@ -3170,10 +3179,10 @@ export default function AttendancePage() {
                         onChange={(e) => setApplyLeaveCategory(e.target.value as any)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
                       >
-                        <option value="PLANNED">Planned Leave (PLANNED)</option>
-                        <option value="UNPLANNED">Unplanned Leave (UNPLANNED)</option>
-                        <option value="SICK">Sick Leave (SICK)</option>
-                        <option value="EMERGENCY">Emergency Leave (EMERGENCY)</option>
+                        <option value="PLANNED">Planned Leave</option>
+                        <option value="UNPLANNED">Unplanned Leave</option>
+                        <option value="SICK">Sick Leave</option>
+                        <option value="EMERGENCY">Emergency Leave</option>
                       </select>
                     </div>
 
@@ -3219,43 +3228,35 @@ export default function AttendancePage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Reason / Note *
+                      Reason / Note (Optional)
                     </label>
                     <textarea
                       rows={2}
-                      placeholder="e.g. Family wedding, medical rest, personal travel"
+                      placeholder="e.g. Family wedding, medical rest, personal travel (optional)"
                       value={applyLeaveReason}
                       onChange={(e) => setApplyLeaveReason(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
                     />
                   </div>
 
-                  <div className="flex items-center gap-2 pt-2">
+                  <div className="pt-2">
                     <button
                       type="button"
                       disabled={applyLeaveSubmitting}
                       onClick={() => handleCreateLeave(false)}
-                      className="flex-1 py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
+                      className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      Submit Pending
-                    </button>
-                    <button
-                      type="button"
-                      disabled={applyLeaveSubmitting}
-                      onClick={() => handleCreateLeave(true)}
-                      className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition cursor-pointer disabled:opacity-50"
-                    >
-                      ⚡ Submit & Auto-Approve (Update Grid)
+                      {applyLeaveSubmitting ? "Submitting..." : "Submit Leave Request (Pending HR Approval)"}
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* TAB 3: ESS PORTAL LOGINS & ROLE CREDENTIALS (3-TIER RBAC) */}
+              {/* TAB 3: ESS PORTAL LOGINS & ROLE CREDENTIALS (4-TIER RBAC) */}
               {leaveDrawerTab === "ess" && (
                 <div className="space-y-3.5">
-                  {/* 3-Tier RBAC Reference Banner */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                  {/* 4-Tier RBAC Reference Banner */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
                     <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800">
                       <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-300 block">
                         Tier 1: Super Admin
@@ -3276,9 +3277,19 @@ export default function AttendancePage() {
                       <span className="text-[10px] text-slate-500 font-mono">Password: employee123</span>
                     </div>
 
+                    <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300 block">
+                        Tier 3: Accountant (Periyasamy)
+                      </span>
+                      <strong className="text-slate-800 dark:text-slate-200 block text-[11px] truncate">
+                        sr003 / accountant@standardroofs.com
+                      </strong>
+                      <span className="text-[10px] text-slate-500 font-mono">Password: employee123</span>
+                    </div>
+
                     <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800">
                       <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-300 block">
-                        Tier 3: Office ESS (10)
+                        Tier 4: Office ESS (10)
                       </span>
                       <strong className="text-slate-800 dark:text-slate-200 block text-[11px] truncate">
                         SR001 – SR010

@@ -69,9 +69,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     let { employeeId, leaveCategory = "PLANNED", dayType = "FULL_DAY", startDate, endDate, reason } = body;
 
-    if (!startDate || !endDate || !reason) {
+    if (!startDate || !endDate) {
       return NextResponse.json(
-        { success: false, error: "Start date, end date, and reason are required." },
+        { success: false, error: "Start date and end date are required." },
         { status: 400 }
       );
     }
@@ -95,14 +95,16 @@ export async function POST(request: Request) {
 
     const emp = await prisma.employeeOrLabour.findUnique({
       where: { id: employeeId },
-      select: { companyUnit: true, employeeCode: true },
+      select: { category: true, companyUnit: true, employeeCode: true },
     });
-    if (emp?.companyUnit !== "STANDARD_ROOFS") {
+    if (!emp || emp.category !== "OFFICE_STAFF") {
       return NextResponse.json(
-        { success: false, error: "Leave requests are restricted to Standard Roofs employees (SR001–SR010)." },
-        { status: 403 }
+        { success: false, error: "Leave requests can only be submitted for Office Staff." },
+        { status: 400 }
       );
     }
+
+    const cleanReason = reason ? String(reason).trim() : "";
 
     const start = new Date(`${startDate}T00:00:00.000Z`);
     const end = new Date(`${endDate}T00:00:00.000Z`);
@@ -138,7 +140,7 @@ export async function POST(request: Request) {
         startDate: start,
         endDate: end,
         totalDays,
-        reason: reason.trim(),
+        reason: cleanReason,
         status: "PENDING",
       },
       include: {
