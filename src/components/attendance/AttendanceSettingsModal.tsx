@@ -24,6 +24,7 @@ import {
   Phone,
   UserCheck,
   Layers,
+  Key,
 } from "lucide-react";
 
 interface HolidayItem {
@@ -55,7 +56,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onRefreshData?: () => void;
-  initialTab?: "personnel" | "holidays" | "rules";
+  initialTab?: "personnel" | "holidays" | "rules" | "ess-logins";
 }
 
 export default function AttendanceSettingsModal({
@@ -64,7 +65,7 @@ export default function AttendanceSettingsModal({
   onRefreshData,
   initialTab = "personnel",
 }: Props) {
-  const [activeTab, setActiveTab] = useState<"personnel" | "holidays" | "rules">(initialTab);
+  const [activeTab, setActiveTab] = useState<"personnel" | "holidays" | "rules" | "ess-logins">(initialTab);
 
   // Holidays state
   const [holidays, setHolidays] = useState<HolidayItem[]>([]);
@@ -440,6 +441,19 @@ export default function AttendanceSettingsModal({
           >
             <ShieldCheck size={15} />
             <span>Status Codes & Rules</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("ess-logins")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              activeTab === "ess-logins"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            }`}
+          >
+            <Key size={15} />
+            <span>ESS Portal Logins (13)</span>
           </button>
         </div>
 
@@ -936,6 +950,93 @@ export default function AttendanceSettingsModal({
                     </span>
                     <span className="font-bold text-[11px] text-slate-800 dark:text-slate-200">{s.label}</span>
                     <span className="text-[10px] text-slate-400 font-mono">{s.val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= TAB 4: ESS PORTAL LOGINS & CREDENTIALS ================= */}
+        {activeTab === "ess-logins" && (
+          <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+            <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-extrabold text-indigo-900 dark:text-indigo-200">
+                  Standard Roofs Employee Self-Service (ESS) Portal
+                </h4>
+                <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-0.5">
+                  Office employees can log in at <code className="font-mono font-bold bg-indigo-100 dark:bg-indigo-900 px-1 py-0.5 rounded">/my-attendance</code> to view personal attendance history, check net payable days, apply for Planned (PL) or Unplanned (UP) leave, and review approved requests.
+                </p>
+                <div className="mt-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Default Access Password: <code className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-indigo-300 font-mono text-indigo-600 font-black">employee123</code>
+                </div>
+              </div>
+              <a
+                href="/my-attendance"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition shrink-0"
+              >
+                Open ESS Portal ↗
+              </a>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
+              <div className="bg-slate-50 dark:bg-slate-800/60 px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+                  13 Registered Office Staff Logins
+                </span>
+                <span className="text-[11px] font-bold text-slate-400">
+                  Standard Roofs (10) • Invi Creation (3)
+                </span>
+              </div>
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {[
+                  { code: "SR001", name: "Thiyagu", email: "thiyagu@standardroofs.com", role: "Supervisor", unit: "Standard Roofs" },
+                  { code: "SR002", name: "Monika", email: "monika@standardroofs.com", role: "HR", unit: "Standard Roofs" },
+                  { code: "SR003", name: "Periyasamy", email: "periyasamy@standardroofs.com", role: "Accountant", unit: "Standard Roofs" },
+                  { code: "SR004", name: "Sabari", email: "sabari@standardroofs.com", role: "Marketing Admin", unit: "Standard Roofs" },
+                  { code: "SR005", name: "Sivakumar", email: "sivakumar@standardroofs.com", role: "Manager", unit: "Standard Roofs" },
+                  { code: "SR006", name: "Sri Manikandan", email: "srimanikandan@standardroofs.com", role: "AI Engineer", unit: "Standard Roofs" },
+                  { code: "SR007", name: "Kavinkumar", email: "kavinkumar@standardroofs.com", role: "AI Prompt Engineer", unit: "Standard Roofs" },
+                  { code: "SR008", name: "Adhi", email: "adhi@standardroofs.com", role: "AI Prompt Engineer", unit: "Standard Roofs" },
+                  { code: "SR009", name: "Gowri", email: "gowri@standardroofs.com", role: "Senior Manager", unit: "Standard Roofs" },
+                  { code: "SR010", name: "Kaviya", email: "kaviya@standardroofs.com", role: "Data Ops", unit: "Standard Roofs" },
+                  { code: "Invi001", name: "Indhu", email: "indhu@invicreation.com", role: "UI/UX Designer", unit: "Invi Creation" },
+                  { code: "Invi002", name: "Malar", email: "malar@invicreation.com", role: "Full-Stack Developer", unit: "Invi Creation" },
+                  { code: "Invi003", name: "Keerthika", email: "keerthika@invicreation.com", role: "Operations Specialist", unit: "Invi Creation" },
+                ].map((s) => (
+                  <div key={s.code} className="p-3 px-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-black text-xs flex items-center justify-center font-mono">
+                        {s.code.slice(-3)}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-slate-900 dark:text-slate-100">{s.name}</span>
+                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600">
+                            {s.code}
+                          </span>
+                          <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-blue-50 text-blue-700">
+                            {s.unit}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-slate-400 font-mono block mt-0.5">
+                          {s.email} • {s.role}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`Username: ${s.email} or ${s.code}\nPassword: employee123`);
+                        alert(`Copied credentials for ${s.name} (${s.code}) to clipboard!`);
+                      }}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs transition cursor-pointer"
+                    >
+                      Copy Credentials
+                    </button>
                   </div>
                 ))}
               </div>

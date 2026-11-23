@@ -248,6 +248,14 @@ export default function AttendancePage() {
   // Leave Requests state for HR drawer
   const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
   const [showLeaveDrawer, setShowLeaveDrawer] = useState<boolean>(false);
+  const [leaveDrawerTab, setLeaveDrawerTab] = useState<"approvals" | "apply" | "ess">("approvals");
+  const [applyLeaveEmpId, setApplyLeaveEmpId] = useState<string>("");
+  const [applyLeaveCategory, setApplyLeaveCategory] = useState<"PLANNED" | "UNPLANNED" | "SICK">("PLANNED");
+  const [applyLeaveDayType, setApplyLeaveDayType] = useState<"FULL_DAY" | "HALF_DAY">("FULL_DAY");
+  const [applyLeaveStartDate, setApplyLeaveStartDate] = useState<string>(selectedDate);
+  const [applyLeaveEndDate, setApplyLeaveEndDate] = useState<string>(selectedDate);
+  const [applyLeaveReason, setApplyLeaveReason] = useState<string>("");
+  const [applyLeaveSubmitting, setApplyLeaveSubmitting] = useState<boolean>(false);
   const [showUniversalExportModal, setShowUniversalExportModal] = useState<boolean>(false);
 
   // Quick 1H permission prompt in Daily View
@@ -385,6 +393,60 @@ export default function AttendancePage() {
     } catch (err) {
       console.error(err);
       alert("Error rejecting leave.");
+    }
+  };
+
+  const handleCreateLeave = async (autoApprove: boolean = false) => {
+    if (!applyLeaveEmpId) {
+      alert("Please select an employee.");
+      return;
+    }
+    if (!applyLeaveStartDate || !applyLeaveEndDate) {
+      alert("Please select start and end dates.");
+      return;
+    }
+    if (!applyLeaveReason.trim()) {
+      alert("Please enter a reason for the leave.");
+      return;
+    }
+
+    setApplyLeaveSubmitting(true);
+    try {
+      const res = await fetch("/api/leave-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeeId: applyLeaveEmpId,
+          leaveCategory: applyLeaveCategory,
+          dayType: applyLeaveDayType,
+          startDate: applyLeaveStartDate,
+          endDate: applyLeaveEndDate,
+          reason: applyLeaveReason.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.error || "Failed to submit leave request.");
+        setApplyLeaveSubmitting(false);
+        return;
+      }
+
+      if (autoApprove && data.leaveRequest?.id) {
+        await handleApproveLeave(data.leaveRequest.id);
+        showToast("Leave created, approved, and marked on attendance grid!");
+      } else {
+        showToast("Leave request submitted successfully.");
+        fetchAttendance();
+      }
+
+      // Reset form
+      setApplyLeaveReason("");
+      setLeaveDrawerTab("approvals");
+    } catch (err: any) {
+      console.error("Error creating leave:", err);
+      alert("Error submitting leave request.");
+    } finally {
+      setApplyLeaveSubmitting(false);
     }
   };
 
@@ -905,13 +967,13 @@ export default function AttendancePage() {
             <button
               type="button"
               onClick={() => setShowLeaveDrawer(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold text-xs rounded-xl border border-indigo-200 dark:border-indigo-800 transition cursor-pointer shrink-0"
-              title="Employee leave requests drawer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold text-xs rounded-xl border border-indigo-200 dark:border-indigo-800 transition cursor-pointer shrink-0 shadow-xs"
+              title="Leaves & Approvals (PL, UP, Half-Day & ESS Logins)"
             >
               <Calendar size={14} className="text-indigo-600" />
-              <span>Leave Requests</span>
+              <span>Leaves & Approvals</span>
               {leaveRequests.filter((r) => r.status === "PENDING").length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-black text-[10px] ml-1">
+                <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-black text-[10px] ml-1 animate-pulse">
                   {leaveRequests.filter((r) => r.status === "PENDING").length}
                 </span>
               )}
@@ -2185,38 +2247,38 @@ export default function AttendancePage() {
                     </th>
                   ))}
 
-                  {/* Right Sticky Summary Columns */}
-                  <th className="py-2.5 px-2 text-center bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-black border-l border-slate-200">
+                  {/* Right Fixed Summary Columns */}
+                  <th className="w-14 min-w-[56px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-emerald-800 dark:text-emerald-300 font-black border-l border-slate-200 dark:border-slate-800">
                     P (1.0)
                   </th>
-                  <th className="py-2.5 px-2 text-center bg-sky-50 dark:bg-sky-950 text-sky-800 dark:text-sky-300 font-black" title="1-Hour Permissions: Total (Morning / Evening)">
+                  <th className="w-16 min-w-[64px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-sky-800 dark:text-sky-300 font-black" title="1-Hour Permissions: Total (Morning / Evening)">
                     1H (M/E)
                   </th>
-                  <th className="py-2.5 px-2 text-center bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-black">
+                  <th className="w-14 min-w-[56px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-300 font-black">
                     H (0.5)
                   </th>
                   {activeTab === "office" && (
-                    <th className="py-2.5 px-2 text-center bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-black">
+                    <th className="w-14 min-w-[56px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-teal-800 dark:text-teal-300 font-black">
                       PL (1.0)
                     </th>
                   )}
                   {activeTab === "office" && (
-                    <th className="py-2.5 px-2 text-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black">
+                    <th className="w-14 min-w-[56px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-black">
                       UP (0.0)
                     </th>
                   )}
-                  <th className="py-2.5 px-2 text-center bg-rose-50 dark:bg-rose-950 text-rose-800 dark:text-rose-300 font-black">
+                  <th className="w-14 min-w-[56px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-rose-800 dark:text-rose-300 font-black">
                     A (0.0)
                   </th>
-                  <th className="py-2.5 px-2 text-center bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-black">
+                  <th className="w-16 min-w-[64px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-300 font-black">
                     OT HRS
                   </th>
                   {activeTab === "office" && (
-                    <th className="py-2.5 px-2 text-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black">
+                    <th className="w-14 min-w-[56px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-black">
                       L (Sun)
                     </th>
                   )}
-                  <th className="py-2.5 px-3 text-center bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-black sticky right-0 z-10 border-l border-blue-200 shadow-xs">
+                  <th className="w-20 min-w-[80px] py-2.5 px-2 text-center bg-slate-50 dark:bg-slate-900 text-blue-700 dark:text-blue-300 font-black sticky right-0 z-20 border-l border-slate-200 dark:border-slate-700 shadow-sm">
                     Payable Days
                   </th>
                 </tr>
@@ -2325,25 +2387,25 @@ export default function AttendancePage() {
                           );
                         })}
 
-                        {/* Right Summary Columns */}
-                        <td className="py-2 px-2 text-center font-bold text-emerald-600 tabular-nums bg-emerald-50/30 dark:bg-emerald-950/20 border-l border-slate-200">
+                        {/* Right Fixed Summary Columns */}
+                        <td className="w-14 min-w-[56px] py-2 px-1 text-center font-bold text-emerald-600 tabular-nums bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800">
                           {activeDays}d
                         </td>
-                        <td className="py-2 px-2 text-center font-bold text-sky-600 tabular-nums bg-sky-50/30 dark:bg-sky-950/20">
+                        <td className="w-16 min-w-[64px] py-2 px-1 text-center font-bold text-sky-600 tabular-nums bg-white dark:bg-slate-900">
                           {activeDays}
                         </td>
-                        <td className="py-2 px-2 text-center font-bold text-amber-500 tabular-nums bg-amber-50/30 dark:bg-amber-950/20">
+                        <td className="w-14 min-w-[56px] py-2 px-1 text-center font-bold text-amber-500 tabular-nums bg-white dark:bg-slate-900">
                           0
                         </td>
-                        <td className="py-2 px-2 text-center font-bold text-rose-500 tabular-nums bg-rose-50/30 dark:bg-rose-950/20">
+                        <td className="w-14 min-w-[56px] py-2 px-1 text-center font-bold text-rose-500 tabular-nums bg-white dark:bg-slate-900">
                           {daysInMonth.length - activeDays}
                         </td>
-                        <td className="py-2 px-2 text-center font-bold text-amber-600 tabular-nums bg-amber-50/30 dark:bg-amber-950/20">
+                        <td className="w-16 min-w-[64px] py-2 px-1 text-center font-bold text-amber-600 tabular-nums bg-white dark:bg-slate-900">
                           {contractorLogs
                             .filter((c) => c.contractorTeamName === team.name)
                             .reduce((acc, curr) => acc + (Number((curr as any).otHours) || 0), 0)}h
                         </td>
-                        <td className="py-2 px-3 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-blue-50/70 dark:bg-blue-950/60 sticky right-0 z-10 border-l border-blue-200 shadow-xs">
+                        <td className="w-20 min-w-[80px] py-2 px-2 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-slate-50 dark:bg-slate-900 sticky right-0 z-20 border-l border-slate-200 dark:border-slate-700 shadow-sm">
                           {totalManDays}L
                         </td>
                       </tr>
@@ -2483,19 +2545,17 @@ export default function AttendancePage() {
                                 >
                                   +{att.otHours}h
                                 </span>
-                              ) : (att?.permissionNote || att?.workNotes || att?.remarks) ? (
-                                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-blue-400 rounded-full ring-1 ring-white dark:ring-slate-900" title={`Note: ${att?.permissionNote || att?.workNotes || att?.remarks}`} />
                               ) : null}
                             </span>
                           </td>
                         );
                       })}
 
-                      {/* Right Sticky Summary Counts */}
-                      <td className="py-1 px-2 text-center font-bold text-emerald-600 tabular-nums bg-emerald-50/30 dark:bg-emerald-950/20 border-l border-slate-200">
+                      {/* Right Fixed Summary Counts */}
+                      <td className="w-14 min-w-[56px] py-1 px-1 text-center font-bold text-emerald-600 tabular-nums bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800">
                         {pTotal}
                       </td>
-                      <td className="py-1 px-2 text-center font-bold text-sky-600 tabular-nums bg-sky-50/30 dark:bg-sky-950/20" title={`Total: ${p1hTotal} (Mrg: ${p1hMorningTotal}, Eve: ${p1hEveningTotal})`}>
+                      <td className="w-16 min-w-[64px] py-1 px-1 text-center font-bold text-sky-600 tabular-nums bg-white dark:bg-slate-900" title={`Total: ${p1hTotal} (Mrg: ${p1hMorningTotal}, Eve: ${p1hEveningTotal})`}>
                         <div>{p1hTotal}</div>
                         {p1hTotal > 0 && (
                           <div className="text-[8.5px] text-slate-400 font-normal">
@@ -2503,31 +2563,31 @@ export default function AttendancePage() {
                           </div>
                         )}
                       </td>
-                      <td className="py-1 px-2 text-center font-bold text-amber-500 tabular-nums bg-amber-50/30 dark:bg-amber-950/20">
+                      <td className="w-14 min-w-[56px] py-1 px-1 text-center font-bold text-amber-500 tabular-nums bg-white dark:bg-slate-900">
                         {hTotal}
                       </td>
                       {activeTab === "office" && (
-                        <td className="py-1 px-2 text-center font-bold text-teal-600 tabular-nums bg-teal-50/30 dark:bg-teal-950/20">
+                        <td className="w-14 min-w-[56px] py-1 px-1 text-center font-bold text-teal-600 tabular-nums bg-white dark:bg-slate-900">
                           {plTotal + halfPaidPlTotal * 0.5}
                         </td>
                       )}
                       {activeTab === "office" && (
-                        <td className="py-1 px-2 text-center font-bold text-slate-500 tabular-nums bg-slate-100/30 dark:bg-slate-800/20">
+                        <td className="w-14 min-w-[56px] py-1 px-1 text-center font-bold text-slate-500 tabular-nums bg-white dark:bg-slate-900">
                           {upTotal}
                         </td>
                       )}
-                      <td className="py-1 px-2 text-center font-bold text-rose-500 tabular-nums bg-rose-50/30 dark:bg-rose-950/20">
+                      <td className="w-14 min-w-[56px] py-1 px-1 text-center font-bold text-rose-500 tabular-nums bg-white dark:bg-slate-900">
                         {aTotal}
                       </td>
-                      <td className="py-1 px-2 text-center font-bold text-amber-600 tabular-nums bg-amber-50/30 dark:bg-amber-950/20">
+                      <td className="w-16 min-w-[64px] py-1 px-1 text-center font-bold text-amber-600 tabular-nums bg-white dark:bg-slate-900">
                         {otHoursTotal > 0 ? `${otHoursTotal}h` : "—"}
                       </td>
                       {activeTab === "office" && (
-                        <td className="py-1 px-2 text-center font-bold text-slate-500 tabular-nums bg-slate-100/40 dark:bg-slate-800/40">
+                        <td className="w-14 min-w-[56px] py-1 px-1 text-center font-bold text-slate-500 tabular-nums bg-white dark:bg-slate-900">
                           {lTotal}
                         </td>
                       )}
-                      <td className="py-1 px-3 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-blue-50/70 dark:bg-blue-950/60 sticky right-0 z-10 border-l border-blue-200 shadow-xs">
+                      <td className="w-20 min-w-[80px] py-1 px-2 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-slate-50 dark:bg-slate-900 sticky right-0 z-20 border-l border-slate-200 dark:border-slate-700 shadow-sm">
                         {netPayableDays}
                       </td>
                     </tr>
@@ -2621,67 +2681,107 @@ export default function AttendancePage() {
                 </div>
               )}
 
-              {/* 1-Hour Permission Morning / Evening Slot Toggle */}
+              {/* 1-Hour Permission Morning / Evening Slot Toggle (Prominent Sky-Blue Box) */}
               {cellEditStatus === "1H" && (
-                <div className="p-2.5 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 space-y-2">
-                  <label className="block font-bold text-sky-800 dark:text-sky-300">
-                    1-Hour Permission Slot
-                  </label>
+                <div className="p-3.5 rounded-2xl bg-sky-50 dark:bg-sky-950/50 border-2 border-sky-300 dark:border-sky-700 shadow-sm space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-black text-xs text-sky-900 dark:text-sky-200 flex items-center gap-1.5 uppercase tracking-wide">
+                      <Clock size={14} className="text-sky-600" />
+                      <span>Select 1-Hour Permission Slot</span>
+                    </label>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-sky-200/80 dark:bg-sky-900 text-sky-900 dark:text-sky-100 uppercase">
+                      {permSlotInput === "EVENING" ? "Evening • 1H·E" : "Morning • 1H·M"}
+                    </span>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => setPermSlotInput("MORNING")}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      onClick={() => {
+                        setPermSlotInput("MORNING");
+                        setPermTimeInput("09:00 AM - 10:00 AM");
+                      }}
+                      className={`p-2.5 rounded-xl text-left border-2 transition cursor-pointer flex flex-col gap-0.5 ${
                         permSlotInput === "MORNING"
-                          ? "bg-sky-600 text-white shadow-2xs"
-                          : "bg-white dark:bg-slate-800 text-slate-600 border border-slate-200 dark:border-slate-700"
+                          ? "bg-sky-600 text-white border-sky-700 shadow-md ring-2 ring-sky-300"
+                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-sky-400"
                       }`}
                     >
-                      Morning (Mrg 1H·M)
+                      <div className="flex items-center justify-between">
+                        <span className="font-black text-xs">Morning (Mrg)</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${permSlotInput === "MORNING" ? "bg-white/20 text-white" : "bg-sky-100 text-sky-800"}`}>
+                          1H·M
+                        </span>
+                      </div>
+                      <span className={`text-[11px] font-mono ${permSlotInput === "MORNING" ? "text-sky-100" : "text-slate-500"}`}>
+                        09:00 AM – 10:00 AM
+                      </span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPermSlotInput("EVENING")}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      onClick={() => {
+                        setPermSlotInput("EVENING");
+                        setPermTimeInput("06:30 PM - 07:30 PM");
+                      }}
+                      className={`p-2.5 rounded-xl text-left border-2 transition cursor-pointer flex flex-col gap-0.5 ${
                         permSlotInput === "EVENING"
-                          ? "bg-cyan-600 text-white shadow-2xs"
-                          : "bg-white dark:bg-slate-800 text-slate-600 border border-slate-200 dark:border-slate-700"
+                          ? "bg-cyan-600 text-white border-cyan-700 shadow-md ring-2 ring-cyan-300"
+                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-cyan-400"
                       }`}
                     >
-                      Evening (Eve 1H·E)
+                      <div className="flex items-center justify-between">
+                        <span className="font-black text-xs">Evening (Eve)</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${permSlotInput === "EVENING" ? "bg-white/20 text-white" : "bg-cyan-100 text-cyan-800"}`}>
+                          1H·E
+                        </span>
+                      </div>
+                      <span className={`text-[11px] font-mono ${permSlotInput === "EVENING" ? "text-cyan-100" : "text-slate-500"}`}>
+                        06:30 PM – 07:30 PM
+                      </span>
                     </button>
                   </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-500 font-semibold mb-0.5">Permission Time Range</label>
-                    <input
-                      type="text"
-                      placeholder={permSlotInput === "MORNING" ? "09:30 AM - 10:30 AM" : "05:30 PM - 06:30 PM"}
-                      value={permTimeInput}
-                      onChange={(e) => setPermTimeInput(e.target.value)}
-                      className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <div>
+                      <label className="block text-[10px] text-slate-600 dark:text-slate-400 font-bold mb-0.5">Time Range</label>
+                      <input
+                        type="text"
+                        placeholder={permSlotInput === "MORNING" ? "09:00 AM - 10:00 AM" : "06:30 PM - 07:30 PM"}
+                        value={permTimeInput}
+                        onChange={(e) => setPermTimeInput(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-mono font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-600 dark:text-slate-400 font-bold mb-0.5">Permission Reason</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Bank work, Doctor visit, Traffic delay"
+                        value={permissionInput}
+                        onChange={(e) => setPermissionInput(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs"
+                      />
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* Overtime (OT) Section */}
-              <div className="p-2.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-2">
+              <div className="p-3 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <label className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1">
-                    <Timer size={13} className="text-amber-600" />
+                  <label className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5 text-xs">
+                    <Timer size={14} className="text-amber-600" />
                     <span>Overtime (OT) Hours</span>
                   </label>
-                  <span className="font-mono text-xs font-black text-amber-700">
+                  <span className="font-mono text-xs font-black text-amber-700 bg-amber-100 dark:bg-amber-900 px-2 py-0.5 rounded-md">
                     {otHoursInput > 0 ? `+${otHoursInput} Hours` : "No OT"}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {[0, 0.5, 1, 1.5, 2, 2.5, 3, 4].map((h) => (
+                  {[0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 8].map((h) => (
                     <button
                       key={h}
                       type="button"
                       onClick={() => setOtHoursInput(h)}
-                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
                         otHoursInput === h
                           ? "bg-amber-500 text-white border-amber-600 shadow-2xs"
                           : "bg-white dark:bg-slate-800 text-slate-600 border-slate-200 dark:border-slate-700 hover:bg-amber-100/50"
@@ -2691,6 +2791,47 @@ export default function AttendancePage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Quick Shift Presets */}
+                <div className="space-y-1 pt-1 border-t border-amber-200/60 dark:border-amber-800/60">
+                  <span className="text-[10px] font-bold text-amber-800 dark:text-amber-400 block">Quick Shift Presets:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtHoursInput(2);
+                        setOtTimeRangeInput("07:00 AM - 09:00 AM");
+                        if (!otReasonInput) setOtReasonInput("Morning site setup");
+                      }}
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 text-[10px] font-bold border border-amber-300 hover:bg-amber-100/80 transition cursor-pointer"
+                    >
+                      🌅 Morning OT (7–9 AM)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtHoursInput(2);
+                        setOtTimeRangeInput("07:00 PM - 09:00 PM");
+                        if (!otReasonInput) setOtReasonInput("Evening extra shift");
+                      }}
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 text-[10px] font-bold border border-amber-300 hover:bg-amber-100/80 transition cursor-pointer"
+                    >
+                      🌙 Evening OT (7–9 PM)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtHoursInput(8);
+                        setOtTimeRangeInput("09:00 AM - 05:00 PM");
+                        if (!otReasonInput) setOtReasonInput("Sunday / Full-Day OT deployment");
+                      }}
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 text-[10px] font-bold border border-amber-300 hover:bg-amber-100/80 transition cursor-pointer"
+                    >
+                      ⭐ Full-Day OT (9 AM–5 PM)
+                    </button>
+                  </div>
+                </div>
+
                 {otHoursInput > 0 && (
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <div>
@@ -2717,19 +2858,21 @@ export default function AttendancePage() {
                 )}
               </div>
 
-              {/* Permission Note */}
-              <div className="pt-1">
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Permission / Work Note (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Doctor appointment, 1-hr morning permission"
-                  value={permissionInput}
-                  onChange={(e) => setPermissionInput(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
-                />
-              </div>
+              {/* Permission Note (when not 1H) */}
+              {cellEditStatus !== "1H" && (
+                <div className="pt-1">
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Work Note / Remarks (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Completed site inspection, client meeting"
+                    value={permissionInput}
+                    onChange={(e) => setPermissionInput(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+                  />
+                </div>
+              )}
 
               <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
@@ -2829,104 +2972,337 @@ export default function AttendancePage() {
         </div>
       )}
 
-      {/* 7. MODAL: EMPLOYEE LEAVE REQUESTS DRAWER (FOR HR) */}
+      {/* 7. MODAL: EMPLOYEE LEAVE REQUESTS & ESS DRAWER (FOR HR) */}
       {showLeaveDrawer && (
         <div className="fixed inset-0 z-[9999] flex justify-end bg-slate-900/60 backdrop-blur-xs p-0 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-lg h-full shadow-2xl p-6 flex flex-col space-y-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-xl h-full shadow-2xl p-5 sm:p-6 flex flex-col space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Calendar className="text-blue-600" size={18} />
-                  Employee Leave Requests
+                  <span>Leaves & Workforce Approvals</span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Office employee self-service leave requests (Auto-marks PL / UP in attendance matrix)
+                  Manage Planned (PL) & Unplanned (UP) leaves, apply on behalf of staff, and view ESS credentials
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowLeaveDrawer(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X size={20} />
               </button>
             </div>
 
+            {/* Drawer Navigation Tabs */}
+            <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold gap-1">
+              <button
+                type="button"
+                onClick={() => setLeaveDrawerTab("approvals")}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  leaveDrawerTab === "approvals"
+                    ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                }`}
+              >
+                <span>Pending Approvals</span>
+                {leaveRequests.filter((r) => r.status === "PENDING").length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-black text-[10px]">
+                    {leaveRequests.filter((r) => r.status === "PENDING").length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setLeaveDrawerTab("apply")}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  leaveDrawerTab === "apply"
+                    ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                }`}
+              >
+                <span>+ Apply Leave (HR)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLeaveDrawerTab("ess")}
+                className={`flex-1 py-1.5 px-2 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  leaveDrawerTab === "ess"
+                    ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
+                }`}
+              >
+                <span>ESS Logins (13)</span>
+              </button>
+            </div>
+
             <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-              {leaveRequests.length === 0 ? (
-                <div className="py-20 text-center text-slate-400 text-xs">
-                  No leave requests submitted yet.
-                </div>
-              ) : (
-                leaveRequests.map((req: any) => (
-                  <div
-                    key={req.id}
-                    className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <strong className="text-sm text-slate-900 dark:text-slate-100">
-                          {req.employee?.name || "Employee"}
-                        </strong>
-                        <span className="text-xs font-mono text-slate-400 ml-2">
-                          ({req.employee?.employeeCode || req.employee?.empCode || "EMP"})
-                        </span>
-                      </div>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
-                          req.status === "APPROVED"
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                            : req.status === "REJECTED"
-                            ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                            : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                        }`}
+              {/* TAB 1: PENDING APPROVALS */}
+              {leaveDrawerTab === "approvals" && (
+                <div className="space-y-3">
+                  {leaveRequests.length === 0 ? (
+                    <div className="py-20 text-center text-slate-400 text-xs">
+                      No leave requests submitted yet.
+                    </div>
+                  ) : (
+                    leaveRequests.map((req: any) => (
+                      <div
+                        key={req.id}
+                        className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2.5"
                       >
-                        {req.status}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <strong className="text-sm text-slate-900 dark:text-slate-100">
+                              {req.employee?.name || "Employee"}
+                            </strong>
+                            <span className="text-xs font-mono text-slate-400 ml-2">
+                              ({req.employee?.employeeCode || req.employee?.empCode || "EMP"})
+                            </span>
+                          </div>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
+                              req.status === "APPROVED"
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                : req.status === "REJECTED"
+                                ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                                : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                            }`}
+                          >
+                            {req.status}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-bold uppercase">Leave Type</span>
+                            <strong className="text-slate-800 dark:text-slate-200">
+                              {req.leaveType === "PAID" ? "Paid Leave [PL]" : req.leaveType === "HALF_DAY" ? "Half-Day [H]" : "Unpaid Leave [UP]"}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-bold uppercase">Dates / Days</span>
+                            <strong className="text-slate-800 dark:text-slate-200 font-mono">
+                              {req.startDate?.split("T")[0]} to {req.endDate?.split("T")[0]} ({req.daysCount || req.totalDays || 1}d)
+                            </strong>
+                          </div>
+                        </div>
+
+                        <div className="text-xs">
+                          <span className="text-[10px] text-slate-400 block font-bold uppercase">Reason</span>
+                          <p className="text-slate-600 dark:text-slate-300 italic bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                            "{req.reason || "Personal work"}"
+                          </p>
+                        </div>
+
+                        {req.status === "PENDING" && (
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                            <button
+                              type="button"
+                              onClick={() => handleRejectLeave(req.id)}
+                              className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition cursor-pointer"
+                            >
+                              Reject
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleApproveLeave(req.id)}
+                              className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer shadow-xs"
+                            >
+                              Approve & Mark Matrix
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: APPLY LEAVE (HR ON BEHALF OF STAFF) */}
+              {leaveDrawerTab === "apply" && (
+                <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-3.5">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                    Apply Leave on Behalf of Employee
+                  </h4>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Select Office Employee *
+                    </label>
+                    <select
+                      value={applyLeaveEmpId}
+                      onChange={(e) => setApplyLeaveEmpId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
+                    >
+                      <option value="">-- Choose Employee --</option>
+                      {employees
+                        .filter((e) => e.category === "OFFICE_STAFF")
+                        .map((emp) => (
+                          <option key={emp.id} value={emp.id}>
+                            {emp.employeeCode} • {emp.name} ({emp.role || emp.designation || "Staff"}) - {emp.companyUnit === "INVI_CREATION" ? "Invi" : "Standard Roofs"}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Leave Category *
+                      </label>
+                      <select
+                        value={applyLeaveCategory}
+                        onChange={(e) => setApplyLeaveCategory(e.target.value as any)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
+                      >
+                        <option value="PLANNED">Planned Paid Leave (PL - 1.0 Day)</option>
+                        <option value="UNPLANNED">Unplanned Unpaid Leave (UP - 0.0 Day)</option>
+                        <option value="SICK">Sick Leave (Emergency PL)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Day Duration *
+                      </label>
+                      <select
+                        value={applyLeaveDayType}
+                        onChange={(e) => setApplyLeaveDayType(e.target.value as any)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
+                      >
+                        <option value="FULL_DAY">Full-Day (1.0 Day)</option>
+                        <option value="HALF_DAY">Half-Day (0.5 Day)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Start Date *
+                      </label>
+                      <input
+                        type="date"
+                        value={applyLeaveStartDate}
+                        onChange={(e) => setApplyLeaveStartDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        End Date *
+                      </label>
+                      <input
+                        type="date"
+                        value={applyLeaveEndDate}
+                        onChange={(e) => setApplyLeaveEndDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Reason / Note *
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Family wedding, medical rest, personal travel"
+                      value={applyLeaveReason}
+                      onChange={(e) => setApplyLeaveReason(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      type="button"
+                      disabled={applyLeaveSubmitting}
+                      onClick={() => handleCreateLeave(false)}
+                      className="flex-1 py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
+                    >
+                      Submit Pending
+                    </button>
+                    <button
+                      type="button"
+                      disabled={applyLeaveSubmitting}
+                      onClick={() => handleCreateLeave(true)}
+                      className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition cursor-pointer disabled:opacity-50"
+                    >
+                      ⚡ Submit & Auto-Approve (Update Grid)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: ESS PORTAL LOGINS & CREDENTIALS */}
+              {leaveDrawerTab === "ess" && (
+                <div className="space-y-3">
+                  <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-black text-indigo-900 dark:text-indigo-200 block">
+                        Employee Self-Service (ESS) Portal
+                      </span>
+                      <span className="text-[11px] text-indigo-700 dark:text-indigo-300">
+                        Default Password: <code className="bg-indigo-200/60 dark:bg-indigo-900 px-1 py-0.5 rounded font-black text-indigo-950 dark:text-indigo-100">employee123</code>
                       </span>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block font-bold uppercase">Leave Type</span>
-                        <strong className="text-slate-800 dark:text-slate-200">
-                          {req.leaveType === "PAID" ? "Paid Leave [PL]" : req.leaveType === "HALF_DAY" ? "Half-Day [H]" : "Unpaid Leave [UP]"}
-                        </strong>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block font-bold uppercase">Dates / Days</span>
-                        <strong className="text-slate-800 dark:text-slate-200 font-mono">
-                          {req.startDate?.split("T")[0]} to {req.endDate?.split("T")[0]} ({req.daysCount}d)
-                        </strong>
-                      </div>
-                    </div>
-
-                    <div className="text-xs">
-                      <span className="text-[10px] text-slate-400 block font-bold uppercase">Reason</span>
-                      <p className="text-slate-600 dark:text-slate-300 italic bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
-                        "{req.reason || "Personal work"}"
-                      </p>
-                    </div>
-
-                    {req.status === "PENDING" && (
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-                        <button
-                          type="button"
-                          onClick={() => handleRejectLeave(req.id)}
-                          className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition cursor-pointer"
-                        >
-                          Reject
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleApproveLeave(req.id)}
-                          className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition cursor-pointer shadow-xs"
-                        >
-                          Approve & Mark Matrix
-                        </button>
-                      </div>
-                    )}
+                    <a
+                      href="/my-attendance"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition"
+                    >
+                      Open ESS Portal ↗
+                    </a>
                   </div>
-                ))
+
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
+                    {[
+                      { code: "SR001", name: "Thiyagu", email: "thiyagu@standardroofs.com", role: "Supervisor", unit: "Standard Roofs" },
+                      { code: "SR002", name: "Monika", email: "monika@standardroofs.com", role: "HR", unit: "Standard Roofs" },
+                      { code: "SR003", name: "Periyasamy", email: "periyasamy@standardroofs.com", role: "Accountant", unit: "Standard Roofs" },
+                      { code: "SR004", name: "Sabari", email: "sabari@standardroofs.com", role: "Marketing Admin", unit: "Standard Roofs" },
+                      { code: "SR005", name: "Sivakumar", email: "sivakumar@standardroofs.com", role: "Manager", unit: "Standard Roofs" },
+                      { code: "SR006", name: "Sri Manikandan", email: "srimanikandan@standardroofs.com", role: "AI Engineer", unit: "Standard Roofs" },
+                      { code: "SR007", name: "Kavinkumar", email: "kavinkumar@standardroofs.com", role: "AI Prompt Engineer", unit: "Standard Roofs" },
+                      { code: "SR008", name: "Adhi", email: "adhi@standardroofs.com", role: "AI Prompt Engineer", unit: "Standard Roofs" },
+                      { code: "SR009", name: "Gowri", email: "gowri@standardroofs.com", role: "Senior Manager", unit: "Standard Roofs" },
+                      { code: "SR010", name: "Kaviya", email: "kaviya@standardroofs.com", role: "Data Ops", unit: "Standard Roofs" },
+                      { code: "Invi001", name: "Indhu", email: "indhu@invicreation.com", role: "UI/UX Designer", unit: "Invi Creation" },
+                      { code: "Invi002", name: "Malar", email: "malar@invicreation.com", role: "Full-Stack Developer", unit: "Invi Creation" },
+                      { code: "Invi003", name: "Keerthika", email: "keerthika@invicreation.com", role: "Operations Specialist", unit: "Invi Creation" },
+                    ].map((staff) => (
+                      <div key={staff.code} className="p-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-slate-900 dark:text-slate-100">{staff.name}</span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 font-bold">
+                              {staff.code}
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-blue-50 text-blue-700">
+                              {staff.unit}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-400 font-mono block mt-0.5">
+                            {staff.email} • {staff.role}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`Login: ${staff.email} or ${staff.code}\nPassword: employee123`);
+                            showToast(`Copied credentials for ${staff.name}`);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold text-[10px] transition cursor-pointer"
+                        >
+                          Copy Login
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>

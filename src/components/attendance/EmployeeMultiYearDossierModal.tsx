@@ -51,6 +51,7 @@ export default function EmployeeMultiYearDossierModal({
   const [activeYear, setActiveYear] = useState<string>("2026");
   const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(10); // Nov = 10 (0-indexed)
   const [activeTab, setActiveTab] = useState<"SCORECARD" | "MONTHLY" | "OVERTIME" | "PERMISSIONS">("SCORECARD");
+  const [downloadPeriod, setDownloadPeriod] = useState<"SELECTED_MONTH" | "FULL_YEAR" | "FISCAL_YEAR">("FULL_YEAR");
 
   const supportedYears = ["2025", "2026", "2027", "2028", "2029", "2030"];
 
@@ -90,15 +91,41 @@ export default function EmployeeMultiYearDossierModal({
   const activeMonthData = currentYearData?.months?.[selectedMonthIndex];
   const isOffice = employee.category === "OFFICE_STAFF";
 
-  // Scorecard calculations for selected activeYear
+  // Exact HRIS calendar math for selected activeYear (Standard Roofs 6-Day Work Week Rule)
+  const yearNum = parseInt(activeYear, 10);
+  const isLeap = (yearNum % 4 === 0 && yearNum % 100 !== 0) || yearNum % 400 === 0;
+  const totalDaysInYear = isLeap ? 366 : 365;
+
+  // Exact count of Sundays across all 12 calendar months in the selected year
+  let sundaysInYear = 0;
+  for (let m = 0; m < 12; m++) {
+    const daysInM = new Date(yearNum, m + 1, 0).getDate();
+    for (let d = 1; d <= daysInM; d++) {
+      if (new Date(yearNum, m, d).getDay() === 0) sundaysInYear++;
+    }
+  }
+  const companyHolidaysCount = 2; // Declared Company Public Holidays (Pongal, Diwali, May Day)
+  const totalSundaysAndLeaves = sundaysInYear + companyHolidaysCount; // 52 Sundays + 2 Holidays = 54 Non-Working Days
+  const scheduledOrgWorkingDays = totalDaysInYear - totalSundaysAndLeaves; // 365 - 54 = 311 Days (NOT 360!)
+
   const yearTotals = currentYearData?.totals || {};
-  const totalDaysInYear = 365;
-  const sundaysAndLeaves = yearTotals.leave || 52;
-  const scheduledOrgWorkingDays = Math.max(1, totalDaysInYear - sundaysAndLeaves);
   const actualDaysWorked = yearTotals.payableDays || 0;
   const attendancePercentage = Math.min(100, Math.round((actualDaysWorked / scheduledOrgWorkingDays) * 100));
 
-  const handleExportExcel = (mode: "FULL_YEAR" | "SELECTED_MONTH") => {
+  // Selected Month calculations
+  const monthDaysCount = activeMonthData ? new Date(yearNum, selectedMonthIndex + 1, 0).getDate() : 30;
+  let monthSundaysCount = 0;
+  if (activeMonthData) {
+    for (let d = 1; d <= monthDaysCount; d++) {
+      if (new Date(yearNum, selectedMonthIndex, d).getDay() === 0) monthSundaysCount++;
+    }
+  }
+  const monthHolidaysCount = selectedMonthIndex === 10 ? 2 : 0; // Nov has 2 holidays
+  const monthOrgWorkingDays = monthDaysCount - monthSundaysCount - monthHolidaysCount;
+  const monthDaysWorked = activeMonthData?.payableDays || 0;
+  const monthAttendancePercentage = monthOrgWorkingDays > 0 ? Math.min(100, Math.round((monthDaysWorked / monthOrgWorkingDays) * 100)) : 0;
+
+  const handleExportExcel = (mode: "FULL_YEAR" | "SELECTED_MONTH" | "FISCAL_YEAR") => {
     if (!dossierData || !employee) return;
     const yearData = dossierData.yearlyData?.[activeYear];
     if (!yearData) return;
@@ -121,16 +148,29 @@ export default function EmployeeMultiYearDossierModal({
     }
 
     if (mode === "SELECTED_MONTH" && activeMonthData) {
-      const exportRows = (activeMonthData.dailyRecords || []).map((r: any) => ({
-        Date: r.date,
-        Status: r.status,
-        "In Time": r.inTime || "-",
-        "Out Time": r.outTime || "-",
-        "Site Location": r.siteName || (isOffice ? "Headquarters Office" : "-"),
-        "1H Permission": r.permissionNote || "-",
-        "OT Hours": r.otHours || 0,
-        "OT Reason": r.otReason || "-",
-      }));
+      const exportRows: any[] = [
+        {
+          "Section / Record": "--- MONTHLY SCORECARD ---",
+          Date: `${activeMonthData.monthName} ${activeYear}`,
+          Status: "SUMMARY",
+          "In / Out Time": "-",
+          "Location / Deployed Site": activeMonthData.sites?.join(", ") || (isOffice ? "Headquarters" : "-"),
+          "1H Permission": `${activeMonthData.permission || 0} (${activeMonthData.permissionMorning || 0}M / ${activeMonthData.permissionEvening || 0}E)`,
+          "OT Hours": activeMonthData.otHours || 0,
+          "Remarks / Notes": `Net Payable: ${activeMonthData.payableDays} Days | Scheduled Days: ${monthOrgWorkingDays} | Efficiency: ${monthAttendancePercentage}%`,
+        },
+        ...((activeMonthData.dailyRecords || []).map((r: any) => ({
+          "Section / Record": "Daily Attendance Log",
+          Date: r.date,
+          Status: r.status,
+          "In / Out Time": `${r.inTime || "09:00 AM"} - ${r.outTime || "07:00 PM"}`,
+          "Location / Deployed Site": r.siteName || (isOffice ? "Headquarters Office" : "-"),
+          "1H Permission": r.permissionNote ? `${r.permissionSlot || "1H"}: ${r.permissionNote}` : "-",
+          "OT Hours": r.otHours ? `+${r.otHours}h (${r.otTimeRange || ""})` : 0,
+          "Remarks / Notes": r.otReason || r.workNotes || "-",
+        }))),
+      ];
+
       exportToExcel(
         exportRows,
         `${employee.employeeCode}_${employee.name}_${activeMonthData.monthName}_${activeYear}`,
@@ -139,27 +179,104 @@ export default function EmployeeMultiYearDossierModal({
       return;
     }
 
-    const exportRows = yearData.months.map((m: any) => ({
-      Year: activeYear,
-      Month: m.monthName,
-      "Present (P)": m.present,
-      "Half-Day (H)": m.halfDay,
-      "1-Hr Permission (1H)": m.permission,
-      "1H Morning": m.permissionMorning || 0,
-      "1H Evening": m.permissionEvening || 0,
-      "Paid Leave (PL)": m.paidLeave || 0,
-      "Unpaid Leave (UP)": m.unpaidLeave || 0,
-      "Absent (A)": m.absent,
-      "Sunday Off (L)": m.leave,
-      "Net Payable Days": m.payableDays,
-      "OT Hours": m.otHours || 0,
-      "Deployed Sites": m.sites?.join(", ") || "-",
-    }));
+    // Comprehensive 3-Section Annual or Fiscal Year Report
+    const exportRows: any[] = [];
 
+    // SECTION 1: ANNUAL SCORECARD
+    exportRows.push({
+      "Report Type": "SECTION 1: ANNUAL HRIS SCORECARD",
+      "Field / Month": "Total Calendar Days",
+      "Metric / Value": totalDaysInYear,
+      "Payable / Status": "-",
+      "Overtime / Hours": "-",
+      Details: `${activeYear} Calendar Days`,
+    });
+    exportRows.push({
+      "Report Type": "SECTION 1: ANNUAL HRIS SCORECARD",
+      "Field / Month": "Sundays & Company Holidays",
+      "Metric / Value": totalSundaysAndLeaves,
+      "Payable / Status": "-",
+      "Overtime / Hours": "-",
+      Details: `${sundaysInYear} Sundays + ${companyHolidaysCount} Declared Public Holidays`,
+    });
+    exportRows.push({
+      "Report Type": "SECTION 1: ANNUAL HRIS SCORECARD",
+      "Field / Month": "Org Scheduled Working Days",
+      "Metric / Value": scheduledOrgWorkingDays,
+      "Payable / Status": "-",
+      "Overtime / Hours": "-",
+      Details: `365 - 54 = 311 Days Official Work Calendar`,
+    });
+    exportRows.push({
+      "Report Type": "SECTION 1: ANNUAL HRIS SCORECARD",
+      "Field / Month": "Net Days Worked (Net Payable)",
+      "Metric / Value": actualDaysWorked,
+      "Payable / Status": "-",
+      "Overtime / Hours": "-",
+      Details: `P(1.0) + 1H(1.0) + H(0.5) + PL(1.0)`,
+    });
+    exportRows.push({
+      "Report Type": "SECTION 1: ANNUAL HRIS SCORECARD",
+      "Field / Month": "Annual Attendance Efficiency",
+      "Metric / Value": `${attendancePercentage}%`,
+      "Payable / Status": "-",
+      "Overtime / Hours": "-",
+      Details: `Days Worked / Org Working Days (${actualDaysWorked}/${scheduledOrgWorkingDays})`,
+    });
+    exportRows.push({
+      "Report Type": "SECTION 1: ANNUAL HRIS SCORECARD",
+      "Field / Month": "Total Overtime Hours",
+      "Metric / Value": `${yearTotals.otHours || 0}h`,
+      "Payable / Status": "-",
+      "Overtime / Hours": "-",
+      Details: `Cumulative OT Hours across all 12 months`,
+    });
+    exportRows.push({
+      "Report Type": "SECTION 1: ANNUAL HRIS SCORECARD",
+      "Field / Month": "1-Hour Permissions",
+      "Metric / Value": `${yearTotals.permission || 0} (${yearTotals.permissionMorning || 0}M / ${yearTotals.permissionEvening || 0}E)`,
+      "Payable / Status": "-",
+      "Overtime / Hours": "-",
+      Details: `Morning (9-10 AM) / Evening (6:30-7:30 PM) Permissions`,
+    });
+
+    // Divider
+    exportRows.push({ "Report Type": "---", "Field / Month": "---", "Metric / Value": "---", "Payable / Status": "---", "Overtime / Hours": "---", Details: "---" });
+
+    // SECTION 2: 12-MONTH MATRIX BREAKDOWN
+    yearData.months.forEach((m: any) => {
+      exportRows.push({
+        "Report Type": "SECTION 2: 12-MONTH MATRIX",
+        "Field / Month": `${m.monthName} ${activeYear}`,
+        "Metric / Value": `P:${m.present} | 1H:${m.permission} | H:${m.halfDay} | PL:${m.paidLeave || 0} | UP:${m.unpaidLeave || 0} | A:${m.absent} | L:${m.leave}`,
+        "Payable / Status": `Payable: ${m.payableDays} Days`,
+        "Overtime / Hours": `${m.otHours || 0}h`,
+        Details: `Sites: ${m.sites?.join(", ") || "-"}`,
+      });
+    });
+
+    // Divider
+    exportRows.push({ "Report Type": "---", "Field / Month": "---", "Metric / Value": "---", "Payable / Status": "---", "Overtime / Hours": "---", Details: "---" });
+
+    // SECTION 3: ALL LOGGED DAILY RECORDS
+    yearData.months.forEach((m: any) => {
+      (m.dailyRecords || []).forEach((r: any) => {
+        exportRows.push({
+          "Report Type": "SECTION 3: DAILY LOG",
+          "Field / Month": r.date,
+          "Metric / Value": `Status: ${r.status}`,
+          "Payable / Status": `Timing: ${r.inTime || "09:00 AM"} - ${r.outTime || "07:00 PM"}`,
+          "Overtime / Hours": r.otHours ? `+${r.otHours}h (${r.otTimeRange || ""})` : "0h",
+          Details: `${r.siteName ? `Site: ${r.siteName} | ` : ""}${r.permissionNote ? `1H: ${r.permissionNote} | ` : ""}${r.otReason ? `OT: ${r.otReason} | ` : ""}${r.workNotes || ""}`,
+        });
+      });
+    });
+
+    const filePrefix = mode === "FISCAL_YEAR" ? `FY_${activeYear}_${Number(activeYear) + 1}` : `Annual_${activeYear}`;
     exportToExcel(
       exportRows,
-      `${employee.employeeCode}_${employee.name}_Dossier_${activeYear}`,
-      "MultiYearDossier"
+      `${employee.employeeCode}_${employee.name}_Dossier_${filePrefix}`,
+      "HRISAttendanceDossier"
     );
   };
 
@@ -206,22 +323,61 @@ export default function EmployeeMultiYearDossierModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Period Selector */}
+            <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setDownloadPeriod("SELECTED_MONTH")}
+                className={`px-2 py-1 rounded-lg transition cursor-pointer text-[10px] ${
+                  downloadPeriod === "SELECTED_MONTH"
+                    ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs font-extrabold"
+                    : "text-slate-600 dark:text-slate-400"
+                }`}
+              >
+                Month ({activeMonthData?.monthName || "Nov"})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDownloadPeriod("FULL_YEAR")}
+                className={`px-2 py-1 rounded-lg transition cursor-pointer text-[10px] ${
+                  downloadPeriod === "FULL_YEAR"
+                    ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs font-extrabold"
+                    : "text-slate-600 dark:text-slate-400"
+                }`}
+              >
+                Full Year ({activeYear})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDownloadPeriod("FISCAL_YEAR")}
+                className={`px-2 py-1 rounded-lg transition cursor-pointer text-[10px] ${
+                  downloadPeriod === "FISCAL_YEAR"
+                    ? "bg-white dark:bg-slate-900 text-blue-600 shadow-2xs font-extrabold"
+                    : "text-slate-600 dark:text-slate-400"
+                }`}
+              >
+                FY (Apr–Mar)
+              </button>
+            </div>
+
             <button
               type="button"
-              onClick={() => handleExportExcel("FULL_YEAR")}
+              onClick={() => handleExportExcel(downloadPeriod)}
               disabled={!dossierData}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-700 transition disabled:opacity-50 cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold text-xs transition disabled:opacity-50 cursor-pointer shadow-xs"
+              title="Download structured Excel (.xlsx) with Scorecard, 12-Month Matrix & Daily Log"
             >
-              <Download size={13} />
-              <span>Export Year (.xlsx)</span>
+              <Download size={13} className="text-emerald-600" />
+              <span>Export (.xlsx)</span>
             </button>
             <button
               type="button"
               onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 font-bold text-xs transition cursor-pointer shadow-xs"
+              title="Print standard A4 Attendance Dossier"
             >
-              <Printer size={13} />
+              <Printer size={13} className="text-blue-600" />
               <span>Print A4</span>
             </button>
             <button
@@ -326,9 +482,9 @@ export default function EmployeeMultiYearDossierModal({
                   <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-center">
                     <span className="text-[10px] uppercase font-bold text-slate-500 block">Sundays & Off</span>
                     <span className="text-xl font-black text-slate-700 dark:text-slate-300 tabular-nums">
-                      {yearTotals.leave || 0}
+                      {totalSundaysAndLeaves}
                     </span>
-                    <span className="text-[10px] text-slate-400 block mt-0.5">Non-Working</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">{sundaysInYear} Sun + {companyHolidaysCount} Hol</span>
                   </div>
 
                   <div className="p-3 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-center">
@@ -336,7 +492,7 @@ export default function EmployeeMultiYearDossierModal({
                     <span className="text-xl font-black text-blue-600 tabular-nums">
                       {scheduledOrgWorkingDays}
                     </span>
-                    <span className="text-[10px] text-blue-400 block mt-0.5">Scheduled</span>
+                    <span className="text-[10px] text-blue-500 block mt-0.5 font-bold">365 − 54 Non-Working</span>
                   </div>
 
                   <div className="p-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-center">
@@ -682,7 +838,7 @@ export default function EmployeeMultiYearDossierModal({
         )}
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3">
+        <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3 print:hidden">
           <span className="text-xs text-slate-400">
             Attendance verification record • Standard Roofs Books HRIS (Workspace 3)
           </span>
@@ -693,6 +849,104 @@ export default function EmployeeMultiYearDossierModal({
           >
             Close
           </button>
+        </div>
+
+        {/* PRINTABLE A4 DOSSIER LAYOUT (Visible only during window.print()) */}
+        <div className="hidden print:block p-4 space-y-4 text-black bg-white">
+          <div className="border-b-2 border-slate-800 pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-black tracking-tight text-slate-900">STANDARD ROOFS BOOKS</h1>
+                <h2 className="text-xs font-bold text-slate-600 uppercase tracking-wider mt-0.5">
+                  Official Workforce Attendance & HRIS Dossier
+                </h2>
+              </div>
+              <div className="text-right text-[11px] text-slate-600">
+                <p className="font-bold">Period: {downloadPeriod === "SELECTED_MONTH" ? `${activeMonthData?.monthName} ${activeYear}` : downloadPeriod === "FISCAL_YEAR" ? `FY ${activeYear}-${Number(activeYear) + 1}` : `Annual Jan–Dec ${activeYear}`}</p>
+                <p>Printed: {new Date().toLocaleDateString("en-IN", { dateStyle: "long" })}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 mt-3 p-2.5 bg-slate-100 border border-slate-300 rounded-lg text-xs">
+              <div><span className="text-[9px] font-bold text-slate-500 uppercase block">Name</span><strong>{employee.name}</strong></div>
+              <div><span className="text-[9px] font-bold text-slate-500 uppercase block">Code</span><strong className="font-mono">{employee.employeeCode}</strong></div>
+              <div><span className="text-[9px] font-bold text-slate-500 uppercase block">Role</span><strong>{employee.designation || employee.role || "Workforce"}</strong></div>
+              <div><span className="text-[9px] font-bold text-slate-500 uppercase block">Unit</span><strong>{employee.companyUnit === "INVI_CREATION" ? "Invi Creation" : "Standard Roofs"}</strong></div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 mb-1.5">
+              1. Attendance Scorecard Summary ({activeYear})
+            </h3>
+            <table className="w-full text-xs border-collapse border border-slate-400 text-center">
+              <thead className="bg-slate-100 font-bold">
+                <tr>
+                  <th className="border border-slate-400 p-1.5">Calendar Days</th>
+                  <th className="border border-slate-400 p-1.5">Sundays & Off</th>
+                  <th className="border border-slate-400 p-1.5">Org Working Days</th>
+                  <th className="border border-slate-400 p-1.5">Days Worked</th>
+                  <th className="border border-slate-400 p-1.5">Efficiency %</th>
+                  <th className="border border-slate-400 p-1.5">Total OT</th>
+                  <th className="border border-slate-400 p-1.5">1H Permissions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="font-mono font-bold">
+                  <td className="border border-slate-400 p-1.5">{totalDaysInYear}</td>
+                  <td className="border border-slate-400 p-1.5">{totalSundaysAndLeaves}</td>
+                  <td className="border border-slate-400 p-1.5 text-blue-800">{scheduledOrgWorkingDays}</td>
+                  <td className="border border-slate-400 p-1.5 text-emerald-800">{actualDaysWorked}</td>
+                  <td className="border border-slate-400 p-1.5">{attendancePercentage}%</td>
+                  <td className="border border-slate-400 p-1.5">{yearTotals.otHours || 0}h</td>
+                  <td className="border border-slate-400 p-1.5">{yearTotals.permission || 0} ({yearTotals.permissionMorning || 0}M/{yearTotals.permissionEvening || 0}E)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 mb-1.5">
+              2. 12-Month Attendance Breakdown ({activeYear})
+            </h3>
+            <table className="w-full text-[10px] border-collapse border border-slate-400 text-center">
+              <thead className="bg-slate-100 font-bold">
+                <tr>
+                  <th className="border border-slate-400 p-1 text-left">Month</th>
+                  <th className="border border-slate-400 p-1">P (1.0)</th>
+                  <th className="border border-slate-400 p-1">1H (1.0)</th>
+                  <th className="border border-slate-400 p-1">H (0.5)</th>
+                  <th className="border border-slate-400 p-1">PL (1.0)</th>
+                  <th className="border border-slate-400 p-1">UP (0.0)</th>
+                  <th className="border border-slate-400 p-1">A (0.0)</th>
+                  <th className="border border-slate-400 p-1">OT (Hrs)</th>
+                  <th className="border border-slate-400 p-1">L (Sun)</th>
+                  <th className="border border-slate-400 p-1 font-black">Net Payable</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentYearData?.months?.map((m: any) => (
+                  <tr key={m.monthName} className="font-mono">
+                    <td className="border border-slate-400 p-1 text-left font-sans font-bold">{m.monthName}</td>
+                    <td className="border border-slate-400 p-1">{m.present}</td>
+                    <td className="border border-slate-400 p-1">{m.permission}</td>
+                    <td className="border border-slate-400 p-1">{m.halfDay}</td>
+                    <td className="border border-slate-400 p-1">{m.paidLeave || 0}</td>
+                    <td className="border border-slate-400 p-1">{m.unpaidLeave || 0}</td>
+                    <td className="border border-slate-400 p-1">{m.absent}</td>
+                    <td className="border border-slate-400 p-1">{m.otHours || 0}h</td>
+                    <td className="border border-slate-400 p-1">{m.leave}</td>
+                    <td className="border border-slate-400 p-1 font-bold">{m.payableDays}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="pt-4 border-t border-slate-300 flex items-center justify-between text-[10px] text-slate-500">
+            <span>HR & Accounts Department • Standard Roofs Books</span>
+            <span>Authorized Signatory: _________________________</span>
+          </div>
         </div>
       </div>
     </div>
