@@ -181,7 +181,7 @@ cloudflared tunnel --url http://localhost:3000
 
 ## 👤 Author, Ownership & Commercial License
 
-* **Project Owner & Lead Architect:** **Srimanikandan K** ([@Srimani26](https://github.com/Srimani26))
-* **Repository:** [https://github.com/Srimani26/standardroof-accounting-software](https://github.com/Srimani26/standardroof-accounting-software)
+* **Project Owner & Lead Architect:** (Standardroofs)(standardroofs-bot/standardroofs-accounting-software)
+* **Repository:** [https://github.com/standardroofs-bot/standardroofs-accounting-software]
 * **Commercial Licensee:** Licensed for commercial operations to **Standard Roofs**.
-* **Copyright Notice:** © 2026 Srimanikandan K. All rights reserved.
+* **Copyright Notice:** © 2026 Standardroofs. All rights reserved.
