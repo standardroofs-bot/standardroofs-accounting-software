@@ -1,0 +1,82 @@
+# ==============================================================================
+# Standard Roofs Books (SR-Books) - Kubernetes Deployment Manifest
+# Multi-replica state with RollingUpdate and Zero-Downtime Health Probes
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sr-books-deployment
+  namespace: default
+  labels:
+    app.kubernetes.io/name: sr-books
+    app.kubernetes.io/component: core-erp
+    app.kubernetes.io/version: "2.6.0"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: sr-books
+  template:
+    metadata:
+      labels:
+        app: sr-books
+    spec:
+      containers:
+        - name: sr-books-app
+          image: standardroofs/sr-books-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sr-books-secrets
+                  key: database-url
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sr-books-secrets
+                  key: jwt-secret
+            - name: SR_BOOKS_INTERNAL_URL
+              value: "http://sr-books-service.default.svc.cluster.local:80"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 2
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false

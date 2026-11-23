@@ -1,0 +1,22 @@
+# ==============================================================================
+# Standard Roofs Books (SR-Books) - Kubernetes ClusterIP Service
+# Internal DNS resolution & Service Discovery endpoint
+# ==============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sr-books-service
+  namespace: default
+  labels:
+    app.kubernetes.io/name: sr-books
+    app.kubernetes.io/component: core-erp
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app: sr-books

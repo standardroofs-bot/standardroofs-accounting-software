@@ -1,0 +1,76 @@
+# ==============================================================================
+# Standard Roofs Books (SR-Books) - Production Multi-Container Compose Architecture
+# Horizontal Scaling: 2 Application Replicas behind Nginx Load Balancer (least_conn)
+# ==============================================================================
+
+version: "3.9"
+
+services:
+  # Application Replica 1
+  app_1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sr-books-app-1
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - SR_BOOKS_INTERNAL_URL=http://app_1:3000
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sr_books_network
+
+  # Application Replica 2
+  app_2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sr-books-app-2
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - SR_BOOKS_INTERNAL_URL=http://app_2:3000
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sr_books_network
+
+  # Nginx Reverse Proxy & Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: sr-books-nginx-lb
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      app_1:
+        condition: service_healthy
+      app_2:
+        condition: service_healthy
+    networks:
+      - sr_books_network
+
+networks:
+  sr_books_network:
+    driver: bridge

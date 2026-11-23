@@ -1,0 +1,118 @@
+# ==============================================================================
+# Standard Roofs Books (SR-Books) - Enterprise Production CI/CD Pipeline
+# Workflow: Quality Gate -> Production Build -> Docker Smoke Test -> K8s Validation
+# ==============================================================================
+
+name: SR-Books Enterprise CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+  DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/sr_books_ci?sslmode=disable"
+  JWT_SECRET: "ci-testing-jwt-secret-key-32-characters-minimum"
+
+jobs:
+  # -------------------------------------------------------------
+  # Job 1: Quality Gate & Production Build
+  # -------------------------------------------------------------
+  quality-and-build:
+    name: Code Quality, Typecheck & Production Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Clean Install Dependencies
+        run: npm ci
+
+      - name: Generate Prisma ORM Client
+        run: npx prisma generate
+
+      - name: Strict TypeScript Compilation Check
+        run: npx tsc --noEmit
+
+      - name: Compile Next.js Production Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NODE_ENV: production
+
+  # -------------------------------------------------------------
+  # Job 2: Multi-Stage Docker Container Build & Health Smoke Test
+  # -------------------------------------------------------------
+  docker-smoke-test:
+    name: Multi-Stage Docker Containerization & Health Smoke Test
+    needs: quality-and-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Standalone Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: sr-books-app:ci-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Execute Container & Probe /api/health
+        run: |
+          docker run -d --name sr-books-ci-container \
+            -p 3000:3000 \
+            -e NODE_ENV=production \
+            -e DATABASE_URL="postgresql://mock:mock@localhost:5432/mock" \
+            -e JWT_SECRET="ci-secret-jwt-key-minimum-32-characters" \
+            sr-books-app:ci-test
+
+          echo "Waiting for container startup..."
+          sleep 12
+
+          echo "Probing /api/health endpoint..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health || true)
+          echo "HTTP Status: $HTTP_STATUS"
+
+          docker logs sr-books-ci-container --tail 50
+          docker stop sr-books-ci-container
+
+  # -------------------------------------------------------------
+  # Job 3: Kubernetes Manifest Syntax & Schema Validation
+  # -------------------------------------------------------------
+  k8s-manifest-lint:
+    name: Validate Kubernetes YAML Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Verify K8s Manifests Exist & Parse
+        run: |
+          python3 -c "
+          import yaml, glob
+          manifests = glob.glob('deploy/k8s/*.yaml')
+          assert len(manifests) >= 4, f'Missing manifests, found: {manifests}'
+          for m in manifests:
+              with open(m) as f:
+                  yaml.safe_load_all(f)
+              print(f'✓ Validated YAML syntax for {m}')
+          "

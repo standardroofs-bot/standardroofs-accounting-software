@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySessionToken, COOKIE_NAME, ModuleKey, hasModulePermission } from "@/lib/auth";
+import { checkRateLimit, getRouteRateLimit } from "@/lib/rateLimit";
+import { invalidateRouteCache } from "@/lib/cache";
 
 // Public URLs that do not require authentication
 const PUBLIC_PATHS = [
   "/login",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/health",
   "/favicon.ico",
 ];
 
@@ -67,50 +70,123 @@ const ROUTE_MODULE_MAP: Record<string, ModuleKey> = {
 };
 
 /**
- * Apply strict anti-cache HTTP headers to prevent bfcache leaks on browser Back/Forward
+ * Apply Unified API Gateway & Security headers
  */
-function applyAntiCacheHeaders(response: NextResponse): NextResponse {
+function applyGatewayHeaders(
+  response: NextResponse,
+  requestId: string,
+  startTime: number,
+  rateLimitInfo?: { limit: number; remaining: number }
+): NextResponse {
+  // Anti-cache headers to prevent bfcache leaks
   response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   response.headers.set("Pragma", "no-cache");
   response.headers.set("Expires", "0");
+
+  // Distributed Tracing & Latency telemetry
+  response.headers.set("X-Request-Id", requestId);
+  response.headers.set("X-Response-Time", `${Math.round(performance.now() - startTime)}ms`);
+
+  // Defense-in-depth Security Headers
+  response.headers.set("X-Frame-Options", "SAMEORIGIN");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+
+  // Rate Limiting headers if available
+  if (rateLimitInfo) {
+    response.headers.set("X-RateLimit-Limit", String(rateLimitInfo.limit));
+    response.headers.set("X-RateLimit-Remaining", String(rateLimitInfo.remaining));
+  }
+
   return response;
 }
 
 export async function middleware(request: NextRequest) {
+  const startTime = performance.now();
   const { pathname } = request.nextUrl;
+  const method = request.method;
 
-  // 1. Allow static Next.js assets, public files, and whitelisted public paths
+  // 1. Correlation ID Tracing
+  const requestId = request.headers.get("x-request-id") || crypto.randomUUID();
+
+  // 2. Allow static Next.js assets, public files, and whitelisted static paths
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/public") ||
     pathname.startsWith("/uploads") ||
     pathname.startsWith("/images") ||
     pathname.includes("/print") ||
-    PUBLIC_PATHS.includes(pathname)
+    pathname === "/favicon.ico"
   ) {
-    return NextResponse.next();
+    const res = NextResponse.next();
+    res.headers.set("X-Request-Id", requestId);
+    return res;
   }
 
-  // 2. Extract and verify session token
+  // 3. Sliding-Window Rate Limiter Protection for /api/*
+  let rateLimitInfo: { limit: number; remaining: number } | undefined;
+  if (pathname.startsWith("/api/")) {
+    const clientIp =
+      request.headers.get("cf-connecting-ip") ||
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "127.0.0.1";
+
+    const { limit, windowMs } = getRouteRateLimit(pathname);
+    const rateLimit = checkRateLimit(`${clientIp}:${pathname.startsWith("/api/auth/") ? "auth" : "api"}`, limit, windowMs);
+    rateLimitInfo = { limit: rateLimit.limit, remaining: rateLimit.remaining };
+
+    if (!rateLimit.allowed) {
+      const errorResponse = NextResponse.json(
+        {
+          success: false,
+          error: `Too Many Requests. Rate limit exceeded, please retry in ${rateLimit.retryAfter}s.`,
+          retryAfter: rateLimit.retryAfter,
+        },
+        { status: 429 }
+      );
+      errorResponse.headers.set("Retry-After", String(rateLimit.retryAfter));
+      errorResponse.headers.set("X-RateLimit-Limit", String(rateLimit.limit));
+      errorResponse.headers.set("X-RateLimit-Remaining", "0");
+      errorResponse.headers.set("X-RateLimit-Reset", String(rateLimit.resetSeconds));
+      return applyGatewayHeaders(errorResponse, requestId, startTime, rateLimitInfo);
+    }
+
+    // Auto-invalidate server cache on mutations
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      invalidateRouteCache(pathname);
+    }
+  }
+
+  // Allow Health & Public Whitelist routes
+  if (PUBLIC_PATHS.includes(pathname)) {
+    return applyGatewayHeaders(NextResponse.next(), requestId, startTime, rateLimitInfo);
+  }
+
+  // 4. Extract and verify session token
   const token = request.cookies.get(COOKIE_NAME)?.value;
   const session = token ? await verifySessionToken(token) : null;
 
-  // 3. Handle unauthenticated requests
+  // 5. Handle unauthenticated requests
   if (!session) {
     if (pathname.startsWith("/api/")) {
-      return applyAntiCacheHeaders(
+      return applyGatewayHeaders(
         NextResponse.json(
           { success: false, error: "Authentication required. Please log in." },
           { status: 401 }
-        )
+        ),
+        requestId,
+        startTime,
+        rateLimitInfo
       );
     }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
-    return applyAntiCacheHeaders(NextResponse.redirect(loginUrl));
+    return applyGatewayHeaders(NextResponse.redirect(loginUrl), requestId, startTime);
   }
 
-  // 3.1 Strict Role Isolation for EMPLOYEE (Self-Service Portal Only)
+  // 5.1 Strict Role Isolation for EMPLOYEE (Self-Service Portal Only)
   if (session.role === "EMPLOYEE") {
     const isEmployeeAllowed =
       pathname === "/my-attendance" ||
@@ -120,52 +196,59 @@ export async function middleware(request: NextRequest) {
       pathname === "/api/leave-requests" ||
       pathname.startsWith("/api/leave-requests/") ||
       pathname === "/api/auth/me" ||
-      pathname === "/api/auth/logout";
+      pathname === "/api/auth/logout" ||
+      pathname === "/api/health";
 
     if (!isEmployeeAllowed) {
       if (pathname.startsWith("/api/")) {
-        return applyAntiCacheHeaders(
+        return applyGatewayHeaders(
           NextResponse.json(
             { success: false, error: "Access Denied: Employee accounts are restricted to the Self-Service Portal." },
             { status: 403 }
-          )
+          ),
+          requestId,
+          startTime,
+          rateLimitInfo
         );
       }
-      return applyAntiCacheHeaders(NextResponse.redirect(new URL("/my-attendance", request.url)));
+      return applyGatewayHeaders(NextResponse.redirect(new URL("/my-attendance", request.url)), requestId, startTime);
     }
-    return applyAntiCacheHeaders(NextResponse.next());
+    return applyGatewayHeaders(NextResponse.next(), requestId, startTime, rateLimitInfo);
   }
 
-  // 4. Granular Module Permission Enforcement
+  // 6. Granular Module Permission Enforcement
   for (const [routePrefix, moduleKey] of Object.entries(ROUTE_MODULE_MAP)) {
     if (pathname === routePrefix || pathname.startsWith(routePrefix + "/")) {
       const isAllowed = hasModulePermission(session, moduleKey, "view");
       if (!isAllowed) {
         if (pathname.startsWith("/api/")) {
-          return applyAntiCacheHeaders(
+          return applyGatewayHeaders(
             NextResponse.json(
               {
                 success: false,
                 error: `Access Denied: You do not have permission to access module '${moduleKey}'.`,
               },
               { status: 403 }
-            )
+            ),
+            requestId,
+            startTime,
+            rateLimitInfo
           );
         }
         // Redirect unauthorized page access to allowed landing page
         if (session.role === "SITE_SUPERVISOR") {
-          return applyAntiCacheHeaders(NextResponse.redirect(new URL("/expenses", request.url)));
+          return applyGatewayHeaders(NextResponse.redirect(new URL("/expenses", request.url)), requestId, startTime);
         }
         if (session.role === "HR_MANAGER") {
-          return applyAntiCacheHeaders(NextResponse.redirect(new URL("/labour", request.url)));
+          return applyGatewayHeaders(NextResponse.redirect(new URL("/labour", request.url)), requestId, startTime);
         }
-        return applyAntiCacheHeaders(NextResponse.redirect(new URL("/", request.url)));
+        return applyGatewayHeaders(NextResponse.redirect(new URL("/", request.url)), requestId, startTime);
       }
       break;
     }
   }
 
-  return applyAntiCacheHeaders(NextResponse.next());
+  return applyGatewayHeaders(NextResponse.next(), requestId, startTime, rateLimitInfo);
 }
 
 export const config = {
