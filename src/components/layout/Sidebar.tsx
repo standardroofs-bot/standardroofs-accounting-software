@@ -144,7 +144,7 @@ const WORKSPACES: WorkspaceConfig[] = [
         title: "Workforce Management",
         items: [
           { name: "Standard Attendance", href: "/attendance", icon: Clock, badge: "Live", moduleKey: "attendance" },
-          { name: "Standard People Directory", href: "/labour", icon: Users2, badge: "Directory", moduleKey: "labour" },
+          { name: "Standard People", href: "/labour", icon: Users2, badge: "HRIS", moduleKey: "labour" },
           { name: "Standard Payroll", href: "/payroll", icon: Coins, moduleKey: "payroll" },
           { name: "Standard Recycle Bin", href: "/recycle-bin", icon: Trash2, badge: "Restore", moduleKey: "recycle_bin" },
         ],
@@ -288,7 +288,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-slate-50/95 dark:bg-slate-900/95 text-slate-700 dark:text-slate-200 flex flex-col border-r border-slate-200/90 dark:border-slate-800 shadow-sm backdrop-blur-md ${
+      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-gradient-to-b from-white via-slate-50/95 to-indigo-50/30 dark:bg-slate-900/95 text-slate-700 dark:text-slate-200 flex flex-col border-r border-slate-200/90 dark:border-slate-800 shadow-sm backdrop-blur-md ${
         isCollapsed ? "w-20" : "w-60"
       } ${
         isMobileOpen
@@ -347,36 +347,36 @@ export function Sidebar() {
 
       {/* 4-Workspace Switcher Bar (Zoho One Style) */}
       {!isCollapsed ? (
-        <div className="p-2 border-b border-slate-200/80 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-800/40 relative">
+        <div className="p-2.5 border-b border-slate-200/80 dark:border-slate-800 bg-white/60 dark:bg-slate-800/40 relative">
           <button
             onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-            className="w-full flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 text-left transition group shadow-2xs cursor-pointer"
+            className="w-full flex items-center justify-between p-2 rounded-2xl bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/80 border border-slate-200/90 dark:border-slate-700 text-left transition group shadow-xs hover:shadow-sm cursor-pointer"
           >
-            <div className="flex items-center gap-2 truncate">
+            <div className="flex items-center gap-2.5 truncate">
               <div
-                className={`w-6 h-6 rounded-lg bg-gradient-to-br ${
+                className={`w-7 h-7 rounded-xl bg-gradient-to-br ${
                   currentWorkspace === "all"
                     ? "from-blue-600 to-indigo-600"
                     : activeWsConfig.color
-                } text-white flex items-center justify-center shrink-0 shadow-2xs`}
+                } text-white flex items-center justify-center shrink-0 shadow-sm`}
               >
                 {currentWorkspace === "all" ? (
-                  <Layers size={13} />
+                  <Layers size={14} />
                 ) : (
-                  <activeWsConfig.icon size={13} />
+                  <activeWsConfig.icon size={14} />
                 )}
               </div>
               <div className="truncate">
                 <span className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">
                   Active Workspace
                 </span>
-                <span className="text-[11px] font-bold text-slate-800 dark:text-white truncate block">
+                <span className="text-[11.5px] font-bold text-slate-800 dark:text-white truncate block">
                   {currentWorkspace === "all" ? "All Modules" : activeWsConfig.title}
                 </span>
               </div>
             </div>
             <ChevronDown
-              size={13}
+              size={14}
               className={`text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform ${
                 showWorkspaceMenu ? "rotate-180" : ""
               }`}
@@ -493,16 +493,16 @@ export function Sidebar() {
                         href={item.href}
                         onClick={() => setIsMobileOpen(false)}
                         title={isCollapsed ? item.name : undefined}
-                        className={`flex items-center gap-2.5 px-2.5 py-1.5 text-xs transition-colors group relative ${
+                        className={`flex items-center gap-2.5 px-2.5 py-1.5 text-xs transition-all group relative rounded-xl ${
                           isActive
-                            ? "border-l-3 border-blue-600 bg-blue-50/90 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold shadow-2xs rounded-r-lg"
-                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/90 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 rounded-lg"
+                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/20"
+                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/90 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 font-medium"
                         }`}
                       >
                         <Icon
                           size={16}
                           className={`shrink-0 transition-colors ${
-                            isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-200"
+                            isActive ? "text-white" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-200"
                           }`}
                         />
                         {!isCollapsed && (
@@ -510,9 +510,9 @@ export function Sidebar() {
                             <span className="truncate">{item.name}</span>
                             {item.badge && (
                               <span
-                                className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${
+                                className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
                                   isActive
-                                    ? "bg-blue-600 text-white"
+                                    ? "bg-white/20 text-white border border-white/30"
                                     : "bg-slate-200/80 text-slate-600 border border-slate-200/60 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
                                 }`}
                               >

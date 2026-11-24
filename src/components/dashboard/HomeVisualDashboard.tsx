@@ -383,7 +383,7 @@ export function HomeVisualDashboard({
       {/* 2. TOP 4 FINTECH KPI CARDS WITH SEGMENTED HEALTH BARS & SPARKLINES */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Total Receivables */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs hover:border-blue-300 dark:hover:border-blue-700 transition flex flex-col justify-between">
+        <div className="porcelain-card p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -418,7 +418,7 @@ export function HomeVisualDashboard({
         </div>
 
         {/* KPI 2: Cash & Bank Liquidity */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-700 transition flex flex-col justify-between">
+        <div className="porcelain-card p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -452,7 +452,7 @@ export function HomeVisualDashboard({
         </div>
 
         {/* KPI 3: Total Payables (AP) */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition flex flex-col justify-between">
+        <div className="porcelain-card p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -486,7 +486,7 @@ export function HomeVisualDashboard({
         </div>
 
         {/* KPI 4: Net Operating Profit */}
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs hover:border-teal-300 dark:hover:border-teal-700 transition flex flex-col justify-between">
+        <div className="porcelain-card p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -524,7 +524,7 @@ export function HomeVisualDashboard({
       {activeView === "visual" ? (
         <div className="space-y-6">
           {/* CHART 1: INTERACTIVE CASH FLOW & WORKING CAPITAL TRAJECTORY */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="porcelain-card rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
               <div>
                 <div className="flex items-center gap-2">

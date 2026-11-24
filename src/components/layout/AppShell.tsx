@@ -31,7 +31,7 @@ export function useSidebar() {
   return context;
 }
 
-// SessionGuard to eliminate bfcache leaks and verify active authentication
+// SessionGuard to eliminate bfcache leaks and verify active authentication safely
 function SessionGuard() {
   const pathname = usePathname();
 
@@ -44,17 +44,18 @@ function SessionGuard() {
     };
     window.addEventListener("pageshow", handlePageShow);
 
-    // 2. Client verification against session endpoint
+    // 2. Safe client verification: ONLY redirect if strictly 401 Unauthorized AND cookie is absent
     fetch("/api/auth/me", { cache: "no-store" })
       .then((res) => {
-        if (!res.ok || res.status === 401) {
-          localStorage.clear();
-          sessionStorage.clear();
-          window.location.replace("/login");
+        if (res.status === 401) {
+          if (typeof document !== "undefined" && !document.cookie.includes("sr_session")) {
+            localStorage.removeItem("sr_workspace");
+            window.location.replace("/login");
+          }
         }
       })
       .catch(() => {
-        // If network error, allow offline or handle gracefully
+        // Network hiccups/cancellations should NEVER log the user out
       });
 
     return () => {
@@ -128,7 +129,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       }}
     >
       <SessionGuard />
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex transition-colors text-slate-900 dark:text-slate-100 antialiased">
+      <div className="min-h-screen bg-[#F3F6FC] dark:bg-slate-950 flex transition-colors text-slate-900 dark:text-slate-100 antialiased">
         {/* Mobile Backdrop Overlay */}
         {isMobileOpen && (
           <div
