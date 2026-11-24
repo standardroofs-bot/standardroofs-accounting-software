@@ -221,7 +221,7 @@ export default function AttendancePage() {
     otReason?: string | null;
   } | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [holidayForm, setHolidayForm] = useState({ date: "", name: "", markStaff: true });
+  const [holidayForm, setHolidayForm] = useState({ date: "", name: "", holidayType: "PL", markStaff: true });
   
   // Lifetime Multi-Year Dossier Modal
   const [selectedDossierEmployee, setSelectedDossierEmployee] = useState<EmployeeItem | null>(null);
@@ -245,6 +245,7 @@ export default function AttendancePage() {
   const [otHoursInput, setOtHoursInput] = useState<number>(0);
   const [otTimeRangeInput, setOtTimeRangeInput] = useState<string>("");
   const [otReasonInput, setOtReasonInput] = useState<string>("");
+  const [otValidationError, setOtValidationError] = useState<string>("");
   const [permSlotInput, setPermSlotInput] = useState<"MORNING" | "EVENING">("MORNING");
   const [permTimeInput, setPermTimeInput] = useState<string>("");
 
@@ -954,16 +955,18 @@ export default function AttendancePage() {
           action: "add",
           date: holidayForm.date,
           name: holidayForm.name,
+          holidayType: holidayForm.holidayType || "PL",
           markAllStaff: holidayForm.markStaff,
+          markOfficeStaff: holidayForm.markStaff,
         }),
       });
       const data = await res.json();
       if (data.success) {
         showToast(
-          `Declared holiday "${holidayForm.name}" on ${holidayForm.date} (Updated ${data.staffMarkedCount} staff as [L])`
+          `Declared ${holidayForm.holidayType === "UP" ? "Company Unpaid Off Day" : "Holiday"} "${holidayForm.name}" on ${holidayForm.date} (Updated ${data.staffMarkedCount || 0} staff)`
         );
         setShowHolidayModal(false);
-        setHolidayForm({ date: "", name: "", markStaff: true });
+        setHolidayForm({ date: "", name: "", holidayType: "PL", markStaff: true });
         fetchAttendance();
       }
     } catch (err) {
@@ -1042,6 +1045,7 @@ export default function AttendancePage() {
       <ModuleHeaderWithAnalytics
         title="Attendance & Workforce Command Center"
         subtitle="6-day work week engine, auto-Sunday leave, 1-hr permissions, daily deployment, and multi-year records"
+        storageKey="sr_attendance_show_analytics"
         totalCount={employees.length + contractorTeamList.length}
         activeCount={
           employees.filter((e) =>
@@ -2269,7 +2273,7 @@ export default function AttendancePage() {
           )}
 
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -2281,20 +2285,20 @@ export default function AttendancePage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Click any cell to edit status: <strong className="text-emerald-600">P (1.0)</strong>, <strong className="text-sky-600">1H-M (1.0)</strong>, <strong className="text-cyan-600">1H-E (1.0)</strong>, <strong className="text-amber-500">H (0.5)</strong>, <strong className="text-teal-600">PL (1.0)</strong>, <strong className="text-slate-600">UP (0.0)</strong>, <strong className="text-rose-600">A (0.0)</strong>, <strong className="text-slate-500">L (Sunday Off)</strong>, <strong className="text-amber-600">OT (Overtime)</strong>
+                  Click any cell to edit status: <strong className="text-emerald-600">P (1.0)</strong>, <strong className="text-sky-600">-1hr M (1.0)</strong>, <strong className="text-cyan-600">-1hr E (1.0)</strong>, <strong className="text-amber-500">H (0.5)</strong>, <strong className="text-teal-600">PL (1.0)</strong>, <strong className="text-slate-600">UP (0.0)</strong>, <strong className="text-rose-600">A (0.0)</strong>, <strong className="text-slate-500">L (Sunday Off)</strong>, <strong className="text-amber-600">OT (After 9PM OT)</strong>
                 </p>
               </div>
 
-            <div className="flex items-center gap-3">
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-extrabold bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex flex-wrap items-center gap-2 max-w-full">
+              <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] font-extrabold bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 max-w-full">
                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold" title="Full Day Present (1.0)">
                   <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P <span className="text-[9px] font-medium text-slate-400">1.0</span>
                 </span>
                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 font-bold" title="1-Hr Morning Permission (1.0)">
-                  <span className="w-2 h-2 rounded-xs bg-sky-500" /> 1H-M <span className="text-[9px] font-medium text-slate-400">1.0</span>
+                  <span className="w-2 h-2 rounded-xs bg-sky-500" /> -1hr M <span className="text-[9px] font-medium text-slate-400">1.0</span>
                 </span>
                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 font-bold" title="1-Hr Evening Permission (1.0)">
-                  <span className="w-2 h-2 rounded-xs bg-cyan-600" /> 1H-E <span className="text-[9px] font-medium text-slate-400">1.0</span>
+                  <span className="w-2 h-2 rounded-xs bg-cyan-600" /> -1hr E <span className="text-[9px] font-medium text-slate-400">1.0</span>
                 </span>
                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold" title="Half-Day (0.5)">
                   <span className="w-2 h-2 rounded-xs bg-amber-400" /> H <span className="text-[9px] font-medium text-slate-400">0.5</span>
@@ -2311,15 +2315,15 @@ export default function AttendancePage() {
                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 font-bold" title="Sunday / Weekly Off (0.0)">
                   <span className="w-2 h-2 rounded-xs bg-slate-300 dark:bg-slate-600" /> L <span className="text-[9px] font-medium text-slate-400">Off</span>
                 </span>
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-200 font-bold" title="Overtime Hours">
-                  <span className="w-2 h-2 rounded-xs bg-amber-500" /> OT +2h
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-200 font-bold" title="After 9:00 PM Overtime Hours">
+                  <span className="w-2 h-2 rounded-xs bg-amber-500" /> +1hr/+2hr OT
                 </span>
               </div>
 
               <button
                 type="button"
                 onClick={handleExportMusterExcel}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-2xs cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-2xs cursor-pointer shrink-0"
               >
                 <FileSpreadsheet size={13} />
                 <span>Export (.xlsx)</span>
@@ -2624,7 +2628,7 @@ export default function AttendancePage() {
                             }`}
                           >
                             <span
-                              className={`relative min-w-[26px] h-6 px-1 rounded-md inline-flex items-center justify-center font-black transition ${
+                              className={`relative min-w-[28px] h-6 px-1 rounded-md inline-flex items-center justify-center font-black transition ${
                                 status === "P"
                                   ? "bg-emerald-500 text-white shadow-2xs text-[10px]"
                                   : status === "1H"
@@ -2644,13 +2648,13 @@ export default function AttendancePage() {
                                   : "bg-slate-100/60 text-slate-300 dark:text-slate-600 border border-dashed border-slate-200 dark:border-slate-700 text-[10px]"
                               }`}
                             >
-                              {status === "1H" ? (isEve ? "1H·E" : "1H·M") : status || "—"}
+                              {status === "1H" ? (isEve ? "-1hr E" : "-1hr M") : status || "—"}
                               {att?.otHours && att.otHours > 0 ? (
                                 <span
                                   className="absolute -top-1.5 -right-1 px-1 py-0.2 rounded-full bg-amber-500 text-white text-[8px] font-black ring-1 ring-white dark:ring-slate-900 shadow-2xs"
-                                  title={`OT: +${att.otHours}h ${att.otTimeRange ? `(${att.otTimeRange})` : ""}`}
+                                  title={`After 9PM OT: +${att.otHours}hr ${att.otTimeRange ? `(${att.otTimeRange})` : ""} - ${att.otReason || ""}`}
                                 >
-                                  +{att.otHours}h
+                                  +{att.otHours}hr
                                 </span>
                               ) : null}
                             </span>
@@ -2903,29 +2907,29 @@ export default function AttendancePage() {
 
                 {/* Quick Shift Presets */}
                 <div className="space-y-1 pt-1 border-t border-amber-200/60 dark:border-amber-800/60">
-                  <span className="text-[10px] font-bold text-amber-800 dark:text-amber-400 block">Quick Shift Presets:</span>
+                  <span className="text-[10px] font-bold text-amber-800 dark:text-amber-400 block">After 9:00 PM Overtime Presets:</span>
                   <div className="flex flex-wrap gap-1.5">
                     <button
                       type="button"
                       onClick={() => {
-                        setOtHoursInput(2);
-                        setOtTimeRangeInput("07:00 AM - 09:00 AM");
-                        if (!otReasonInput) setOtReasonInput("Morning site setup");
+                        setOtHoursInput(1);
+                        setOtTimeRangeInput("09:00 PM - 10:00 PM");
+                        setOtValidationError("");
                       }}
                       className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 text-[10px] font-bold border border-amber-300 hover:bg-amber-100/80 transition cursor-pointer"
                     >
-                      🌅 Morning OT (7–9 AM)
+                      🌙 +1hr OT (09:00 PM - 10:00 PM)
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         setOtHoursInput(2);
-                        setOtTimeRangeInput("07:00 PM - 09:00 PM");
-                        if (!otReasonInput) setOtReasonInput("Evening extra shift");
+                        setOtTimeRangeInput("09:00 PM - 11:00 PM");
+                        setOtValidationError("");
                       }}
                       className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 text-[10px] font-bold border border-amber-300 hover:bg-amber-100/80 transition cursor-pointer"
                     >
-                      🌙 Evening OT (7–9 PM)
+                      🌙 +2hr OT (09:00 PM - 11:00 PM)
                     </button>
                     <button
                       type="button"
@@ -2933,36 +2937,57 @@ export default function AttendancePage() {
                         setOtHoursInput(8);
                         setOtTimeRangeInput("09:00 AM - 05:00 PM");
                         if (!otReasonInput) setOtReasonInput("Sunday / Full-Day OT deployment");
+                        setOtValidationError("");
                       }}
                       className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 text-[10px] font-bold border border-amber-300 hover:bg-amber-100/80 transition cursor-pointer"
                     >
-                      ⭐ Full-Day OT (9 AM–5 PM)
+                      ⭐ Full-Day / Custom OT
                     </button>
                   </div>
                 </div>
 
                 {otHoursInput > 0 && (
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div>
-                      <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">OT Time Slot</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 7:00 PM - 9:00 PM"
-                        value={otTimeRangeInput}
-                        onChange={(e) => setOtTimeRangeInput(e.target.value)}
-                        className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
-                      />
+                  <div className="space-y-1.5 pt-1">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">OT Time Slot (After 9 PM)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 09:00 PM - 10:00 PM"
+                          value={otTimeRangeInput}
+                          onChange={(e) => {
+                            setOtTimeRangeInput(e.target.value);
+                            setOtValidationError("");
+                          }}
+                          className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-amber-800 dark:text-amber-300 font-bold mb-0.5">
+                          OT Reason * <span className="text-[9px] text-rose-500">(Mandatory)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Explain work done after 9 PM"
+                          value={otReasonInput}
+                          onChange={(e) => {
+                            setOtReasonInput(e.target.value);
+                            if (e.target.value.trim()) setOtValidationError("");
+                          }}
+                          className={`w-full px-2 py-1 rounded-lg border text-xs ${
+                            otValidationError
+                              ? "border-rose-500 bg-rose-50 dark:bg-rose-950/40 text-rose-900 dark:text-rose-200"
+                              : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                          }`}
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">OT Reason</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Roof truss welding"
-                        value={otReasonInput}
-                        onChange={(e) => setOtReasonInput(e.target.value)}
-                        className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
-                      />
-                    </div>
+                    {otValidationError && (
+                      <div className="text-[11px] text-rose-600 font-bold bg-rose-50 dark:bg-rose-950/50 p-1.5 rounded-lg border border-rose-200 dark:border-rose-800 flex items-center gap-1.5 animate-in fade-in">
+                        <AlertCircle size={13} className="shrink-0" />
+                        <span>{otValidationError}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2987,6 +3012,11 @@ export default function AttendancePage() {
                 <button
                   type="button"
                   onClick={() => {
+                    if (otHoursInput > 0 && !otReasonInput.trim()) {
+                      setOtValidationError("OT Reason is mandatory to explain work done after 9:00 PM");
+                      return;
+                    }
+                    setOtValidationError("");
                     handleMarkStatus(
                       cellEditTarget.employee.id,
                       cellEditStatus,
@@ -3576,12 +3606,12 @@ export default function AttendancePage() {
               ))}
             </div>
 
-            {/* Add Holiday Form */}
+            {/* Add Holiday / Shutdown Form */}
             <form onSubmit={handleSaveHoliday} className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-3 text-xs">
-              <strong className="block text-slate-800 dark:text-slate-200">Declare New Public Holiday</strong>
+              <strong className="block text-slate-800 dark:text-slate-200">Declare Holiday or Company Shutdown Day</strong>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-slate-500 mb-1 font-semibold">Holiday Date</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Date</label>
                   <input
                     type="date"
                     required
@@ -3591,16 +3621,34 @@ export default function AttendancePage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-500 mb-1 font-semibold">Holiday Name</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Title / Occasion</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Diwali, Pongal, May Day"
+                    placeholder="e.g. Diwali, Company Shutdown, Pongal"
                     value={holidayForm.name}
                     onChange={(e) => setHolidayForm({ ...holidayForm, name: e.target.value })}
                     className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-500 mb-1 font-semibold">Holiday / Day-Off Category</label>
+                <select
+                  value={holidayForm.holidayType}
+                  onChange={(e) => setHolidayForm({ ...holidayForm, holidayType: e.target.value })}
+                  className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold"
+                >
+                  <option value="PL">Paid Public Holiday [PL] (1.0 Day Paid)</option>
+                  <option value="UP">Company Unpaid Off Day / Shutdown [UP] (0.0 Day Pay, worked = 1.0 Day P)</option>
+                  <option value="HALF_PAID">Half-Day Paid Holiday [HALF_PAID] (0.5 Day Paid)</option>
+                </select>
+                {holidayForm.holidayType === "UP" && (
+                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1">
+                    Staff who do not work will be marked UP (0.0 payable days). Any staff member who attends will be credited P (1.0 paid).
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
@@ -3612,15 +3660,19 @@ export default function AttendancePage() {
                   className="rounded text-blue-600 focus:ring-0"
                 />
                 <label htmlFor="markStaff" className="text-slate-600 dark:text-slate-300 cursor-pointer">
-                  Mark as Leave [L] across all active employees in 1 click
+                  Auto-mark across active workforce in 1 click
                 </label>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-xs transition cursor-pointer"
+                className={`w-full py-2 text-white rounded-xl font-bold text-xs shadow-xs transition cursor-pointer ${
+                  holidayForm.holidayType === "UP" ? "bg-slate-700 hover:bg-slate-800" : "bg-amber-600 hover:bg-amber-700"
+                }`}
               >
-                + Declare Holiday & Auto-Mark [L]
+                {holidayForm.holidayType === "UP"
+                  ? "+ Mark Company Unpaid Off Day [UP]"
+                  : "+ Declare Holiday & Auto-Mark"}
               </button>
             </form>
           </div>
@@ -4012,8 +4064,8 @@ export default function AttendancePage() {
 
       {/* 11. MODAL: EDIT LEAVE REQUEST */}
       {editingLeave && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 w-full max-w-lg p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-700 w-full max-w-lg p-6 shadow-2xl space-y-4 relative z-[101]">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">

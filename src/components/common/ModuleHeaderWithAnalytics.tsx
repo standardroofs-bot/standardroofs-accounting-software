@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   BarChart3,
   ChevronDown,
@@ -55,6 +55,7 @@ export interface ModuleHeaderWithAnalyticsProps {
   subtitle?: string;
   icon?: any;
   badge?: string;
+  storageKey?: string;
   
   // Analytics
   analyticsPreset?: "sales" | "parties" | "purchases" | "banking" | "operations" | "hr";
@@ -143,8 +144,35 @@ export function ModuleHeaderWithAnalytics({
   customActions,
   onRefresh,
   extraControls,
+  storageKey,
 }: ModuleHeaderWithAnalyticsProps) {
+  const effectiveStorageKey =
+    storageKey ||
+    (title.toLowerCase().includes("attendance")
+      ? "sr_attendance_show_analytics"
+      : `sr_analytics_${title.toLowerCase().replace(/[^a-z0-9]/g, "_")}`);
+
   const [showAnalytics, setShowAnalytics] = useState(defaultShowAnalytics);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(effectiveStorageKey);
+      if (saved !== null) {
+        setShowAnalytics(saved === "true");
+      }
+    } catch (e) {}
+  }, [effectiveStorageKey]);
+
+  const toggleAnalytics = () => {
+    setShowAnalytics((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(effectiveStorageKey, String(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
   const [showImportModal, setShowImportModal] = useState(false);
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
   const [hoveredSlice, setHoveredSlice] = useState<number | null>(null);
@@ -225,7 +253,7 @@ export function ModuleHeaderWithAnalytics({
           {/* Analytics Toggle */}
           <button
             type="button"
-            onClick={() => setShowAnalytics(!showAnalytics)}
+            onClick={toggleAnalytics}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition shadow-2xs ${
               showAnalytics
                 ? "bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300"

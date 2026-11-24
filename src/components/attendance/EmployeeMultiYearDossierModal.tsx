@@ -19,6 +19,10 @@ import {
   Timer,
   Flame,
   Award,
+  BarChart3,
+  TrendingUp,
+  PieChart,
+  Activity,
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
 
@@ -220,7 +224,7 @@ export default function EmployeeMultiYearDossierModal({
           <table class="header-table">
             <tr>
               <td style="width: 80px; vertical-align: middle;">
-                <img src="/images/standard-roofs-logo.png" style="height: 52px; width: auto; object-fit: contain;" alt="Logo" onerror="this.style.display='none'" />
+                <img src="/images/standard-roofs-logo.png" style="height: 52px; width: auto; object-fit: contain;" alt="Logo" onerror="this.onerror=null; this.src='/logo.png';" />
               </td>
               <td style="vertical-align: middle; padding-left: 10px;">
                 <h1 style="margin: 0; font-size: 16px; font-weight: 900; letter-spacing: -0.5px; color: #0f172a;">STANDARD ROOFS</h1>
@@ -757,6 +761,140 @@ export default function EmployeeMultiYearDossierModal({
                     <span className="text-[10px] text-sky-500 block mt-0.5">
                       {yearTotals.permissionMorning || 0}M · {yearTotals.permissionEvening || 0}E
                     </span>
+                  </div>
+                </div>
+
+                {/* Executive Graphical Visualizations */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                  {/* Jan - Dec Monthly Attendance Trajectory Bar Chart */}
+                  <div className="lg:col-span-2 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 size={15} className="text-blue-600" />
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          Monthly Attendance Trend ({activeYear})
+                        </h4>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-medium">Days Worked vs Scheduled</span>
+                    </div>
+
+                    <div className="h-44 flex items-end justify-between gap-1.5 pt-4 px-2 border-b border-slate-100 dark:border-slate-800">
+                      {(currentYearData?.months || []).map((m: any, idx: number) => {
+                        const daysInM = new Date(parseInt(activeYear, 10), idx + 1, 0).getDate();
+                        const worked = m.payableDays || 0;
+                        const pct = Math.min(100, Math.round((worked / 26) * 100));
+                        const isCurrentMonth = idx === selectedMonthIndex;
+
+                        return (
+                          <div
+                            key={m.monthName}
+                            onClick={() => setSelectedMonthIndex(idx)}
+                            className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group cursor-pointer"
+                            title={`${m.monthName} ${activeYear}: ${worked} Days Worked\nPresent: ${m.present} | 1H: ${m.permission} | Half: ${m.halfDay}\nLeaves: ${m.absent + (m.unpaidLeave || 0)} | OT: ${m.otHours || 0}h`}
+                          >
+                            <span className="text-[9px] font-bold text-slate-600 dark:text-slate-300 opacity-0 group-hover:opacity-100 transition">
+                              {worked}
+                            </span>
+                            <div className="w-full max-w-[28px] bg-slate-100 dark:bg-slate-800 rounded-t-md h-full flex items-end p-0.5 relative">
+                              <div
+                                style={{ height: `${pct}%` }}
+                                className={`w-full rounded-t-sm transition-all duration-300 ${
+                                  isCurrentMonth
+                                    ? "bg-gradient-to-t from-blue-600 to-indigo-500 shadow-xs"
+                                    : worked > 20
+                                    ? "bg-gradient-to-t from-emerald-500 to-teal-400 group-hover:from-emerald-600 group-hover:to-teal-500"
+                                    : worked > 0
+                                    ? "bg-gradient-to-t from-amber-500 to-amber-400"
+                                    : "bg-slate-200 dark:bg-slate-700"
+                                }`}
+                              />
+                            </div>
+                            <span
+                              className={`text-[9.5px] font-bold truncate ${
+                                isCurrentMonth
+                                  ? "text-blue-600 font-black"
+                                  : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200"
+                              }`}
+                            >
+                              {m.monthName.slice(0, 3)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between text-[10.5px] text-slate-500 pt-1">
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500" /> &ge; 20 Days (Optimal)
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-xs bg-amber-500" /> &lt; 20 Days
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-xs bg-blue-600" /> Selected Month
+                        </span>
+                      </div>
+                      <span className="font-mono text-[10px] text-slate-400">Click bar to inspect month</span>
+                    </div>
+                  </div>
+
+                  {/* Efficiency Donut & Work Distribution */}
+                  <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs space-y-3 flex flex-col justify-between">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp size={15} className="text-emerald-600" />
+                      <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        Attendance Efficiency ({activeYear})
+                      </h4>
+                    </div>
+
+                    {/* Donut Gauge */}
+                    <div className="flex items-center justify-center relative py-2">
+                      <svg className="w-28 h-28 transform -rotate-90" viewBox="0 0 100 100">
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          className="text-slate-100 dark:text-slate-800"
+                          strokeWidth="10"
+                          stroke="currentColor"
+                          fill="transparent"
+                        />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="40"
+                          className="text-blue-600"
+                          strokeWidth="10"
+                          strokeDasharray={251.2}
+                          strokeDashoffset={251.2 - (251.2 * Math.min(100, attendancePercentage)) / 100}
+                          strokeLinecap="round"
+                          stroke="currentColor"
+                          fill="transparent"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                        <span className="text-xl font-black text-slate-900 dark:text-white tabular-nums">
+                          {attendancePercentage}%
+                        </span>
+                        <span className="text-[9px] uppercase font-bold text-slate-400">Annual Ratio</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                        <span className="text-slate-500 font-medium">Days Worked</span>
+                        <span className="font-extrabold text-emerald-600">{actualDaysWorked} Days</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                        <span className="text-slate-500 font-medium">Non-Working Offs</span>
+                        <span className="font-extrabold text-slate-600 dark:text-slate-300">{totalSundaysAndLeaves} Days</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                        <span className="text-slate-500 font-medium">Overtime Logged</span>
+                        <span className="font-extrabold text-amber-600">{yearTotals.otHours || 0} Hours</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

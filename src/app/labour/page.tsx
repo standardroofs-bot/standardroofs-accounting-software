@@ -110,6 +110,7 @@ export default function LabourWorkforceMasterPage() {
     experienceJson: "",
   });
 
+  const [modalKycTab, setModalKycTab] = useState<"profile" | "kyc" | "bank" | "education">("profile");
   const [uploadingField, setUploadingField] = useState<string | null>(null);
 
   // Fetch Workers based on current segment
@@ -226,6 +227,7 @@ export default function LabourWorkforceMasterPage() {
       experienceJson: "",
     });
     setSelectedWorkerForAction(null);
+    setModalKycTab("profile");
     setShowAddEditModal(true);
   };
 
@@ -269,6 +271,7 @@ export default function LabourWorkforceMasterPage() {
       graduationDetails: w.graduationDetails || "",
       experienceJson: w.experienceJson || "",
     });
+    setModalKycTab("profile");
     setShowAddEditModal(true);
   };
 
@@ -411,8 +414,9 @@ export default function LabourWorkforceMasterPage() {
     <div className="max-w-[1700px] mx-auto px-3 sm:px-6 py-4 space-y-5 select-none font-sans pb-24 text-slate-800 dark:text-slate-100">
       {/* 1. TOP MODULE HEADER WITH ANALYTICS & QUICK ACTIONS */}
       <ModuleHeaderWithAnalytics
-        title="Workforce & Personnel KYC Directory"
+        title="Standard People Directory (HR & KYC Hub)"
         subtitle="Single Master Source of Truth for Standard Roofs Office, Invi Digital Hub, Tamil Labours, Hindi Crew & Contractors"
+        storageKey="sr_labour_show_analytics"
         totalCount={segmentCounts.total}
         activeCount={segmentCounts.total}
         archivedCount={0}
@@ -957,20 +961,25 @@ export default function LabourWorkforceMasterPage() {
 
       {/* 9. ADD / EDIT WORKER MODAL WITH FULL KYC & UPLOADS */}
       {showAddEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-3xl w-full flex flex-col max-h-[92vh] overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl max-w-3xl w-full flex flex-col max-h-[92vh] overflow-hidden relative z-[101]">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-850">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/90 dark:bg-slate-850">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md">
                   <Edit2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                    {formData.id ? `Edit Workforce Profile: ${formData.name}` : `Add New Workforce Profile`}
+                  <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    {formData.id ? `Edit Profile: ${formData.name}` : `New Workforce Registration`}
+                    {formData.employeeCode && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        {formData.employeeCode}
+                      </span>
+                    )}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Complete statutory KYC, banking credentials, identity documents and compensation
+                    Enterprise statutory KYC, banking credentials, identity documents and compensation
                   </p>
                 </div>
               </div>
@@ -979,431 +988,551 @@ export default function LabourWorkforceMasterPage() {
               <button
                 type="button"
                 onClick={() => setShowAddEditModal(false)}
-                className="w-8 h-8 rounded-full border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shadow-sm focus:outline-none"
+                className="w-8 h-8 rounded-full border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shadow-sm focus:outline-none cursor-pointer"
                 title="Close"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
+            {/* Structured Multi-Step KYC Tabs */}
+            <div className="flex items-center px-6 pt-3 pb-2 border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50 gap-2 overflow-x-auto text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setModalKycTab("profile")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition cursor-pointer shrink-0 ${
+                  modalKycTab === "profile"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800"
+                }`}
+              >
+                <span>👤 Profile & Role</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalKycTab("kyc")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition cursor-pointer shrink-0 ${
+                  modalKycTab === "kyc"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800"
+                }`}
+              >
+                <ShieldCheck size={14} />
+                <span>KYC & Documents</span>
+                {(formData.aadhaarDocUrl || formData.panDocUrl || formData.drivingLicenseDocUrl) && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalKycTab("bank")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition cursor-pointer shrink-0 ${
+                  modalKycTab === "bank"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Building size={14} />
+                <span>Bank Details</span>
+                {formData.bankAccountNumber && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalKycTab("education")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition cursor-pointer shrink-0 ${
+                  modalKycTab === "education"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800"
+                }`}
+              >
+                <GraduationCap size={14} />
+                <span>Education & Experience</span>
+              </button>
+            </div>
+
             {/* Modal Form Body */}
             <form onSubmit={handleSaveWorker} className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
-              {/* Photo & Basic Details */}
-              <div className="flex flex-col sm:flex-row gap-5 items-start">
-                {/* Photo Upload Box */}
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center relative group">
-                    {formData.photoUrl ? (
-                      <img
-                        src={formData.photoUrl}
-                        alt="Profile"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="text-center p-2">
-                        <Upload className="w-5 h-5 text-slate-400 mx-auto mb-1" />
-                        <span className="text-[10px] text-slate-400 font-semibold block">Photo</span>
+              {/* TAB 1: PROFILE & ROLE */}
+              {modalKycTab === "profile" && (
+                <div className="space-y-5 animate-in fade-in duration-150">
+                  {/* Photo & Basic Details */}
+                  <div className="flex flex-col sm:flex-row gap-5 items-start">
+                    {/* Photo Upload Box */}
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800 flex items-center justify-center relative group">
+                        {formData.photoUrl ? (
+                          <img
+                            src={formData.photoUrl}
+                            alt="Profile"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="text-center p-2">
+                            <Upload className="w-5 h-5 text-slate-400 mx-auto mb-1" />
+                            <span className="text-[10px] text-slate-400 font-semibold block">Photo</span>
+                          </div>
+                        )}
+                        {uploadingField === "photoUrl" && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                            <Loader2 className="w-5 h-5 text-white animate-spin" />
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {uploadingField === "photoUrl" && (
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <Loader2 className="w-5 h-5 text-white animate-spin" />
+                      <label className="cursor-pointer text-[11px] font-bold text-blue-600 hover:text-blue-700">
+                        Upload Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadFile("photoUrl", file);
+                          }}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Name, Code, Father */}
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Full Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Senthil Kumar"
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold outline-none focus:border-blue-500"
+                        />
                       </div>
-                    )}
-                  </div>
-                  <label className="cursor-pointer text-[11px] font-bold text-blue-600 hover:text-blue-700">
-                    Upload Photo
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleUploadFile("photoUrl", file);
-                      }}
-                    />
-                  </label>
-                </div>
 
-                {/* Name, Code, Father */}
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Senthil Kumar"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold outline-none focus:border-blue-500"
-                    />
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Employee / Contractor ID
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. SR011, TL-072, CON-007"
+                          value={formData.employeeCode || formData.empCode}
+                          onChange={(e) =>
+                            setFormData({ ...formData, employeeCode: e.target.value, empCode: e.target.value })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Father / Team Lead Name
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Murugesan"
+                          value={formData.fatherName || formData.contractorLeadName}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              fatherName: e.target.value,
+                              contractorLeadName: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Date of Birth
+                        </label>
+                        <input
+                          type="date"
+                          value={formData.dob}
+                          onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Employee / Contractor ID
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. SR011, TL-072, CON-007"
-                      value={formData.employeeCode || formData.empCode}
-                      onChange={(e) =>
-                        setFormData({ ...formData, employeeCode: e.target.value, empCode: e.target.value })
-                      }
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono outline-none focus:border-blue-500"
-                    />
+                  {/* Segment, Role & Compensation */}
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
+                    <h4 className="font-bold text-slate-700 dark:text-slate-300 uppercase text-[10.5px] tracking-wider">
+                      Workforce Category & Remuneration
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Category</label>
+                        <select
+                          value={formData.category}
+                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
+                        >
+                          <option value="OFFICE_STAFF">Office Staff</option>
+                          <option value="TAMIL_LABOUR">Tamil Site Labour</option>
+                          <option value="HINDI_LABOUR">Hindi Migrant Crew</option>
+                          <option value="CONTRACTOR_TEAM">Contractor Team</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Company Unit</label>
+                        <select
+                          value={formData.companyUnit}
+                          onChange={(e) => setFormData({ ...formData, companyUnit: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
+                        >
+                          <option value="STANDARD_ROOFS">Standard Roofs</option>
+                          <option value="INVI_CREATION">Invi Creation</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Designation / Trade Specialty
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={formData.companyUnit === "INVI_CREATION" ? "(Optional)" : "e.g. Fitter, Welder, HR"}
+                          value={formData.designation || formData.tradeSpecialty}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              designation: e.target.value,
+                              tradeSpecialty: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {formData.category === "OFFICE_STAFF" ? (
+                        <div>
+                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            Fixed Monthly Salary (₹)
+                          </label>
+                          <input
+                            type="number"
+                            value={formData.monthlySalary}
+                            onChange={(e) =>
+                              setFormData({ ...formData, monthlySalary: Number(e.target.value) || 0 })
+                            }
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            Daily Wage / Rate (₹)
+                          </label>
+                          <input
+                            type="number"
+                            value={formData.dailyWage}
+                            onChange={(e) =>
+                              setFormData({ ...formData, dailyWage: Number(e.target.value) || 0 })
+                            }
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 9876543210"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Date of Joining</label>
+                        <input
+                          type="date"
+                          value={formData.dateOfJoining}
+                          onChange={(e) => setFormData({ ...formData, dateOfJoining: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
                   </div>
 
+                  {/* Full Address */}
                   <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Father / Team Lead Name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Murugesan"
-                      value={formData.fatherName || formData.contractorLeadName}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          fatherName: e.target.value,
-                          contractorLeadName: e.target.value,
-                        })
-                      }
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Full Residential Address</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Street, Village / Town, District, State, PIN"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:border-blue-500"
                     />
                   </div>
+                </div>
+              )}
 
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Date of Birth
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.dob}
-                      onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:border-blue-500"
-                    />
+              {/* TAB 2: KYC & STATUTORY DOCUMENTS */}
+              {modalKycTab === "kyc" && (
+                <div className="space-y-4 animate-in fade-in duration-150">
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
+                    <h4 className="font-bold text-blue-700 dark:text-blue-400 uppercase text-[10.5px] tracking-wider">
+                      Statutory Identity & KYC Documents
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Aadhaar (12 Digits)</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            maxLength={14}
+                            placeholder="1234 5678 9012"
+                            value={formData.aadhaarNumber}
+                            onChange={(e) => setFormData({ ...formData, aadhaarNumber: e.target.value })}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono outline-none focus:border-blue-500"
+                          />
+                          <label className="px-2.5 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 cursor-pointer flex items-center justify-center shrink-0" title="Upload Aadhaar">
+                            <Upload className="w-3.5 h-3.5" />
+                            <input
+                              type="file"
+                              accept=".pdf,.png,.jpg,.jpeg"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleUploadFile("aadhaarDocUrl", f);
+                              }}
+                            />
+                          </label>
+                        </div>
+                        {formData.aadhaarDocUrl && (
+                          <a href={formData.aadhaarDocUrl} target="_blank" rel="noreferrer" className="text-[10px] text-emerald-600 hover:underline mt-1 block">
+                            ✓ Aadhaar Document Uploaded
+                          </a>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">PAN Card</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            maxLength={10}
+                            placeholder="ABCDE1234F"
+                            value={formData.panNumber}
+                            onChange={(e) => setFormData({ ...formData, panNumber: e.target.value.toUpperCase() })}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono uppercase outline-none focus:border-blue-500"
+                          />
+                          <label className="px-2.5 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 cursor-pointer flex items-center justify-center shrink-0" title="Upload PAN">
+                            <Upload className="w-3.5 h-3.5" />
+                            <input
+                              type="file"
+                              accept=".pdf,.png,.jpg,.jpeg"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleUploadFile("panDocUrl", f);
+                              }}
+                            />
+                          </label>
+                        </div>
+                        {formData.panDocUrl && (
+                          <a href={formData.panDocUrl} target="_blank" rel="noreferrer" className="text-[10px] text-emerald-600 hover:underline mt-1 block">
+                            ✓ PAN Document Uploaded
+                          </a>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Driving License</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            placeholder="TN3320150001234"
+                            value={formData.drivingLicenseNumber}
+                            onChange={(e) => setFormData({ ...formData, drivingLicenseNumber: e.target.value })}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono outline-none focus:border-blue-500"
+                          />
+                          <label className="px-2.5 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 cursor-pointer flex items-center justify-center shrink-0" title="Upload Driving License">
+                            <Upload className="w-3.5 h-3.5" />
+                            <input
+                              type="file"
+                              accept=".pdf,.png,.jpg,.jpeg"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleUploadFile("drivingLicenseDocUrl", f);
+                              }}
+                            />
+                          </label>
+                        </div>
+                        {formData.drivingLicenseDocUrl && (
+                          <a href={formData.drivingLicenseDocUrl} target="_blank" rel="noreferrer" className="text-[10px] text-emerald-600 hover:underline mt-1 block">
+                            ✓ DL Document Uploaded
+                          </a>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Segment, Role & Compensation */}
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
-                <h4 className="font-bold text-slate-700 dark:text-slate-300 uppercase text-[10.5px] tracking-wider">
-                  Workforce Category & Remuneration
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Category</label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
-                    >
-                      <option value="OFFICE_STAFF">Office Staff</option>
-                      <option value="TAMIL_LABOUR">Tamil Site Labour</option>
-                      <option value="HINDI_LABOUR">Hindi Migrant Crew</option>
-                      <option value="CONTRACTOR_TEAM">Contractor Team</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Company Unit</label>
-                    <select
-                      value={formData.companyUnit}
-                      onChange={(e) => setFormData({ ...formData, companyUnit: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
-                    >
-                      <option value="STANDARD_ROOFS">Standard Roofs</option>
-                      <option value="INVI_CREATION">Invi Creation</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Designation / Trade Specialty
-                    </label>
-                    <input
-                      type="text"
-                      placeholder={formData.companyUnit === "INVI_CREATION" ? "(Optional)" : "e.g. Fitter, Welder, HR"}
-                      value={formData.designation || formData.tradeSpecialty}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          designation: e.target.value,
-                          tradeSpecialty: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  {formData.category === "OFFICE_STAFF" ? (
-                    <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Fixed Monthly Salary (₹)
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.monthlySalary}
-                        onChange={(e) =>
-                          setFormData({ ...formData, monthlySalary: Number(e.target.value) || 0 })
-                        }
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
-                      />
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Daily Wage / Rate (₹)
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.dailyWage}
-                        onChange={(e) =>
-                          setFormData({ ...formData, dailyWage: Number(e.target.value) || 0 })
-                        }
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
-                      />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 9876543210"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Date of Joining</label>
-                    <input
-                      type="date"
-                      value={formData.dateOfJoining}
-                      onChange={(e) => setFormData({ ...formData, dateOfJoining: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Statutory Identity & Document Uploads */}
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
-                <h4 className="font-bold text-blue-700 dark:text-blue-400 uppercase text-[10.5px] tracking-wider">
-                  Statutory Identity & KYC Documents
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Aadhaar (12 Digits)</label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        maxLength={14}
-                        placeholder="1234 5678 9012"
-                        value={formData.aadhaarNumber}
-                        onChange={(e) => setFormData({ ...formData, aadhaarNumber: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono outline-none focus:border-blue-500"
-                      />
-                      <label className="px-2.5 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 cursor-pointer flex items-center justify-center shrink-0">
-                        <Upload className="w-3.5 h-3.5" />
+              {/* TAB 3: BANK REMITTANCE */}
+              {modalKycTab === "bank" && (
+                <div className="space-y-4 animate-in fade-in duration-150">
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
+                    <h4 className="font-bold text-emerald-700 dark:text-emerald-400 uppercase text-[10.5px] tracking-wider">
+                      Direct Bank Remittance Credentials
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Bank Name</label>
                         <input
-                          type="file"
-                          accept=".pdf,.png,.jpg,.jpeg"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) handleUploadFile("aadhaarDocUrl", f);
-                          }}
+                          type="text"
+                          placeholder="e.g. State Bank of India"
+                          value={formData.bankName}
+                          onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
                         />
-                      </label>
-                    </div>
-                  </div>
+                      </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">PAN Card</label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        maxLength={10}
-                        placeholder="ABCDE1234F"
-                        value={formData.panNumber}
-                        onChange={(e) => setFormData({ ...formData, panNumber: e.target.value.toUpperCase() })}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono uppercase outline-none focus:border-blue-500"
-                      />
-                      <label className="px-2.5 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 cursor-pointer flex items-center justify-center shrink-0">
-                        <Upload className="w-3.5 h-3.5" />
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Account Number</label>
                         <input
-                          type="file"
-                          accept=".pdf,.png,.jpg,.jpeg"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) handleUploadFile("panDocUrl", f);
-                          }}
+                          type="text"
+                          placeholder="e.g. 39281048192"
+                          value={formData.bankAccountNo || formData.bankAccountNumber}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              bankAccountNo: e.target.value,
+                              bankAccountNumber: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono outline-none focus:border-blue-500"
                         />
-                      </label>
-                    </div>
-                  </div>
+                      </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Driving License</label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        placeholder="TN3320150001234"
-                        value={formData.drivingLicenseNumber}
-                        onChange={(e) => setFormData({ ...formData, drivingLicenseNumber: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono outline-none focus:border-blue-500"
-                      />
-                      <label className="px-2.5 py-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 cursor-pointer flex items-center justify-center shrink-0">
-                        <Upload className="w-3.5 h-3.5" />
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">IFSC Code</label>
                         <input
-                          type="file"
-                          accept=".pdf,.png,.jpg,.jpeg"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) handleUploadFile("drivingLicenseDocUrl", f);
-                          }}
+                          type="text"
+                          placeholder="e.g. SBIN0001234"
+                          value={formData.bankIfsc}
+                          onChange={(e) => setFormData({ ...formData, bankIfsc: e.target.value.toUpperCase() })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono uppercase outline-none focus:border-blue-500"
                         />
-                      </label>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Branch Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Erode Main"
+                          value={formData.bankBranch}
+                          onChange={(e) => setFormData({ ...formData, bankBranch: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Direct Banking Remittance */}
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
-                <h4 className="font-bold text-emerald-700 dark:text-emerald-400 uppercase text-[10.5px] tracking-wider">
-                  Direct Bank Remittance Credentials
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Bank Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. State Bank of India"
-                      value={formData.bankName}
-                      onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
-                    />
-                  </div>
+              {/* TAB 4: EDUCATION & EXPERIENCE */}
+              {modalKycTab === "education" && (
+                <div className="space-y-4 animate-in fade-in duration-150">
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
+                    <h4 className="font-bold text-purple-700 dark:text-purple-400 uppercase text-[10.5px] tracking-wider">
+                      Education & Prior Experience
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">10th Standard</label>
+                        <input
+                          type="text"
+                          placeholder="School, Year, Percentage"
+                          value={formData.tenthDetails}
+                          onChange={(e) => setFormData({ ...formData, tenthDetails: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Account Number</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 39281048192"
-                      value={formData.bankAccountNo || formData.bankAccountNumber}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          bankAccountNo: e.target.value,
-                          bankAccountNumber: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono outline-none focus:border-blue-500"
-                    />
-                  </div>
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">12th Standard</label>
+                        <input
+                          type="text"
+                          placeholder="School, Year, Percentage"
+                          value={formData.twelfthDetails}
+                          onChange={(e) => setFormData({ ...formData, twelfthDetails: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">IFSC Code</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. SBIN0001234"
-                      value={formData.bankIfsc}
-                      onChange={(e) => setFormData({ ...formData, bankIfsc: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono uppercase outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Branch Name</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Erode Main"
-                      value={formData.bankBranch}
-                      onChange={(e) => setFormData({ ...formData, bankBranch: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
-                    />
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Degree / Diploma</label>
+                        <input
+                          type="text"
+                          placeholder="College, Degree, Year"
+                          value={formData.graduationDetails}
+                          onChange={(e) => setFormData({ ...formData, graduationDetails: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Education & Experience Details */}
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-3">
-                <h4 className="font-bold text-purple-700 dark:text-purple-400 uppercase text-[10.5px] tracking-wider">
-                  Education & Prior Experience
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">10th Standard</label>
-                    <input
-                      type="text"
-                      placeholder="School, Year, Percentage"
-                      value={formData.tenthDetails}
-                      onChange={(e) => setFormData({ ...formData, tenthDetails: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">12th Standard</label>
-                    <input
-                      type="text"
-                      placeholder="School, Year, Percentage"
-                      value={formData.twelfthDetails}
-                      onChange={(e) => setFormData({ ...formData, twelfthDetails: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Degree / Diploma</label>
-                    <input
-                      type="text"
-                      placeholder="College, Degree, Year"
-                      value={formData.graduationDetails}
-                      onChange={(e) => setFormData({ ...formData, graduationDetails: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Full Address */}
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Full Residential Address</label>
-                <textarea
-                  rows={2}
-                  placeholder="Street, Village / Town, District, State, PIN"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:border-blue-500"
-                />
-              </div>
+              )}
 
               {/* Form Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowAddEditModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition shadow-xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-md shadow-blue-500/20"
-                >
-                  Save Profile & KYC
-                </button>
+              <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  {modalKycTab !== "profile" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (modalKycTab === "education") setModalKycTab("bank");
+                        else if (modalKycTab === "bank") setModalKycTab("kyc");
+                        else if (modalKycTab === "kyc") setModalKycTab("profile");
+                      }}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 font-semibold transition"
+                    >
+                      ← Previous
+                    </button>
+                  )}
+                  {modalKycTab !== "education" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (modalKycTab === "profile") setModalKycTab("kyc");
+                        else if (modalKycTab === "kyc") setModalKycTab("bank");
+                        else if (modalKycTab === "bank") setModalKycTab("education");
+                      }}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition"
+                    >
+                      Next Step →
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddEditModal(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 transition shadow-xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-md shadow-blue-500/20"
+                  >
+                    Save Profile & KYC
+                  </button>
+                </div>
               </div>
             </form>
           </div>
