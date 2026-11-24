@@ -19,8 +19,10 @@ if (!(Test-Path $LogsDir)) { New-Item -ItemType Directory -Path $LogsDir | Out-N
 $PublicDir = Join-Path $ProjectRoot "public"
 if (!(Test-Path $PublicDir)) { New-Item -ItemType Directory -Path $PublicDir | Out-Null }
 
-$ServerLog = Join-Path $LogsDir "nextjs-server.log"
-$TunnelLog = Join-Path $LogsDir "cloudflared-tunnel.log"
+$ServerOutLog = Join-Path $LogsDir "nextjs-out.log"
+$ServerErrLog = Join-Path $LogsDir "nextjs-err.log"
+$TunnelOutLog = Join-Path $LogsDir "cloudflared-out.log"
+$TunnelErrLog = Join-Path $LogsDir "cloudflared-err.log"
 $TunnelUrlFile = Join-Path $PublicDir "active-tunnel.txt"
 $TunnelJsonFile = Join-Path $PublicDir "active-tunnel.json"
 
@@ -48,8 +50,13 @@ function Test-ServerHealthy {
 
 function Start-NextServer {
   Write-Host "[Watchdog] $(Get-Date -Format 'HH:mm:ss') Starting Next.js Production Server..." -ForegroundColor Yellow
-  Start-Process -FilePath "npm.cmd" -ArgumentList "run start" -WorkingDirectory $ProjectRoot -RedirectStandardOutput $ServerLog -RedirectStandardError $ServerLog -WindowStyle Hidden
-  Start-Sleep -Seconds 3
+  $serverScript = Join-Path $ProjectRoot ".next\standalone\server.js"
+  if (Test-Path $serverScript) {
+    Start-Process -FilePath "node.exe" -ArgumentList "`"$serverScript`"" -WorkingDirectory $ProjectRoot -RedirectStandardOutput $ServerOutLog -RedirectStandardError $ServerErrLog -WindowStyle Hidden
+  } else {
+    Start-Process -FilePath "npm.cmd" -ArgumentList "run start" -WorkingDirectory $ProjectRoot -RedirectStandardOutput $ServerOutLog -RedirectStandardError $ServerErrLog -WindowStyle Hidden
+  }
+  Start-Sleep -Seconds 2
 }
 
 function Test-TunnelHealthy {
@@ -63,14 +70,15 @@ function Start-CloudflareTunnel {
   if (!(Test-Path $cloudflaredPath)) {
     $cloudflaredPath = "cloudflared"
   }
-  Start-Process -FilePath $cloudflaredPath -ArgumentList "tunnel --url http://localhost:$Port" -WorkingDirectory $ProjectRoot -RedirectStandardOutput $TunnelLog -RedirectStandardError $TunnelLog -WindowStyle Hidden
+  Start-Process -FilePath $cloudflaredPath -ArgumentList "tunnel --url http://localhost:$Port" -WorkingDirectory $ProjectRoot -RedirectStandardOutput $TunnelOutLog -RedirectStandardError $TunnelErrLog -WindowStyle Hidden
   Start-Sleep -Seconds 4
   Update-TunnelUrl
 }
 
 function Update-TunnelUrl {
-  if (Test-Path $TunnelLog) {
-    $lines = Get-Content $TunnelLog -Tail 100
+  $logToCheck = if (Test-Path $TunnelErrLog) { $TunnelErrLog } elseif (Test-Path $TunnelOutLog) { $TunnelOutLog } else { $null }
+  if ($logToCheck) {
+    $lines = Get-Content $logToCheck -Tail 100
     foreach ($line in $lines) {
       if ($line -match "https://[a-zA-Z0-9-]+\.trycloudflare\.com") {
         $foundUrl = $matches[0]
