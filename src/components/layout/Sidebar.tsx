@@ -304,7 +304,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-gradient-to-b from-[#F7F9FD] via-[#F1F5FC] to-[#EBF0FA] dark:bg-slate-900/95 text-slate-700 dark:text-slate-200 flex flex-col border-r border-slate-300/70 dark:border-slate-800 shadow-[4px_0_24px_-12px_rgba(15,23,42,0.12)] backdrop-blur-md ${
+      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-gradient-to-b from-[#131C31] via-[#18233C] to-[#111827] text-slate-100 flex flex-col border-r border-slate-800/80 shadow-2xl backdrop-blur-md ${
         isCollapsed ? "w-20" : "w-64"
       } ${
         isMobileOpen
@@ -313,14 +313,14 @@ export function Sidebar() {
       }`}
     >
       {/* Brand Header */}
-      <div className="h-14 flex items-center justify-between px-3 border-b border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 shrink-0">
+      <div className="h-14 flex items-center justify-between px-3 border-b border-slate-800/80 bg-[#131C31]/90 shrink-0">
         <Link
           href="/"
           onClick={() => setIsMobileOpen(false)}
           className="flex items-center gap-2 overflow-hidden hover:opacity-95 transition group cursor-pointer"
           title="Return to Home"
         >
-          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center p-1 shrink-0 shadow-2xs border border-slate-200 dark:border-slate-700 group-hover:border-blue-400 transition">
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center p-1 shrink-0 shadow-sm border border-white/20 group-hover:scale-105 transition">
             <img
               src="/images/standard-roofs-logo.png"
               alt="Standard Roofs Logo"
@@ -329,13 +329,13 @@ export function Sidebar() {
           </div>
           {!isCollapsed && (
             <div className="flex flex-col truncate">
-              <span className="font-bold text-xs tracking-tight text-slate-900 dark:text-white leading-none group-hover:text-blue-600 transition flex items-center gap-1.5">
+              <span className="font-bold text-xs tracking-tight text-white leading-none flex items-center gap-1.5">
                 SR-Books
-                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200/80 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800">
+                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
                   v2.6
                 </span>
               </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+              <span className="text-[10px] text-slate-400 truncate mt-0.5">
                 Standard Roofs • Erode
               </span>
             </div>
@@ -346,14 +346,14 @@ export function Sidebar() {
         <div className="flex items-center">
           <button
             onClick={() => setIsMobileOpen(false)}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 lg:hidden transition cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 lg:hidden transition cursor-pointer"
             title="Close Menu"
           >
             <X size={18} />
           </button>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden lg:flex p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition cursor-pointer"
+            className="hidden lg:flex p-1.5 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer"
             title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
             {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
@@ -363,10 +363,10 @@ export function Sidebar() {
 
       {/* 4-Workspace Switcher Bar (Zoho One Style) */}
       {!isCollapsed ? (
-        <div className="p-2.5 border-b border-slate-200/80 dark:border-slate-800 bg-white/60 dark:bg-slate-800/40 relative">
+        <div className="p-2.5 border-b border-slate-800/80 bg-[#131C31]/50 relative">
           <button
             onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-            className="w-full flex items-center justify-between p-2 rounded-2xl bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/80 border border-slate-200/90 dark:border-slate-700 text-left transition group shadow-xs hover:shadow-sm cursor-pointer"
+            className="w-full flex items-center justify-between p-2 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-left transition group shadow-sm cursor-pointer text-white"
           >
             <div className="flex items-center gap-2.5 truncate">
               <div
@@ -383,17 +383,17 @@ export function Sidebar() {
                 )}
               </div>
               <div className="truncate">
-                <span className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">
+                <span className="text-[9px] text-slate-400 uppercase tracking-wider block font-bold">
                   Active Workspace
                 </span>
-                <span className="text-[11.5px] font-bold text-slate-800 dark:text-white truncate block">
+                <span className="text-[11.5px] font-bold text-white truncate block">
                   {currentWorkspace === "all" ? "All Modules" : activeWsConfig.title}
                 </span>
               </div>
             </div>
             <ChevronDown
               size={14}
-              className={`text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform ${
+              className={`text-slate-400 group-hover:text-white transition-transform ${
                 showWorkspaceMenu ? "rotate-180" : ""
               }`}
             />
@@ -401,8 +401,8 @@ export function Sidebar() {
 
           {/* Workspace Dropdown Menu */}
           {showWorkspaceMenu && (
-            <div className="absolute left-2 right-2 top-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 space-y-1">
-              <div className="px-2 py-1 text-[9.5px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+            <div className="absolute left-2 right-2 top-full mt-1 bg-[#18233C] border border-slate-700/80 rounded-xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 space-y-1">
+              <div className="px-2 py-1 text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">
                 Select Workspace
               </div>
               {accessibleWorkspaces.map((ws) => {
@@ -414,12 +414,12 @@ export function Sidebar() {
                     onClick={() => handleSwitchWorkspace(ws.id)}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
                       isSelected
-                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/20"
-                        : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
+                        ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold shadow-md shadow-blue-500/30"
+                        : "text-slate-300 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 truncate">
-                      <WsIcon size={15} className={isSelected ? "text-white" : "text-slate-500"} />
+                      <WsIcon size={15} className={isSelected ? "text-white" : "text-slate-400"} />
                       <span className="truncate">{ws.title}</span>
                     </div>
                     {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />}
@@ -428,13 +428,13 @@ export function Sidebar() {
               })}
 
               {!isHr && (
-                <div className="border-t border-slate-100 dark:border-slate-800 my-1 pt-1">
+                <div className="border-t border-slate-700/60 my-1 pt-1">
                   <button
                     onClick={() => handleSwitchWorkspace("all")}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition cursor-pointer ${
                       currentWorkspace === "all"
-                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/20"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold shadow-md shadow-blue-500/30"
+                        : "text-slate-400 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
@@ -449,10 +449,10 @@ export function Sidebar() {
         </div>
       ) : (
         /* Collapsed Workspace Icon Button */
-        <div className="p-2 border-b border-slate-200/80 dark:border-slate-800 flex justify-center">
+        <div className="p-2 border-b border-slate-800/80 flex justify-center">
           <button
             onClick={() => setIsCollapsed(false)}
-            className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-blue-600 dark:text-blue-400 transition cursor-pointer"
+            className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/15 text-blue-400 flex items-center justify-center transition cursor-pointer border border-white/10"
             title={`Active: ${activeWsConfig.title} (Click to expand)`}
           >
             <activeWsConfig.icon size={16} />
@@ -474,18 +474,18 @@ export function Sidebar() {
               {!isCollapsed ? (
                 <button
                   onClick={() => toggleSection(group.id)}
-                  className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] font-bold tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 uppercase transition group cursor-pointer"
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] font-bold tracking-wider text-slate-400 hover:text-slate-200 uppercase transition group cursor-pointer"
                 >
                   <span className="truncate">{group.title}</span>
                   <ChevronDown
                     size={14}
-                    className={`text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform duration-200 ${
+                    className={`text-slate-400 group-hover:text-slate-200 transition-transform duration-200 ${
                       isOpen ? "" : "-rotate-90"
                     }`}
                   />
                 </button>
               ) : (
-                <div className="h-px bg-slate-200 dark:bg-slate-800 my-2 mx-1" />
+                <div className="h-px bg-slate-800 my-2 mx-1" />
               )}
 
               {/* Items List */}
@@ -505,14 +505,14 @@ export function Sidebar() {
                         title={isCollapsed ? item.name : undefined}
                         className={`flex items-center gap-3 px-3.5 py-2.5 text-[14px] transition-all group relative rounded-xl ${
                           isActive
-                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold shadow-lg shadow-blue-600/25 ring-1 ring-blue-500/30"
-                            : "text-slate-600 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white font-medium"
+                            ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold shadow-lg shadow-blue-500/30 ring-1 ring-blue-400/40"
+                            : "text-slate-300 hover:bg-white/8 hover:text-white font-medium"
                         }`}
                       >
                         <Icon
                           size={18}
                           className={`shrink-0 transition-colors ${
-                            isActive ? "text-white" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-200"
+                            isActive ? "text-white" : "text-slate-400 group-hover:text-white"
                           }`}
                         />
                         {!isCollapsed && (
@@ -523,7 +523,7 @@ export function Sidebar() {
                                 className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${
                                   isActive
                                     ? "bg-white/20 text-white border border-white/30"
-                                    : "bg-slate-200/80 text-slate-600 border border-slate-200/60 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
+                                    : "bg-white/10 text-slate-300 border border-white/10"
                                 }`}
                               >
                                 {item.badge}
@@ -543,20 +543,20 @@ export function Sidebar() {
 
       {/* Super Admin Status Footer */}
       {!isCollapsed && currentUser && (
-        <div className="p-2.5 border-t border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-950/80 text-[11px] flex items-center justify-between shrink-0">
+        <div className="p-2.5 border-t border-slate-800/80 bg-[#111827]/90 text-[11px] flex items-center justify-between shrink-0">
           <div className="truncate">
-            <div className="font-bold text-slate-800 dark:text-white truncate">
+            <div className="font-bold text-white truncate">
               {currentUser.email === "admin@standardroofs.in" || currentUser.role === "SUPER_ADMIN"
                 ? "Prabhakaran T"
                 : currentUser.name}
             </div>
-            <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+            <div className="text-[10px] text-slate-400 flex items-center gap-1">
               <span>{currentUser.role === "SUPER_ADMIN" ? "Super Admin" : currentUser.role?.replace(/_/g, " ")}</span>
               <span>•</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Online</span>
+              <span className="text-emerald-400 font-semibold">Online</span>
             </div>
           </div>
-          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-2xs shadow-emerald-500/50" />
+          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-2xs shadow-emerald-400/50" />
         </div>
       )}
     </aside>

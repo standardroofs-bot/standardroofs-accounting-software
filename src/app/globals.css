@@ -55,7 +55,7 @@
 }
 
 body {
-  background-color: #eaeef7;
+  background-color: #e2e8f2;
   color: #334155;
   font-family: var(--font-sans), "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -64,9 +64,9 @@ body {
   padding: 0;
   -webkit-font-smoothing: antialiased;
   background-image: 
-    radial-gradient(at 20% 0%, rgba(59, 130, 246, 0.09) 0px, transparent 55%),
-    radial-gradient(at 85% 5%, rgba(99, 102, 241, 0.08) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.04) 0px, transparent 55%);
+    radial-gradient(at 15% 0%, rgba(59, 130, 246, 0.12) 0px, transparent 55%),
+    radial-gradient(at 85% 5%, rgba(99, 102, 241, 0.10) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 60%);
   background-attachment: fixed;
 }
 

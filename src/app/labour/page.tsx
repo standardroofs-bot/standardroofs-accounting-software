@@ -31,6 +31,8 @@ import {
   ExternalLink,
   Loader2,
   Settings,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
 import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
@@ -46,6 +48,7 @@ type SegmentType = "SR_OFFICE" | "INVI_OFFICE" | "TAMIL" | "HINDI" | "CONTRACTOR
 export default function LabourWorkforceMasterPage() {
   const [activeSegment, setActiveSegment] = useState<SegmentType>("SR_OFFICE");
   const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -717,6 +720,36 @@ export default function LabourWorkforceMasterPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* View Switcher: Table vs Cards */}
+          <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200/80 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg transition cursor-pointer ${
+                viewMode === "table"
+                  ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs font-black"
+                  : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+              }`}
+              title="Modern SaaS Table View"
+            >
+              <List size={13} />
+              <span>Table</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("cards")}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg transition cursor-pointer ${
+                viewMode === "cards"
+                  ? "bg-white dark:bg-slate-900 text-blue-600 shadow-xs font-black"
+                  : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+              }`}
+              title="Rich Interactive Cards View"
+            >
+              <LayoutGrid size={13} />
+              <span>Cards</span>
+            </button>
+          </div>
+
           {/* Active / Archived Toggle */}
           <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
             <button
@@ -751,46 +784,297 @@ export default function LabourWorkforceMasterPage() {
         </div>
       </div>
 
-      {/* 4. WORKFORCE & KYC MASTER TABLE */}
+      {/* 4. WORKFORCE & KYC MASTER DIRECTORY (TABLE OR RICH CARDS) */}
       <div className="bg-white/95 dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 overflow-hidden shadow-[0_4px_20px_-4px_rgba(15,23,42,0.06)]">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 font-bold uppercase text-xs tracking-wider border-b border-slate-200/90 dark:border-slate-800">
-              <tr>
-                <th className="py-3.5 px-4">Personnel Profile</th>
-                <th className="py-3.5 px-4">
-                  {activeSegment === "CONTRACTOR" ? "Trade Specialty" : "Designation / Role"}
-                </th>
-                <th className="py-3.5 px-4 text-right">
-                  {activeSegment === "SR_OFFICE" || activeSegment === "INVI_OFFICE"
-                    ? "Monthly Salary"
-                    : activeSegment === "CONTRACTOR"
-                    ? "Contract / Rate"
-                    : "Daily Wage"}
-                </th>
-                <th className="py-3.5 px-4">Contact & Location</th>
-                <th className="py-3.5 px-4">Aadhaar & PAN / DL</th>
-                <th className="py-3.5 px-4">Bank Remittance</th>
-                <th className="py-3.5 px-4 text-center">KYC Status</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {loading ? (
+        {viewMode === "table" ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white font-bold uppercase text-xs tracking-wider border-b border-slate-800">
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
-                    Loading workforce directory...
-                  </td>
+                  <th className="py-3.5 px-4 text-slate-200">Personnel Profile</th>
+                  <th className="py-3.5 px-4 text-slate-200">
+                    {activeSegment === "CONTRACTOR" ? "Trade Specialty" : "Designation / Role"}
+                  </th>
+                  <th className="py-3.5 px-4 text-right text-slate-200">
+                    {activeSegment === "SR_OFFICE" || activeSegment === "INVI_OFFICE"
+                      ? "Monthly Salary"
+                      : activeSegment === "CONTRACTOR"
+                      ? "Contract / Rate"
+                      : "Daily Wage"}
+                  </th>
+                  <th className="py-3.5 px-4 text-slate-200">Contact & Location</th>
+                  <th className="py-3.5 px-4 text-slate-200">Aadhaar & PAN / DL</th>
+                  <th className="py-3.5 px-4 text-slate-200">Bank Remittance</th>
+                  <th className="py-3.5 px-4 text-center text-slate-200">KYC Status</th>
+                  <th className="py-3.5 px-4 text-right text-slate-200">Actions</th>
                 </tr>
-              ) : workers.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
-                    No workforce profiles found matching current filters.
-                  </td>
-                </tr>
-              ) : (
-                workers.map((w) => {
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
+                      Loading workforce directory...
+                    </td>
+                  </tr>
+                ) : workers.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                      No workforce profiles found matching current filters.
+                    </td>
+                  </tr>
+                ) : (
+                  workers.map((w) => {
+                    const kyc = getKycBadge(w);
+                    const isContractor = activeSegment === "CONTRACTOR" || w.category === "CONTRACTOR_TEAM";
+
+                    const initials = (w.name || "SR")
+                      .split(" ")
+                      .filter(Boolean)
+                      .map((n: string) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase();
+
+                    const avatarGrad =
+                      w.companyUnit === "INVI_CREATION"
+                        ? "from-purple-600 to-fuchsia-600 text-white"
+                        : w.category === "OFFICE_STAFF"
+                        ? "from-blue-600 to-indigo-600 text-white"
+                        : w.category === "TAMIL_LABOUR"
+                        ? "from-emerald-600 to-teal-600 text-white"
+                        : w.category === "HINDI_LABOUR"
+                        ? "from-amber-500 to-orange-500 text-white"
+                        : "from-cyan-600 to-blue-600 text-white";
+
+                    return (
+                      <tr
+                        key={w.id}
+                        className="hover:bg-blue-50/60 dark:hover:bg-slate-800/80 transition-all group"
+                      >
+                        {/* Column 1: Personnel Profile with Gradient Avatar */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedWorkerForKyc(w)}
+                              className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs shrink-0 cursor-pointer overflow-hidden border border-slate-200/90 dark:border-slate-700 shadow-xs ring-2 ring-blue-500/30 group-hover:ring-blue-500 transition-all ${
+                                w.photoUrl ? "bg-white" : `bg-gradient-to-br ${avatarGrad}`
+                              }`}
+                              title="Open Worker KYC Dossier"
+                            >
+                              {w.photoUrl ? (
+                                <img
+                                  src={w.photoUrl}
+                                  alt={w.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span>{initials}</span>
+                              )}
+                            </button>
+
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedWorkerForKyc(w)}
+                                className="font-bold text-slate-900 dark:text-slate-100 text-left hover:text-blue-600 transition flex items-center gap-1.5 cursor-pointer text-[14px]"
+                              >
+                                <span>{w.name}</span>
+                                <FileCheck className="w-3.5 h-3.5 text-blue-500 opacity-60 group-hover:opacity-100 transition-opacity" />
+                              </button>
+                              <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mt-0.5">
+                                <span className="font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px]">
+                                  {w.employeeCode || w.code || "—"}
+                                </span>
+                                {(w.fatherName || w.contractorLeadName) && (
+                                  <span className="truncate max-w-[140px]">
+                                    • {isContractor ? `Lead: ${w.contractorLeadName || w.fatherName}` : `S/O ${w.fatherName}`}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Column 2: Designation / Specialty Badge */}
+                        <td className="py-3.5 px-4">
+                          {isContractor ? (
+                            <div>
+                              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-50 text-cyan-800 border border-cyan-200/80 inline-block">
+                                {w.tradeSpecialty || w.specialty || "Roofing & Fabrication"}
+                              </span>
+                              <span className="text-[11px] text-slate-400 block mt-0.5">
+                                Default Headcount: {w.defaultHeadcount || 1} Labours
+                              </span>
+                            </div>
+                          ) : activeSegment === "INVI_OFFICE" ? (
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 inline-block">
+                              {w.designation || w.role || "Digital Hub"}
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200/80 dark:bg-slate-800 dark:text-slate-200 inline-block">
+                              {w.designation || w.role || "Staff"}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Column 3: Wage / Salary */}
+                        <td className="py-3.5 px-4 text-right font-mono tabular-nums">
+                          {w.monthlySalary && Number(w.monthlySalary) > 0 ? (
+                            <div className="inline-block">
+                              <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold px-2.5 py-0.5 rounded-lg text-[13px] block">
+                                {formatINR(Number(w.monthlySalary))}
+                              </span>
+                              <span className="text-[10px] text-slate-400 block font-sans mt-0.5">/ month</span>
+                            </div>
+                          ) : w.dailyWage || w.dailyRate ? (
+                            <div className="inline-block">
+                              <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold px-2.5 py-0.5 rounded-lg text-[13px] block">
+                                ₹{Number(w.dailyWage || w.dailyRate).toLocaleString("en-IN")}
+                              </span>
+                              <span className="text-[10px] text-slate-400 block font-sans mt-0.5">/ day</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+
+                        {/* Column 4: Contact & Location */}
+                        <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
+                          <div className="flex items-center gap-1 font-mono text-xs font-semibold text-slate-700 dark:text-slate-200">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            <span>{w.phone || "—"}</span>
+                          </div>
+                          {w.address && (
+                            <span className="text-[11px] text-slate-400 block truncate max-w-[160px] mt-0.5" title={w.address}>
+                              {w.address}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Column 5: Statutory Identity Micro-Badges */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex flex-wrap gap-1 max-w-[180px]">
+                            {w.aadhaarNumber ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 inline-flex items-center gap-0.5">
+                                ✓ UID ..{w.aadhaarNumber.slice(-4)}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-400 border border-slate-200/60">
+                                No Aadhaar
+                              </span>
+                            )}
+                            {w.panNumber ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200/80 inline-flex items-center gap-0.5">
+                                ✓ PAN
+                              </span>
+                            ) : null}
+                            {w.drivingLicenseNumber ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 inline-flex items-center gap-0.5">
+                                ✓ DL
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+
+                        {/* Column 6: Bank Remittance */}
+                        <td className="py-3.5 px-4 text-xs">
+                          {w.bankAccountNo || w.bankAccountNumber ? (
+                            <div>
+                              <span className="font-bold text-slate-900 dark:text-slate-100 block">
+                                {w.bankName || "Bank"} ..{(w.bankAccountNo || w.bankAccountNumber).slice(-4)}
+                              </span>
+                              <span className="text-[11px] text-slate-400 font-mono block">
+                                {w.bankIfsc || w.ifscCode || "—"}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80 inline-block">
+                              No Bank on File
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Column 7: KYC Status Badge */}
+                        <td className="py-3.5 px-4 text-center">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border shadow-2xs ${kyc.color}`}
+                          >
+                            {kyc.label === "Verified" ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                            )}
+                            <span>{kyc.label}</span>
+                          </span>
+                        </td>
+
+                        {/* Column 8: Actions */}
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedWorkerForKyc(w)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+                              title="View Full KYC Profile Drawer & Print Dossier"
+                            >
+                              <FileCheck className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedWorkerForDossier(w)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition cursor-pointer"
+                              title="View Lifetime Multi-Year Attendance Dossier"
+                            >
+                              <History className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(w)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+                              title="Edit Workforce Details"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedWorkerForAction(w);
+                                setShowDeleteModal(true);
+                              }}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                              title="Soft-Delete to Recycle Bin"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* RICH SAAS CARDS VIEW */
+          <div className="p-4 sm:p-5">
+            {loading ? (
+              <div className="py-16 text-center text-slate-400">
+                <Loader2 className="w-7 h-7 animate-spin mx-auto text-blue-600 mb-2" />
+                Loading workforce directory cards...
+              </div>
+            ) : workers.length === 0 ? (
+              <div className="py-16 text-center text-slate-400">
+                No workforce profiles found matching current filters.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4.5">
+                {workers.map((w) => {
                   const kyc = getKycBadge(w);
                   const isContractor = activeSegment === "CONTRACTOR" || w.category === "CONTRACTOR_TEAM";
 
@@ -813,219 +1097,192 @@ export default function LabourWorkforceMasterPage() {
                       ? "from-amber-500 to-orange-500 text-white"
                       : "from-cyan-600 to-blue-600 text-white";
 
-                  return (
-                    <tr
-                      key={w.id}
-                      className="hover:bg-blue-50/40 dark:hover:bg-slate-800/60 transition-colors group"
-                    >
-                      {/* Column 1: Personnel Profile with Gradient Avatar */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedWorkerForKyc(w)}
-                            className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs shrink-0 cursor-pointer overflow-hidden border border-slate-200/90 dark:border-slate-700 shadow-xs group-hover:scale-105 transition-transform ${
-                              w.photoUrl ? "bg-white" : `bg-gradient-to-br ${avatarGrad}`
-                            }`}
-                            title="Open Worker KYC Dossier"
-                          >
-                            {w.photoUrl ? (
-                              <img
-                                src={w.photoUrl}
-                                alt={w.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span>{initials}</span>
-                            )}
-                          </button>
+                  // KYC completion calculation
+                  let kycPoints = 0;
+                  if (w.aadhaarNumber) kycPoints += 25;
+                  if (w.panNumber || w.drivingLicenseNumber) kycPoints += 25;
+                  if (w.bankAccountNo || w.bankAccountNumber) kycPoints += 25;
+                  if (w.phone && w.address) kycPoints += 25;
+                  const kycPercent = Math.max(25, kycPoints);
 
-                          <div>
+                  return (
+                    <div
+                      key={w.id}
+                      className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between group relative overflow-hidden"
+                    >
+                      {/* Top accent light bar */}
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-500 opacity-80 group-hover:opacity-100 transition-opacity" />
+
+                      <div>
+                        {/* Header: Avatar, Name, Code & Actions */}
+                        <div className="flex items-start justify-between gap-3 pt-1">
+                          <div className="flex items-center gap-3">
                             <button
                               type="button"
                               onClick={() => setSelectedWorkerForKyc(w)}
-                              className="font-bold text-slate-900 dark:text-slate-100 text-left hover:text-blue-600 transition flex items-center gap-1.5 cursor-pointer text-[14px]"
+                              className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 cursor-pointer overflow-hidden border border-slate-200/90 dark:border-slate-700 shadow-xs ring-2 ring-blue-500/30 group-hover:ring-blue-500 transition-all ${
+                                w.photoUrl ? "bg-white" : `bg-gradient-to-br ${avatarGrad}`
+                              }`}
+                              title="Open Worker KYC Dossier"
                             >
-                              <span>{w.name}</span>
-                              <FileCheck className="w-3.5 h-3.5 text-blue-500 opacity-60 group-hover:opacity-100 transition-opacity" />
-                            </button>
-                            <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mt-0.5">
-                              <span className="font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px]">
-                                {w.employeeCode || w.code || "—"}
-                              </span>
-                              {(w.fatherName || w.contractorLeadName) && (
-                                <span className="truncate max-w-[140px]">
-                                  • {isContractor ? `Lead: ${w.contractorLeadName || w.fatherName}` : `S/O ${w.fatherName}`}
-                                </span>
+                              {w.photoUrl ? (
+                                <img
+                                  src={w.photoUrl}
+                                  alt={w.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span>{initials}</span>
                               )}
+                            </button>
+
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedWorkerForKyc(w)}
+                                className="font-bold text-slate-900 dark:text-slate-100 text-left hover:text-blue-600 transition flex items-center gap-1.5 cursor-pointer text-[15px]"
+                              >
+                                <span>{w.name}</span>
+                                <FileCheck className="w-3.5 h-3.5 text-blue-500 opacity-60 group-hover:opacity-100 transition-opacity" />
+                              </button>
+                              <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mt-0.5">
+                                <span className="font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px]">
+                                  {w.employeeCode || w.code || "—"}
+                                </span>
+                                {(w.fatherName || w.contractorLeadName) && (
+                                  <span className="truncate max-w-[130px]">
+                                    • {isContractor ? `Lead: ${w.contractorLeadName || w.fatherName}` : `S/O ${w.fatherName}`}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
+
+                          {/* Quick Action Buttons */}
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedWorkerForKyc(w)}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition cursor-pointer"
+                              title="KYC Dossier"
+                            >
+                              <FileCheck className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(w)}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 transition cursor-pointer"
+                              title="Edit Worker"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                      </td>
 
-                      {/* Column 2: Designation / Specialty Badge */}
-                      <td className="py-3.5 px-4">
-                        {isContractor ? (
+                        {/* Middle Info: Role Badge & Salary Pill */}
+                        <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                           <div>
-                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-50 text-cyan-800 border border-cyan-200/80 inline-block">
-                              {w.tradeSpecialty || w.specialty || "Roofing & Fabrication"}
-                            </span>
-                            <span className="text-[11px] text-slate-400 block mt-0.5">
-                              Default Headcount: {w.defaultHeadcount || 1} Labours
-                            </span>
+                            {isContractor ? (
+                              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-50 text-cyan-800 border border-cyan-200/80 inline-block">
+                                {w.tradeSpecialty || w.specialty || "Roofing & Fabrication"}
+                              </span>
+                            ) : activeSegment === "INVI_OFFICE" ? (
+                              <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 inline-block">
+                                {w.designation || w.role || "Digital Hub"}
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200/80 dark:bg-slate-800 dark:text-slate-200 inline-block">
+                                {w.designation || w.role || "Staff"}
+                              </span>
+                            )}
                           </div>
-                        ) : activeSegment === "INVI_OFFICE" ? (
-                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 inline-block">
-                            {w.designation || w.role || "Digital Hub"}
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200/80 dark:bg-slate-800 dark:text-slate-200 inline-block">
-                            {w.designation || w.role || "Staff"}
-                          </span>
-                        )}
-                      </td>
 
-                      {/* Column 3: Wage / Salary */}
-                      <td className="py-3.5 px-4 text-right font-mono tabular-nums">
-                        {w.monthlySalary && Number(w.monthlySalary) > 0 ? (
                           <div>
-                            <span className="text-slate-900 dark:text-slate-100 font-bold text-[13px]">
-                              {formatINR(Number(w.monthlySalary))}
-                            </span>
-                            <span className="text-[11px] text-slate-400 block font-sans">/ month</span>
+                            {w.monthlySalary && Number(w.monthlySalary) > 0 ? (
+                              <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold px-2.5 py-0.5 rounded-lg text-xs font-mono inline-block">
+                                {formatINR(Number(w.monthlySalary))}/mo
+                              </span>
+                            ) : w.dailyWage || w.dailyRate ? (
+                              <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold px-2.5 py-0.5 rounded-lg text-xs font-mono inline-block">
+                                ₹{Number(w.dailyWage || w.dailyRate).toLocaleString("en-IN")}/day
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-xs">—</span>
+                            )}
                           </div>
-                        ) : w.dailyWage || w.dailyRate ? (
-                          <div>
-                            <span className="text-blue-700 dark:text-blue-400 font-bold text-[13px]">
-                              ₹{Number(w.dailyWage || w.dailyRate).toLocaleString("en-IN")}
-                            </span>
-                            <span className="text-[11px] text-slate-400 block font-sans">/ day</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-
-                      {/* Column 4: Contact & Location */}
-                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                        <div className="flex items-center gap-1 font-mono text-xs font-semibold text-slate-700 dark:text-slate-200">
-                          <Phone className="w-3 h-3 text-slate-400" />
-                          <span>{w.phone || "—"}</span>
                         </div>
-                        {w.address && (
-                          <span className="text-[11px] text-slate-400 block truncate max-w-[160px] mt-0.5" title={w.address}>
-                            {w.address}
-                          </span>
-                        )}
-                      </td>
 
-                      {/* Column 5: Statutory Identity Micro-Badges */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex flex-wrap gap-1 max-w-[180px]">
-                          {w.aadhaarNumber ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 inline-flex items-center gap-0.5">
-                              ✓ UID ..{w.aadhaarNumber.slice(-4)}
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-400 border border-slate-200/60">
-                              No Aadhaar
-                            </span>
-                          )}
-                          {w.panNumber ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200/80 inline-flex items-center gap-0.5">
-                              ✓ PAN
-                            </span>
-                          ) : null}
-                          {w.drivingLicenseNumber ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 inline-flex items-center gap-0.5">
-                              ✓ DL
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-
-                      {/* Column 6: Bank Remittance */}
-                      <td className="py-3.5 px-4 text-xs">
-                        {w.bankAccountNo || w.bankAccountNumber ? (
-                          <div>
-                            <span className="font-bold text-slate-900 dark:text-slate-100 block">
-                              {w.bankName || "Bank"} ..{(w.bankAccountNo || w.bankAccountNumber).slice(-4)}
-                            </span>
-                            <span className="text-[11px] text-slate-400 font-mono block">
-                              {w.bankIfsc || w.ifscCode || "—"}
+                        {/* Contact & Banking preview */}
+                        <div className="mt-2.5 space-y-1 text-xs text-slate-500">
+                          <div className="flex items-center gap-1.5 font-mono">
+                            <Phone className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{w.phone || "No Phone recorded"}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <CreditCard className="w-3.5 h-3.5 text-slate-400" />
+                            <span className="truncate">
+                              {w.bankAccountNo || w.bankAccountNumber
+                                ? `${w.bankName || "Bank"} ••${(w.bankAccountNo || w.bankAccountNumber).slice(-4)}`
+                                : "No Bank details"}
                             </span>
                           </div>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80 inline-block">
-                            No Bank on File
-                          </span>
-                        )}
-                      </td>
+                        </div>
+                      </div>
 
-                      {/* Column 7: KYC Status Badge */}
-                      <td className="py-3.5 px-4 text-center">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border shadow-2xs ${kyc.color}`}
-                        >
-                          {kyc.label === "Verified" ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          ) : (
-                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                          )}
-                          <span>{kyc.label}</span>
-                        </span>
-                      </td>
-
-                      {/* Column 8: Actions */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedWorkerForKyc(w)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
-                            title="View Full KYC Profile Drawer & Print Dossier"
+                      {/* Bottom: KYC Health Progress Bar & Status Pill */}
+                      <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center justify-between text-xs mb-1.5">
+                          <span className="text-slate-400 font-semibold">KYC Verification</span>
+                          <span
+                            className={`font-bold text-[11px] ${
+                              kycPercent === 100 ? "text-emerald-600" : "text-blue-600"
+                            }`}
                           >
-                            <FileCheck className="w-4 h-4" />
-                          </button>
+                            {kycPercent}% Complete
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              kycPercent === 100
+                                ? "bg-emerald-500"
+                                : kycPercent >= 75
+                                ? "bg-blue-600"
+                                : "bg-amber-500"
+                            }`}
+                            style={{ width: `${kycPercent}%` }}
+                          />
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold border shadow-2xs ${kyc.color}`}
+                          >
+                            {kyc.label === "Verified" ? (
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            ) : (
+                              <AlertTriangle className="w-3 h-3 text-amber-600" />
+                            )}
+                            <span>{kyc.label}</span>
+                          </span>
 
                           <button
                             type="button"
                             onClick={() => setSelectedWorkerForDossier(w)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition cursor-pointer"
-                            title="View Lifetime Multi-Year Attendance Dossier"
+                            className="flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-blue-600 transition"
                           >
-                            <History className="w-4 h-4" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(w)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
-                            title="Edit Workforce Details"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedWorkerForAction(w);
-                              setShowDeleteModal(true);
-                            }}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
-                            title="Soft-Delete to Recycle Bin"
-                          >
-                            <Trash2 className="w-4 h-4" />
+                            <History className="w-3.5 h-3.5" />
+                            <span>Muster Dossier &rarr;</span>
                           </button>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 5. WORKER KYC PROFILE DRAWER */}

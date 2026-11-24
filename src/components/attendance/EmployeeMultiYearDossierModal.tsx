@@ -1046,25 +1046,34 @@ export default function EmployeeMultiYearDossierModal({
                                   {rec.date}
                                 </td>
                                 <td className="py-2 px-3 text-center">
-                                  <span
-                                    className={`px-2 py-0.5 rounded-md font-black text-[10px] ${
-                                      rec.status === "P"
-                                        ? "bg-emerald-600 text-white"
-                                        : rec.status === "1H"
-                                        ? "bg-sky-600 text-white"
-                                        : rec.status === "H"
-                                        ? "bg-amber-500 text-white"
-                                        : rec.status === "PL"
-                                        ? "bg-teal-600 text-white"
-                                        : rec.status === "UP"
-                                        ? "bg-slate-600 text-white"
-                                        : rec.status === "A"
-                                        ? "bg-rose-600 text-white"
-                                        : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
-                                    }`}
-                                  >
-                                    {rec.status === "1H" ? (rec.permissionSlot === "EVENING" ? "1H·E" : "1H·M") : rec.status}
-                                  </span>
+                                  <div className="relative inline-flex items-center justify-center">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-md font-black text-[10px] ${
+                                        rec.status === "P" || rec.status === "1H"
+                                          ? "bg-emerald-600 text-white"
+                                          : rec.status === "H"
+                                          ? "bg-amber-500 text-white"
+                                          : rec.status === "PL"
+                                          ? "bg-teal-600 text-white"
+                                          : rec.status === "UP"
+                                          ? "bg-slate-600 text-white"
+                                          : rec.status === "A"
+                                          ? "bg-rose-600 text-white"
+                                          : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
+                                      }`}
+                                    >
+                                      {rec.status === "1H" ? "P" : rec.status}
+                                    </span>
+                                    {rec.status === "1H" && (
+                                      <span
+                                        className={`absolute -top-2.5 -right-2 px-1 py-0.2 rounded-full text-white text-[7.5px] font-black ring-1 ring-white dark:ring-slate-900 shadow-2xs z-10 ${
+                                          rec.permissionSlot === "EVENING" ? "bg-rose-500" : "bg-amber-600"
+                                        }`}
+                                      >
+                                        {rec.permissionSlot === "EVENING" ? "-1hr E" : "-1hr M"}
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="py-2 px-3 text-center font-mono text-slate-500">
                                   {rec.inTime && rec.outTime ? `${rec.inTime} - ${rec.outTime}` : rec.inTime || rec.outTime || "—"}

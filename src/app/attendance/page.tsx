@@ -2346,7 +2346,7 @@ export default function AttendancePage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Click any cell to edit status: <strong className="text-emerald-600">P (1.0)</strong>, <strong className="text-sky-600">-1hr M (1.0)</strong>, <strong className="text-cyan-600">-1hr E (1.0)</strong>, <strong className="text-amber-500">H (0.5)</strong>, <strong className="text-teal-600">PL (1.0)</strong>, <strong className="text-slate-600">UP (0.0)</strong>, <strong className="text-rose-600">A (0.0)</strong>, <strong className="text-slate-500">L (Sunday Off)</strong>, <strong className="text-amber-600">OT (After 9PM OT)</strong>
+                  Click any cell to edit status: <strong className="text-emerald-600">P (1.0)</strong>, <strong className="text-amber-600">P + -1hr M (1.0)</strong>, <strong className="text-rose-600">P + -1hr E (1.0)</strong>, <strong className="text-amber-500">H (0.5)</strong>, <strong className="text-teal-600">PL (1.0)</strong>, <strong className="text-slate-600">UP (0.0)</strong>, <strong className="text-rose-600">A (0.0)</strong>, <strong className="text-slate-500">L (Sunday Off)</strong>, <strong className="text-amber-600">OT (+1hr/+2hr)</strong>
                 </p>
               </div>
 
@@ -2355,11 +2355,11 @@ export default function AttendancePage() {
                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold" title="Full Day Present (1.0)">
                   <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P <span className="text-[9px] font-medium text-slate-400">1.0</span>
                 </span>
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 font-bold" title="1-Hr Morning Permission (1.0)">
-                  <span className="w-2 h-2 rounded-xs bg-sky-500" /> -1hr M <span className="text-[9px] font-medium text-slate-400">1.0</span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold" title="1-Hr Morning Permission (1.0 Present)">
+                  <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P + <span className="px-1 py-0.2 rounded-full bg-amber-600 text-white text-[8px] font-black shadow-2xs">-1hr M</span> <span className="text-[9px] font-medium text-slate-400">1.0</span>
                 </span>
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 font-bold" title="1-Hr Evening Permission (1.0)">
-                  <span className="w-2 h-2 rounded-xs bg-cyan-600" /> -1hr E <span className="text-[9px] font-medium text-slate-400">1.0</span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold" title="1-Hr Evening Permission (1.0 Present)">
+                  <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P + <span className="px-1 py-0.2 rounded-full bg-rose-500 text-white text-[8px] font-black shadow-2xs">-1hr E</span> <span className="text-[9px] font-medium text-slate-400">1.0</span>
                 </span>
                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold" title="Half-Day (0.5)">
                   <span className="w-2 h-2 rounded-xs bg-amber-400" /> H <span className="text-[9px] font-medium text-slate-400">0.5</span>
@@ -2377,7 +2377,7 @@ export default function AttendancePage() {
                   <span className="w-2 h-2 rounded-xs bg-slate-300 dark:bg-slate-600" /> L <span className="text-[9px] font-medium text-slate-400">Off</span>
                 </span>
                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-200 font-bold" title="After 9:00 PM Overtime Hours">
-                  <span className="w-2 h-2 rounded-xs bg-amber-500" /> +1hr/+2hr OT
+                  <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P + <span className="px-1 py-0.2 rounded-full bg-amber-500 text-white text-[8px] font-black shadow-2xs">+1hr/+2hr OT</span>
                 </span>
               </div>
 
@@ -2738,12 +2738,8 @@ export default function AttendancePage() {
                           >
                             <span
                               className={`relative min-w-[28px] h-6 px-1 rounded-md inline-flex items-center justify-center font-black transition ${
-                                status === "P"
+                                status === "P" || status === "1H"
                                   ? "bg-emerald-500 text-white shadow-2xs text-[10px]"
-                                  : status === "1H"
-                                  ? isEve
-                                    ? "bg-cyan-600 text-white shadow-2xs text-[8.5px] font-extrabold tracking-tight"
-                                    : "bg-sky-500 text-white shadow-2xs text-[8.5px] font-extrabold tracking-tight"
                                   : status === "H"
                                   ? "bg-amber-400 text-white shadow-2xs text-[10px]"
                                   : status === "PL"
@@ -2757,10 +2753,28 @@ export default function AttendancePage() {
                                   : "bg-slate-100/60 text-slate-300 dark:text-slate-600 border border-dashed border-slate-200 dark:border-slate-700 text-[10px]"
                               }`}
                             >
-                              {status === "1H" ? (isEve ? "-1hr E" : "-1hr M") : status || "—"}
+                              {status === "1H" ? "P" : status || "—"}
+
+                              {/* 1-Hour Permission Corner Pill (-1hr M / -1hr E) */}
+                              {status === "1H" && (
+                                <span
+                                  className={`absolute -top-2 ${
+                                    att?.otHours && att.otHours > 0 ? "-left-1.5" : "left-1/2 -translate-x-1/2"
+                                  } px-1 py-0.2 rounded-full text-white text-[7.5px] font-black ring-1 ring-white dark:ring-slate-900 shadow-2xs z-10 ${
+                                    isEve ? "bg-rose-500" : "bg-amber-600"
+                                  }`}
+                                  title={`1-Hour Permission: ${isEve ? "Evening (-1hr E)" : "Morning (-1hr M)"}`}
+                                >
+                                  {isEve ? "-1hr E" : "-1hr M"}
+                                </span>
+                              )}
+
+                              {/* Overtime Corner Pill (+1hr / +2hr) */}
                               {att?.otHours && att.otHours > 0 ? (
                                 <span
-                                  className="absolute -top-1.5 -right-1 px-1 py-0.2 rounded-full bg-amber-500 text-white text-[8px] font-black ring-1 ring-white dark:ring-slate-900 shadow-2xs"
+                                  className={`absolute -top-2 ${
+                                    status === "1H" ? "-right-1.5" : "left-1/2 -translate-x-1/2"
+                                  } px-1 py-0.2 rounded-full bg-amber-500 text-white text-[8px] font-black ring-1 ring-white dark:ring-slate-900 shadow-2xs z-10`}
                                   title={`After 9PM OT: +${att.otHours}hr ${att.otTimeRange ? `(${att.otTimeRange})` : ""} - ${att.otReason || ""}`}
                                 >
                                   +{att.otHours}hr

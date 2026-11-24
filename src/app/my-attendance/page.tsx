@@ -866,7 +866,7 @@ export default function MyAttendancePage() {
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> P (Present 1.0)
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-sky-500" /> 1H·M / 1H·E (1-Hr Perm)
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> P + <span className="px-1 py-0.2 rounded-full bg-amber-600 text-white text-[8px] font-black">-1hr M</span> / <span className="px-1 py-0.2 rounded-full bg-rose-500 text-white text-[8px] font-black">-1hr E</span> (1-Hr Perm)
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> H (Half-Day 0.5)
@@ -903,12 +903,9 @@ export default function MyAttendancePage() {
                   let badgeColor = "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400";
                   let statusLabel = d.status;
 
-                  if (isPresent) {
+                  if (isPresent || is1H) {
                     badgeColor = "bg-emerald-500 text-white font-extrabold shadow-2xs";
                     statusLabel = "P";
-                  } else if (is1H) {
-                    badgeColor = "bg-sky-500 text-white font-extrabold shadow-2xs";
-                    statusLabel = d.permissionSlot === "EVENING" ? "1H·E" : "1H·M";
                   } else if (isHalf) {
                     badgeColor = "bg-amber-500 text-white font-bold shadow-2xs";
                     statusLabel = "H";
@@ -971,11 +968,22 @@ export default function MyAttendancePage() {
                       </div>
 
                       <div className="flex items-center justify-between mt-auto">
-                        <span
-                          className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-xs font-black ${badgeColor}`}
-                        >
-                          {statusLabel}
-                        </span>
+                        <div className="relative inline-flex items-center">
+                          <span
+                            className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-xs font-black ${badgeColor}`}
+                          >
+                            {statusLabel}
+                          </span>
+                          {is1H && (
+                            <span
+                              className={`absolute -top-2.5 -right-2 px-1 py-0.2 rounded-full text-white text-[7.5px] font-black ring-1 ring-white dark:ring-slate-900 shadow-2xs z-10 ${
+                                d.permissionSlot === "EVENING" ? "bg-rose-500" : "bg-amber-600"
+                              }`}
+                            >
+                              {d.permissionSlot === "EVENING" ? "-1hr E" : "-1hr M"}
+                            </span>
+                          )}
+                        </div>
 
                         {d.otHours > 0 && (
                           <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 px-1.5 py-0.2 rounded-md border border-amber-200 dark:border-amber-800">
