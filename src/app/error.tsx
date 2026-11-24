@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { AlertTriangle, RefreshCw, Home, ShieldAlert } from "lucide-react";
+import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 
 export default function ErrorBoundary({
   error,
@@ -11,9 +11,33 @@ export default function ErrorBoundary({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const isChunkError =
+    error?.message?.toLowerCase().includes("loading chunk") ||
+    error?.message?.toLowerCase().includes("failed to fetch") ||
+    error?.name === "ChunkLoadError";
+
   useEffect(() => {
     console.error("SR-Books Application Error:", error);
-  }, [error]);
+
+    // If a deployment or rebuild replaced client chunks, automatically reload once to fetch latest build
+    if (isChunkError && typeof window !== "undefined") {
+      const storageKey = "sr_chunk_reload_ts";
+      const lastReload = sessionStorage.getItem(storageKey);
+      const now = Date.now();
+      if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+        sessionStorage.setItem(storageKey, String(now));
+        window.location.reload();
+      }
+    }
+  }, [error, isChunkError]);
+
+  const handleRetry = () => {
+    if (isChunkError && typeof window !== "undefined") {
+      window.location.reload();
+    } else {
+      reset();
+    }
+  };
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center p-4">
@@ -24,14 +48,16 @@ export default function ErrorBoundary({
 
         <div className="space-y-1">
           <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">
-            System Notice: Action Interrupted
+            {isChunkError ? "Application Updated to Latest Version" : "System Notice: Action Interrupted"}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-            Standard Roofs Books caught an unexpected runtime condition. Your accounting ledgers and database records are completely secure.
+            {isChunkError
+              ? "A fresh build of Standard Roofs Books was deployed. Please click reload below to update your session."
+              : "Standard Roofs Books caught an unexpected runtime condition. Your accounting ledgers and database records are completely secure."}
           </p>
         </div>
 
-        {error?.message && (
+        {error?.message && !isChunkError && (
           <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3 rounded-xl text-[11px] font-mono text-slate-700 dark:text-slate-300 text-left overflow-x-auto max-h-24">
             {error.message}
           </div>
@@ -39,11 +65,11 @@ export default function ErrorBoundary({
 
         <div className="flex items-center justify-center gap-3 pt-2">
           <button
-            onClick={() => reset()}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition active:scale-95"
+            onClick={handleRetry}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition active:scale-95 cursor-pointer"
           >
             <RefreshCw size={14} />
-            <span>Try Again</span>
+            <span>{isChunkError ? "Reload Fresh App" : "Try Again"}</span>
           </button>
 
           <Link

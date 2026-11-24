@@ -11,9 +11,32 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const isChunkError =
+    error?.message?.toLowerCase().includes("loading chunk") ||
+    error?.message?.toLowerCase().includes("failed to fetch") ||
+    error?.name === "ChunkLoadError";
+
   useEffect(() => {
     console.error("SR-Books Critical Global Error:", error);
-  }, [error]);
+
+    if (isChunkError && typeof window !== "undefined") {
+      const storageKey = "sr_global_chunk_reload_ts";
+      const lastReload = sessionStorage.getItem(storageKey);
+      const now = Date.now();
+      if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+        sessionStorage.setItem(storageKey, String(now));
+        window.location.reload();
+      }
+    }
+  }, [error, isChunkError]);
+
+  const handleRetry = () => {
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    } else {
+      reset();
+    }
+  };
 
   return (
     <html lang="en">
@@ -25,17 +48,19 @@ export default function GlobalError({
 
           <div className="space-y-1">
             <h2 className="text-lg font-black text-white">
-              Critical Runtime Error
+              {isChunkError ? "Application Updated to Latest Version" : "Critical Runtime Error"}
             </h2>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Standard Roofs Books experienced a root layout issue. All financial tables remain safely committed.
+              {isChunkError
+                ? "A fresh build was deployed. Please reload to initialize the updated assets."
+                : "Standard Roofs Books experienced a root layout issue. All financial tables remain safely committed."}
             </p>
           </div>
 
           <div className="flex items-center justify-center gap-3 pt-2">
             <button
-              onClick={() => reset()}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition"
+              onClick={handleRetry}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
             >
               <RefreshCw size={14} />
               <span>Reload Application</span>
