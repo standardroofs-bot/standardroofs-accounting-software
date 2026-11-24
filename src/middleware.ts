@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/auth/logout",
   "/api/health",
+  "/logo.png",
   "/manifest.webmanifest",
   "/sw.js",
   "/favicon.ico",
@@ -121,8 +122,10 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/icons") ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js" ||
+    pathname === "/logo.png" ||
     pathname.includes("/print") ||
-    pathname === "/favicon.ico"
+    pathname === "/favicon.ico" ||
+    pathname.match(/\.(png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|eot|css|js|json|webmanifest)$/i)
   ) {
     const res = NextResponse.next();
     res.headers.set("X-Request-Id", requestId);
