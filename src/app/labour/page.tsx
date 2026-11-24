@@ -496,10 +496,10 @@ export default function LabourWorkforceMasterPage() {
           }`}
         >
           <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500" />
-          <div className="p-3.5 flex flex-col justify-between flex-1">
+          <div className="p-4 sm:p-5 flex flex-col justify-between flex-1">
             <div className="flex items-center justify-between">
               <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${
                   activeSegment === "SR_OFFICE"
                     ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-sm"
                     : "bg-blue-50 text-blue-600 border border-blue-200/60"
@@ -508,19 +508,19 @@ export default function LabourWorkforceMasterPage() {
                 <Building2 className="w-5 h-5" />
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono tabular-nums">
+                <span className="text-3xl font-black text-slate-900 dark:text-slate-100 font-mono tabular-nums">
                   {segmentCounts.srOffice}
                 </span>
-                <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold justify-end mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="flex items-center gap-1 text-[11px] text-emerald-600 font-bold justify-end mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   HQ Team
                 </span>
               </div>
             </div>
-            <div className="mt-3">
-              <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 tracking-tight">Standard Roofs Office</h4>
-              <p className="text-[10px] text-slate-500 font-medium">SR001 – SR010 • Core Operations</p>
-              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px]">
+            <div className="mt-3.5">
+              <h4 className="text-[15px] font-bold text-slate-900 dark:text-slate-100 tracking-tight">Standard Roofs Office</h4>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">SR001 – SR010 • Core Operations</p>
+              <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                 <span className="text-slate-400 font-semibold">KYC Health</span>
                 <span className="font-bold text-blue-600">80% Complete</span>
               </div>
@@ -539,10 +539,10 @@ export default function LabourWorkforceMasterPage() {
           }`}
         >
           <div className="h-1.5 w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600" />
-          <div className="p-3.5 flex flex-col justify-between flex-1">
+          <div className="p-4 sm:p-5 flex flex-col justify-between flex-1">
             <div className="flex items-center justify-between">
               <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${
                   activeSegment === "INVI_OFFICE"
                     ? "bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white shadow-sm"
                     : "bg-purple-50 text-purple-600 border border-purple-200/60"
@@ -551,19 +551,19 @@ export default function LabourWorkforceMasterPage() {
                 <Users2 className="w-5 h-5" />
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono tabular-nums">
+                <span className="text-3xl font-black text-slate-900 dark:text-slate-100 font-mono tabular-nums">
                   {segmentCounts.inviOffice}
                 </span>
-                <span className="flex items-center gap-1 text-[10px] text-purple-600 font-bold justify-end mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                <span className="flex items-center gap-1 text-[11px] text-purple-600 font-bold justify-end mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
                   Digital Hub
                 </span>
               </div>
             </div>
-            <div className="mt-3">
-              <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 tracking-tight">Invi Creation Team</h4>
-              <p className="text-[10px] text-slate-500 font-medium">Invi001 – Invi003 • Tech & Creative</p>
-              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px]">
+            <div className="mt-3.5">
+              <h4 className="text-[15px] font-bold text-slate-900 dark:text-slate-100 tracking-tight">Invi Creation Team</h4>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">Invi001 – Invi003 • Tech & Creative</p>
+              <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                 <span className="text-slate-400 font-semibold">KYC Health</span>
                 <span className="font-bold text-purple-600">100% Complete</span>
               </div>
@@ -582,10 +582,10 @@ export default function LabourWorkforceMasterPage() {
           }`}
         >
           <div className="h-1.5 w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500" />
-          <div className="p-3.5 flex flex-col justify-between flex-1">
+          <div className="p-4 sm:p-5 flex flex-col justify-between flex-1">
             <div className="flex items-center justify-between">
               <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${
                   activeSegment === "TAMIL"
                     ? "bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-sm"
                     : "bg-emerald-50 text-emerald-600 border border-emerald-200/60"
@@ -594,19 +594,19 @@ export default function LabourWorkforceMasterPage() {
                 <HardHat className="w-5 h-5" />
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono tabular-nums">
+                <span className="text-3xl font-black text-slate-900 dark:text-slate-100 font-mono tabular-nums">
                   {segmentCounts.tamil}
                 </span>
-                <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold justify-end mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="flex items-center gap-1 text-[11px] text-emerald-600 font-bold justify-end mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   On Site
                 </span>
               </div>
             </div>
-            <div className="mt-3">
-              <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 tracking-tight">Tamil Site Labours</h4>
-              <p className="text-[10px] text-slate-500 font-medium">71 Masons, Fitters & Layers</p>
-              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px]">
+            <div className="mt-3.5">
+              <h4 className="text-[15px] font-bold text-slate-900 dark:text-slate-100 tracking-tight">Tamil Site Labours</h4>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">71 Masons, Fitters & Layers</p>
+              <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                 <span className="text-slate-400 font-semibold">KYC Health</span>
                 <span className="font-bold text-emerald-600">75% Complete</span>
               </div>
@@ -625,10 +625,10 @@ export default function LabourWorkforceMasterPage() {
           }`}
         >
           <div className="h-1.5 w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600" />
-          <div className="p-3.5 flex flex-col justify-between flex-1">
+          <div className="p-4 sm:p-5 flex flex-col justify-between flex-1">
             <div className="flex items-center justify-between">
               <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${
                   activeSegment === "HINDI"
                     ? "bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm"
                     : "bg-amber-50 text-amber-600 border border-amber-200/60"
@@ -637,19 +637,19 @@ export default function LabourWorkforceMasterPage() {
                 <Users2 className="w-5 h-5" />
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono tabular-nums">
+                <span className="text-3xl font-black text-slate-900 dark:text-slate-100 font-mono tabular-nums">
                   {segmentCounts.hindi}
                 </span>
-                <span className="flex items-center gap-1 text-[10px] text-amber-600 font-bold justify-end mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="flex items-center gap-1 text-[11px] text-amber-600 font-bold justify-end mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                   Migrant Crew
                 </span>
               </div>
             </div>
-            <div className="mt-3">
-              <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 tracking-tight">Hindi Helpers & Crew</h4>
-              <p className="text-[10px] text-slate-500 font-medium">5 Dedicated Site Helpers</p>
-              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px]">
+            <div className="mt-3.5">
+              <h4 className="text-[15px] font-bold text-slate-900 dark:text-slate-100 tracking-tight">Hindi Helpers & Crew</h4>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">5 Dedicated Site Helpers</p>
+              <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                 <span className="text-slate-400 font-semibold">KYC Health</span>
                 <span className="font-bold text-amber-600">80% Complete</span>
               </div>
@@ -668,10 +668,10 @@ export default function LabourWorkforceMasterPage() {
           }`}
         >
           <div className="h-1.5 w-full bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600" />
-          <div className="p-3.5 flex flex-col justify-between flex-1">
+          <div className="p-4 sm:p-5 flex flex-col justify-between flex-1">
             <div className="flex items-center justify-between">
               <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${
                   activeSegment === "CONTRACTOR"
                     ? "bg-gradient-to-br from-cyan-600 to-blue-600 text-white shadow-sm"
                     : "bg-cyan-50 text-cyan-600 border border-cyan-200/60"
@@ -680,19 +680,19 @@ export default function LabourWorkforceMasterPage() {
                 <Truck className="w-5 h-5" />
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono tabular-nums">
+                <span className="text-3xl font-black text-slate-900 dark:text-slate-100 font-mono tabular-nums">
                   {segmentCounts.contractor}
                 </span>
-                <span className="flex items-center gap-1 text-[10px] text-cyan-600 font-bold justify-end mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                <span className="flex items-center gap-1 text-[11px] text-cyan-600 font-bold justify-end mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
                   Agencies
                 </span>
               </div>
             </div>
-            <div className="mt-3">
-              <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 tracking-tight">Contractor Teams</h4>
-              <p className="text-[10px] text-slate-500 font-medium">6 Specialized Agencies</p>
-              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px]">
+            <div className="mt-3.5">
+              <h4 className="text-[15px] font-bold text-slate-900 dark:text-slate-100 tracking-tight">Contractor Teams</h4>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">6 Specialized Agencies</p>
+              <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                 <span className="text-slate-400 font-semibold">KYC Health</span>
                 <span className="font-bold text-cyan-600">83% Complete</span>
               </div>
@@ -755,24 +755,24 @@ export default function LabourWorkforceMasterPage() {
       <div className="bg-white/95 dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 overflow-hidden shadow-[0_4px_20px_-4px_rgba(15,23,42,0.06)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-bold uppercase text-[11px] border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-50/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 font-bold uppercase text-xs tracking-wider border-b border-slate-200/90 dark:border-slate-800">
               <tr>
-                <th className="py-3 px-3">Personnel Profile</th>
-                <th className="py-3 px-3">
+                <th className="py-3.5 px-4">Personnel Profile</th>
+                <th className="py-3.5 px-4">
                   {activeSegment === "CONTRACTOR" ? "Trade Specialty" : "Designation / Role"}
                 </th>
-                <th className="py-3 px-3 text-right">
+                <th className="py-3.5 px-4 text-right">
                   {activeSegment === "SR_OFFICE" || activeSegment === "INVI_OFFICE"
                     ? "Monthly Salary"
                     : activeSegment === "CONTRACTOR"
                     ? "Contract / Rate"
                     : "Daily Wage"}
                 </th>
-                <th className="py-3 px-3">Contact & Location</th>
-                <th className="py-3 px-3">Aadhaar & PAN / DL</th>
-                <th className="py-3 px-3">Bank Remittance</th>
-                <th className="py-3 px-3 text-center">KYC Status</th>
-                <th className="py-3 px-3 text-right">Actions</th>
+                <th className="py-3.5 px-4">Contact & Location</th>
+                <th className="py-3.5 px-4">Aadhaar & PAN / DL</th>
+                <th className="py-3.5 px-4">Bank Remittance</th>
+                <th className="py-3.5 px-4 text-center">KYC Status</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -819,7 +819,7 @@ export default function LabourWorkforceMasterPage() {
                       className="hover:bg-blue-50/40 dark:hover:bg-slate-800/60 transition-colors group"
                     >
                       {/* Column 1: Personnel Profile with Gradient Avatar */}
-                      <td className="py-3 px-3">
+                      <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
                           <button
                             type="button"
@@ -844,17 +844,17 @@ export default function LabourWorkforceMasterPage() {
                             <button
                               type="button"
                               onClick={() => setSelectedWorkerForKyc(w)}
-                              className="font-extrabold text-slate-900 dark:text-slate-100 text-left hover:text-blue-600 transition flex items-center gap-1.5 cursor-pointer text-xs"
+                              className="font-bold text-slate-900 dark:text-slate-100 text-left hover:text-blue-600 transition flex items-center gap-1.5 cursor-pointer text-[14px]"
                             >
                               <span>{w.name}</span>
                               <FileCheck className="w-3.5 h-3.5 text-blue-500 opacity-60 group-hover:opacity-100 transition-opacity" />
                             </button>
-                            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono mt-0.5">
-                              <span className="font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mt-0.5">
+                              <span className="font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px]">
                                 {w.employeeCode || w.code || "—"}
                               </span>
                               {(w.fatherName || w.contractorLeadName) && (
-                                <span className="truncate max-w-[120px]">
+                                <span className="truncate max-w-[140px]">
                                   • {isContractor ? `Lead: ${w.contractorLeadName || w.fatherName}` : `S/O ${w.fatherName}`}
                                 </span>
                               )}
@@ -864,42 +864,42 @@ export default function LabourWorkforceMasterPage() {
                       </td>
 
                       {/* Column 2: Designation / Specialty Badge */}
-                      <td className="py-3 px-3">
+                      <td className="py-3.5 px-4">
                         {isContractor ? (
                           <div>
-                            <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-cyan-50 text-cyan-800 border border-cyan-200/80 inline-block">
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-50 text-cyan-800 border border-cyan-200/80 inline-block">
                               {w.tradeSpecialty || w.specialty || "Roofing & Fabrication"}
                             </span>
-                            <span className="text-[10px] text-slate-400 block mt-0.5">
+                            <span className="text-[11px] text-slate-400 block mt-0.5">
                               Default Headcount: {w.defaultHeadcount || 1} Labours
                             </span>
                           </div>
                         ) : activeSegment === "INVI_OFFICE" ? (
-                          <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 inline-block">
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 inline-block">
                             {w.designation || w.role || "Digital Hub"}
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200/80 dark:bg-slate-800 dark:text-slate-200 inline-block">
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200/80 dark:bg-slate-800 dark:text-slate-200 inline-block">
                             {w.designation || w.role || "Staff"}
                           </span>
                         )}
                       </td>
 
                       {/* Column 3: Wage / Salary */}
-                      <td className="py-3 px-3 text-right font-mono tabular-nums">
+                      <td className="py-3.5 px-4 text-right font-mono tabular-nums">
                         {w.monthlySalary && Number(w.monthlySalary) > 0 ? (
                           <div>
-                            <span className="text-slate-900 dark:text-slate-100 font-extrabold text-xs">
+                            <span className="text-slate-900 dark:text-slate-100 font-bold text-[13px]">
                               {formatINR(Number(w.monthlySalary))}
                             </span>
-                            <span className="text-[10px] text-slate-400 block font-sans">/ month</span>
+                            <span className="text-[11px] text-slate-400 block font-sans">/ month</span>
                           </div>
                         ) : w.dailyWage || w.dailyRate ? (
                           <div>
-                            <span className="text-blue-700 dark:text-blue-400 font-extrabold text-xs">
+                            <span className="text-blue-700 dark:text-blue-400 font-bold text-[13px]">
                               ₹{Number(w.dailyWage || w.dailyRate).toLocaleString("en-IN")}
                             </span>
-                            <span className="text-[10px] text-slate-400 block font-sans">/ day</span>
+                            <span className="text-[11px] text-slate-400 block font-sans">/ day</span>
                           </div>
                         ) : (
                           <span className="text-slate-400">—</span>
@@ -907,37 +907,37 @@ export default function LabourWorkforceMasterPage() {
                       </td>
 
                       {/* Column 4: Contact & Location */}
-                      <td className="py-3 px-3 text-slate-600 dark:text-slate-300">
-                        <div className="flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
+                        <div className="flex items-center gap-1 font-mono text-xs font-semibold text-slate-700 dark:text-slate-200">
                           <Phone className="w-3 h-3 text-slate-400" />
                           <span>{w.phone || "—"}</span>
                         </div>
                         {w.address && (
-                          <span className="text-[10px] text-slate-400 block truncate max-w-[140px] mt-0.5" title={w.address}>
+                          <span className="text-[11px] text-slate-400 block truncate max-w-[160px] mt-0.5" title={w.address}>
                             {w.address}
                           </span>
                         )}
                       </td>
 
                       {/* Column 5: Statutory Identity Micro-Badges */}
-                      <td className="py-3 px-3">
-                        <div className="flex flex-wrap gap-1 max-w-[160px]">
+                      <td className="py-3.5 px-4">
+                        <div className="flex flex-wrap gap-1 max-w-[180px]">
                           {w.aadhaarNumber ? (
-                            <span className="px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 inline-flex items-center gap-0.5">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 inline-flex items-center gap-0.5">
                               ✓ UID ..{w.aadhaarNumber.slice(-4)}
                             </span>
                           ) : (
-                            <span className="px-1.5 py-0.2 rounded text-[9.5px] font-mono bg-slate-100 text-slate-400 border border-slate-200/60">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-400 border border-slate-200/60">
                               No Aadhaar
                             </span>
                           )}
                           {w.panNumber ? (
-                            <span className="px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200/80 inline-flex items-center gap-0.5">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200/80 inline-flex items-center gap-0.5">
                               ✓ PAN
                             </span>
                           ) : null}
                           {w.drivingLicenseNumber ? (
-                            <span className="px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 inline-flex items-center gap-0.5">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 inline-flex items-center gap-0.5">
                               ✓ DL
                             </span>
                           ) : null}
@@ -945,44 +945,44 @@ export default function LabourWorkforceMasterPage() {
                       </td>
 
                       {/* Column 6: Bank Remittance */}
-                      <td className="py-3 px-3 text-[11px]">
+                      <td className="py-3.5 px-4 text-xs">
                         {w.bankAccountNo || w.bankAccountNumber ? (
                           <div>
-                            <span className="font-extrabold text-slate-900 dark:text-slate-100 block">
+                            <span className="font-bold text-slate-900 dark:text-slate-100 block">
                               {w.bankName || "Bank"} ..{(w.bankAccountNo || w.bankAccountNumber).slice(-4)}
                             </span>
-                            <span className="text-[10px] text-slate-400 font-mono block">
+                            <span className="text-[11px] text-slate-400 font-mono block">
                               {w.bankIfsc || w.ifscCode || "—"}
                             </span>
                           </div>
                         ) : (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80 inline-block">
+                          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80 inline-block">
                             No Bank on File
                           </span>
                         )}
                       </td>
 
                       {/* Column 7: KYC Status Badge */}
-                      <td className="py-3 px-3 text-center">
+                      <td className="py-3.5 px-4 text-center">
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-extrabold border shadow-2xs ${kyc.color}`}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border shadow-2xs ${kyc.color}`}
                         >
                           {kyc.label === "Verified" ? (
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                           ) : (
-                            <AlertTriangle className="w-3 h-3 text-amber-600" />
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
                           )}
                           <span>{kyc.label}</span>
                         </span>
                       </td>
 
                       {/* Column 8: Actions */}
-                      <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => setSelectedWorkerForKyc(w)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
                             title="View Full KYC Profile Drawer & Print Dossier"
                           >
                             <FileCheck className="w-4 h-4" />
@@ -991,7 +991,7 @@ export default function LabourWorkforceMasterPage() {
                           <button
                             type="button"
                             onClick={() => setSelectedWorkerForDossier(w)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition cursor-pointer"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition cursor-pointer"
                             title="View Lifetime Multi-Year Attendance Dossier"
                           >
                             <History className="w-4 h-4" />
@@ -1000,7 +1000,7 @@ export default function LabourWorkforceMasterPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(w)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
                             title="Edit Workforce Details"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -1012,7 +1012,7 @@ export default function LabourWorkforceMasterPage() {
                               setSelectedWorkerForAction(w);
                               setShowDeleteModal(true);
                             }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
                             title="Soft-Delete to Recycle Bin"
                           >
                             <Trash2 className="w-4 h-4" />

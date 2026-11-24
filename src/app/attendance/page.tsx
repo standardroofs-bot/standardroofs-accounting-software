@@ -169,6 +169,7 @@ export default function AttendancePage() {
   const [holidays, setHolidays] = useState<HolidayItem[]>([]);
   const [kpis, setKpis] = useState<any>({});
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Canonical 6 Contractor Teams + DB Contractors
   const defaultContractorTeams = [
@@ -346,22 +347,65 @@ export default function AttendancePage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Fetch Attendance & Roster
+  // Fetch Attendance & Roster with Warm Session Cache & Exponential Retry
   const fetchAttendance = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/attendance?date=${selectedDate}&month=${selectedMonth}`);
-      const data = await res.json();
-      if (data.success) {
-        setEmployees(data.employees || []);
-        setContractorLogs(data.contractorLogs || []);
-        setContractorsFromDb(data.contractors || []);
-        setHolidays(data.holidays || []);
-        setLeaveRequests(data.leaveRequests || []);
-        setKpis(data.kpis || {});
+      setFetchError(null);
+
+      // Check warm session cache for instantaneous rendering
+      const cacheKey = `sr_att_cache_${selectedMonth}_${selectedDate}`;
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached && employees.length === 0) {
+          const parsed = JSON.parse(cached);
+          if (parsed && Array.isArray(parsed.employees) && parsed.employees.length > 0) {
+            setEmployees(parsed.employees);
+            if (parsed.contractorLogs) setContractorLogs(parsed.contractorLogs);
+            if (parsed.contractors) setContractorsFromDb(parsed.contractors);
+            if (parsed.holidays) setHolidays(parsed.holidays);
+            if (parsed.leaveRequests) setLeaveRequests(parsed.leaveRequests);
+            if (parsed.kpis) setKpis(parsed.kpis);
+          }
+        }
+      } catch (ce) {}
+
+      let attempts = 0;
+      let success = false;
+      while (attempts < 3 && !success) {
+        try {
+          const res = await fetch(`/api/attendance?date=${selectedDate}&month=${selectedMonth}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success) {
+              setEmployees(data.employees || []);
+              setContractorLogs(data.contractorLogs || []);
+              setContractorsFromDb(data.contractors || []);
+              setHolidays(data.holidays || []);
+              setLeaveRequests(data.leaveRequests || []);
+              setKpis(data.kpis || {});
+              try {
+                sessionStorage.setItem(cacheKey, JSON.stringify(data));
+              } catch (se) {}
+              success = true;
+              break;
+            }
+          }
+        } catch (netErr) {
+          // retry on next tick
+        }
+        attempts++;
+        if (!success && attempts < 3) {
+          await new Promise((r) => setTimeout(r, 350 * attempts));
+        }
       }
-    } catch (err) {
+
+      if (!success && employees.length === 0) {
+        setFetchError("Unable to connect to Attendance Server. Please click Retry below.");
+      }
+    } catch (err: any) {
       console.error("Error fetching attendance:", err);
+      setFetchError(err.message || "Attendance network timeout.");
     } finally {
       setLoading(false);
     }
@@ -1511,7 +1555,24 @@ export default function AttendancePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {activeTab === "contractor" ? (
+                {loading && employees.length === 0 ? (
+                  Array.from({ length: 8 }).map((_, idx) => (
+                    <tr key={`skel_att_${idx}`} className="h-11 animate-pulse">
+                      <td className="py-2.5 px-3 sticky left-0 bg-white dark:bg-slate-900 z-10 border-r border-slate-200 dark:border-slate-800">
+                        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-md w-28 mb-1" />
+                        <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-md w-14" />
+                      </td>
+                      {daysInMonth.map((d) => (
+                        <td key={`skeld_${d.dayNum}`} className="py-2 px-0.5 text-center">
+                          <div className="h-6 w-7 bg-slate-100 dark:bg-slate-800 rounded-md mx-auto" />
+                        </td>
+                      ))}
+                      <td colSpan={8} className="py-2 px-2">
+                        <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-md w-full" />
+                      </td>
+                    </tr>
+                  ))
+                ) : activeTab === "contractor" ? (
                   contractorTeamList.map((team) => {
                     const log = contractorLogs.find(
                       (c) => c.contractorTeamName === team.name && c.date.split("T")[0] === selectedDate
@@ -2395,7 +2456,24 @@ export default function AttendancePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {activeTab === "contractor" ? (
+                {loading && employees.length === 0 ? (
+                  Array.from({ length: 8 }).map((_, idx) => (
+                    <tr key={`skel_att_${idx}`} className="h-11 animate-pulse">
+                      <td className="py-2.5 px-3 sticky left-0 bg-white dark:bg-slate-900 z-10 border-r border-slate-200 dark:border-slate-800">
+                        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-md w-28 mb-1" />
+                        <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-md w-14" />
+                      </td>
+                      {daysInMonth.map((d) => (
+                        <td key={`skeld_${d.dayNum}`} className="py-2 px-0.5 text-center">
+                          <div className="h-6 w-7 bg-slate-100 dark:bg-slate-800 rounded-md mx-auto" />
+                        </td>
+                      ))}
+                      <td colSpan={8} className="py-2 px-2">
+                        <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-md w-full" />
+                      </td>
+                    </tr>
+                  ))
+                ) : activeTab === "contractor" ? (
                   contractorTeamList.map((team) => {
                     let activeDays = 0;
                     let totalManDays = 0;
@@ -2522,6 +2600,27 @@ export default function AttendancePage() {
                       </tr>
                     );
                   })
+                ) : tabEmployees.length === 0 ? (
+                  <tr>
+                    <td colSpan={daysInMonth.length + 9} className="py-14 text-center">
+                      {fetchError ? (
+                        <div className="flex flex-col items-center justify-center gap-2.5 max-w-md mx-auto p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700">
+                          <p className="text-xs font-bold">{fetchError}</p>
+                          <button
+                            type="button"
+                            onClick={fetchAttendance}
+                            className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+                          >
+                            Retry Attendance Grid
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-slate-400 font-semibold text-sm">
+                          No personnel profiles found matching current filters.
+                        </div>
+                      )}
+                    </td>
+                  </tr>
                 ) : (
                   tabEmployees.map((emp) => {
                   const isOffice = emp.category === "OFFICE_STAFF";
@@ -2537,11 +2636,17 @@ export default function AttendancePage() {
                   let lTotal = 0;
                   let otHoursTotal = 0;
 
+                  const attList = Array.isArray(emp.attendances) ? emp.attendances : [];
+
                   // Pre-calculate sums with Separate Rules:
                   // Office: Sunday auto-marked L if no record.
                   // Labours: Sunday is NOT auto-marked L. If no record, null.
                   daysInMonth.forEach((d) => {
-                    const att = emp.attendances.find((a) => a.date.split("T")[0] === d.fullDate);
+                    const att = attList.find((a) => {
+                      if (!a || !a.date) return false;
+                      const dateStr = typeof a.date === "string" ? a.date.split("T")[0] : new Date(a.date).toISOString().split("T")[0];
+                      return dateStr === d.fullDate;
+                    });
                     const status = att ? att.status : isOffice && d.isSunday ? "L" : null;
 
                     if (status === "P") pTotal++;
@@ -2569,25 +2674,29 @@ export default function AttendancePage() {
                     : pTotal + p1hTotal + hTotal * 0.5;
 
                   return (
-                    <tr key={emp.id} className="h-9 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                    <tr key={emp.id} className="h-11 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
                       {/* Fixed Left Column (Clickable to open Dossier) */}
-                      <td className="py-1 px-3 sticky left-0 bg-white dark:bg-slate-900 z-10 font-bold border-r border-slate-200 dark:border-slate-800 shadow-xs">
+                      <td className="py-2 px-3.5 sticky left-0 bg-white dark:bg-slate-900 z-10 font-bold border-r border-slate-200 dark:border-slate-800 shadow-xs">
                         <div
                           onClick={() => handleOpenDossier(emp)}
-                          className="truncate max-w-[150px] text-slate-800 dark:text-slate-200 hover:text-blue-600 cursor-pointer flex items-center justify-between"
+                          className="truncate max-w-[170px] text-[14px] font-bold text-slate-900 dark:text-slate-100 hover:text-blue-600 cursor-pointer flex items-center justify-between"
                           title="Click to view full Tenure Dossier"
                         >
                           <span className="truncate">{emp.name}</span>
-                          <History size={11} className="text-slate-400 opacity-60 shrink-0 ml-1" />
+                          <History size={13} className="text-slate-400 opacity-60 shrink-0 ml-1.5" />
                         </div>
-                        <span className="text-[9.5px] text-slate-400 font-mono block -mt-0.5">
+                        <span className="text-[11px] text-slate-400 font-mono font-medium block">
                           {emp.employeeCode}
                         </span>
                       </td>
 
                       {/* 1..31 Clickable Day Cells */}
                       {daysInMonth.map((d) => {
-                        const att = emp.attendances.find((a) => a.date.split("T")[0] === d.fullDate);
+                        const att = attList.find((a) => {
+                          if (!a || !a.date) return false;
+                          const dateStr = typeof a.date === "string" ? a.date.split("T")[0] : new Date(a.date).toISOString().split("T")[0];
+                          return dateStr === d.fullDate;
+                        });
                         const status = att ? att.status : isOffice && d.isSunday ? "L" : null;
                         const isEve = att?.permissionSlot === "EVENING";
 

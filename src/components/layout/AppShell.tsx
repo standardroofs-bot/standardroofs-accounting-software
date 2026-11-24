@@ -129,7 +129,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       }}
     >
       <SessionGuard />
-      <div className="min-h-screen bg-[#F3F6FC] dark:bg-slate-950 flex transition-colors text-slate-900 dark:text-slate-100 antialiased">
+      <div className="min-h-screen bg-[#EAEEF7] dark:bg-slate-950 flex transition-colors text-slate-900 dark:text-slate-100 antialiased">
         {/* Mobile Backdrop Overlay */}
         {isMobileOpen && (
           <div
@@ -145,7 +145,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Main Content Area */}
         <div
           className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ease-in-out ${
-            isCollapsed ? "lg:ml-20" : "lg:ml-60"
+            isCollapsed ? "lg:ml-20" : "lg:ml-64"
           } ml-0 w-full min-w-0`}
         >
           <Header />

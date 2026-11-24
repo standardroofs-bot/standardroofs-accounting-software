@@ -25,76 +25,100 @@ export async function GET(request: Request) {
     if (category) whereEmployee.category = category;
     if (companyUnit) whereEmployee.companyUnit = companyUnit;
 
-    const [employees, targetDateAttendance, contractorLogs, holidays, contractorList, leaveRequests] = await Promise.all([
-      prisma.employeeOrLabour.findMany({
-        where: whereEmployee,
-        orderBy: [
-          { companyUnit: "desc" },
-          { employeeCode: "asc" },
-        ],
-        include: {
-          attendances: {
+    let employees: any[] = [];
+    let targetDateAttendance: any[] = [];
+    let contractorLogs: any[] = [];
+    let holidays: any[] = [];
+    let contractorList: any[] = [];
+    let leaveRequests: any[] = [];
+
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        const results = await Promise.all([
+          prisma.employeeOrLabour.findMany({
+            where: whereEmployee,
+            orderBy: [
+              { companyUnit: "desc" },
+              { employeeCode: "asc" },
+            ],
+            include: {
+              attendances: {
+                where: {
+                  date: {
+                    gte: startOfMonth,
+                    lte: endOfMonth,
+                  },
+                },
+                orderBy: { date: "asc" },
+              },
+            },
+          }),
+          prisma.attendanceRecord.findMany({
+            where: {
+              date: targetDate,
+            },
+            include: {
+              employee: true,
+            },
+          }),
+          prisma.contractorDailyLog.findMany({
             where: {
               date: {
                 gte: startOfMonth,
                 lte: endOfMonth,
               },
             },
-            orderBy: { date: "asc" },
-          },
-        },
-      }),
-      prisma.attendanceRecord.findMany({
-        where: {
-          date: targetDate,
-        },
-        include: {
-          employee: true,
-        },
-      }),
-      prisma.contractorDailyLog.findMany({
-        where: {
-          date: {
-            gte: startOfMonth,
-            lte: endOfMonth,
-          },
-        },
-        orderBy: { date: "desc" },
-      }),
-      prisma.companyHoliday.findMany({
-        where: {
-          year: year || 2026,
-        },
-        orderBy: { date: "asc" },
-      }),
-      prisma.contractor.findMany({
-        where: {
-          status: "ACTIVE",
-        },
-        orderBy: { code: "asc" },
-      }),
-      prisma.leaveRequest.findMany({
-        where: {
-          OR: [
-            { startDate: { gte: startOfMonth, lte: endOfMonth } },
-            { endDate: { gte: startOfMonth, lte: endOfMonth } },
-            { status: "PENDING" },
-          ],
-        },
-        include: {
-          employee: {
-            select: {
-              id: true,
-              name: true,
-              employeeCode: true,
-              category: true,
-              companyUnit: true,
+            orderBy: { date: "desc" },
+          }),
+          prisma.companyHoliday.findMany({
+            where: {
+              year: year || 2026,
             },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-    ]);
+            orderBy: { date: "asc" },
+          }),
+          prisma.contractor.findMany({
+            where: {
+              status: "ACTIVE",
+            },
+            orderBy: { code: "asc" },
+          }),
+          prisma.leaveRequest.findMany({
+            where: {
+              OR: [
+                { startDate: { gte: startOfMonth, lte: endOfMonth } },
+                { endDate: { gte: startOfMonth, lte: endOfMonth } },
+                { status: "PENDING" },
+              ],
+            },
+            include: {
+              employee: {
+                select: {
+                  id: true,
+                  name: true,
+                  employeeCode: true,
+                  category: true,
+                  companyUnit: true,
+                },
+              },
+            },
+            orderBy: { createdAt: "desc" },
+          }),
+        ]);
+
+        employees = results[0];
+        targetDateAttendance = results[1];
+        contractorLogs = results[2];
+        holidays = results[3];
+        contractorList = results[4];
+        leaveRequests = results[5];
+        break;
+      } catch (dbErr: any) {
+        attempts++;
+        if (attempts >= 3) throw dbErr;
+        await new Promise((resolve) => setTimeout(resolve, 300 * attempts));
+      }
+    }
 
     // Group active workforce
     const officeStaff = employees.filter((e) => e.category === "OFFICE_STAFF");

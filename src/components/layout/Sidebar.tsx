@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   BookOpen,
@@ -176,6 +176,7 @@ const WORKSPACES: WorkspaceConfig[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const {
     isMobileOpen,
     setIsMobileOpen,
@@ -196,6 +197,21 @@ export function Sidebar() {
     workforce: true,
     governance: true,
   });
+
+  const WORKSPACE_FIRST_ROUTES: Record<string, string> = {
+    accounting_gst: "/",
+    site_fleet: "/projects",
+    hr_payroll: "/attendance",
+    admin_control: "/settings",
+    all: "/",
+  };
+
+  const handleSwitchWorkspace = (wsId: string) => {
+    setCurrentWorkspace(wsId);
+    setShowWorkspaceMenu(false);
+    const targetRoute = WORKSPACE_FIRST_ROUTES[wsId] || "/";
+    router.push(targetRoute);
+  };
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -288,8 +304,8 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-gradient-to-b from-white via-slate-50/95 to-indigo-50/30 dark:bg-slate-900/95 text-slate-700 dark:text-slate-200 flex flex-col border-r border-slate-200/90 dark:border-slate-800 shadow-sm backdrop-blur-md ${
-        isCollapsed ? "w-20" : "w-60"
+      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-gradient-to-b from-[#F7F9FD] via-[#F1F5FC] to-[#EBF0FA] dark:bg-slate-900/95 text-slate-700 dark:text-slate-200 flex flex-col border-r border-slate-300/70 dark:border-slate-800 shadow-[4px_0_24px_-12px_rgba(15,23,42,0.12)] backdrop-blur-md ${
+        isCollapsed ? "w-20" : "w-64"
       } ${
         isMobileOpen
           ? "translate-x-0"
@@ -395,18 +411,15 @@ export function Sidebar() {
                 return (
                   <button
                     key={ws.id}
-                    onClick={() => {
-                      setCurrentWorkspace(ws.id);
-                      setShowWorkspaceMenu(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    onClick={() => handleSwitchWorkspace(ws.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
                       isSelected
-                        ? "bg-blue-600 text-white font-bold shadow-2xs"
+                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/20"
                         : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
                     }`}
                   >
-                    <div className="flex items-center gap-2 truncate">
-                      <WsIcon size={14} className={isSelected ? "text-white" : "text-slate-500"} />
+                    <div className="flex items-center gap-2.5 truncate">
+                      <WsIcon size={15} className={isSelected ? "text-white" : "text-slate-500"} />
                       <span className="truncate">{ws.title}</span>
                     </div>
                     {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />}
@@ -417,18 +430,15 @@ export function Sidebar() {
               {!isHr && (
                 <div className="border-t border-slate-100 dark:border-slate-800 my-1 pt-1">
                   <button
-                    onClick={() => {
-                      setCurrentWorkspace("all");
-                      setShowWorkspaceMenu(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition cursor-pointer ${
+                    onClick={() => handleSwitchWorkspace("all")}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition cursor-pointer ${
                       currentWorkspace === "all"
-                        ? "bg-blue-600 text-white font-bold"
+                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/20"
                         : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <Layers size={14} />
+                    <div className="flex items-center gap-2.5">
+                      <Layers size={15} />
                       <span>View All Workspaces</span>
                     </div>
                   </button>
@@ -464,11 +474,11 @@ export function Sidebar() {
               {!isCollapsed ? (
                 <button
                   onClick={() => toggleSection(group.id)}
-                  className="w-full flex items-center justify-between px-2 py-1 text-[9.5px] font-bold tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 uppercase transition group cursor-pointer"
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] font-bold tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 uppercase transition group cursor-pointer"
                 >
                   <span className="truncate">{group.title}</span>
                   <ChevronDown
-                    size={13}
+                    size={14}
                     className={`text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform duration-200 ${
                       isOpen ? "" : "-rotate-90"
                     }`}
@@ -480,7 +490,7 @@ export function Sidebar() {
 
               {/* Items List */}
               {(isCollapsed || isOpen) && (
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {visibleItems.map((item) => {
                     const isActive =
                       item.href === "/"
@@ -493,24 +503,24 @@ export function Sidebar() {
                         href={item.href}
                         onClick={() => setIsMobileOpen(false)}
                         title={isCollapsed ? item.name : undefined}
-                        className={`flex items-center gap-2.5 px-2.5 py-1.5 text-xs transition-all group relative rounded-xl ${
+                        className={`flex items-center gap-3 px-3.5 py-2.5 text-[14px] transition-all group relative rounded-xl ${
                           isActive
-                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/20"
-                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/90 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 font-medium"
+                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold shadow-lg shadow-blue-600/25 ring-1 ring-blue-500/30"
+                            : "text-slate-600 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white font-medium"
                         }`}
                       >
                         <Icon
-                          size={16}
+                          size={18}
                           className={`shrink-0 transition-colors ${
                             isActive ? "text-white" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-200"
                           }`}
                         />
                         {!isCollapsed && (
                           <div className="flex items-center justify-between flex-1 truncate">
-                            <span className="truncate">{item.name}</span>
+                            <span className="truncate tracking-tight">{item.name}</span>
                             {item.badge && (
                               <span
-                                className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
+                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${
                                   isActive
                                     ? "bg-white/20 text-white border border-white/30"
                                     : "bg-slate-200/80 text-slate-600 border border-slate-200/60 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
