@@ -6,7 +6,7 @@
   "author": "Srimanikandan K (https://github.com/Srimani26)",
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build",
+    "build": "next build && node scripts/copy-standalone-assets.mjs",
     "start": "next start -p 3000",
     "start:local": "next start -p 3000",
     "push:all": "powershell -ExecutionPolicy Bypass -File scripts/push-all.ps1",

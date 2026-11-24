@@ -78,6 +78,12 @@ export default function LoginPage() {
               src="/images/standard-roofs-logo.png"
               alt="Standard Roofs Logo"
               className="h-10 w-auto object-contain"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.src.endsWith("/logo.png")) {
+                  target.src = "/logo.png";
+                }
+              }}
             />
           </div>
           <div>

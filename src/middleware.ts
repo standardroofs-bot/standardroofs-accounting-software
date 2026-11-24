@@ -299,11 +299,11 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images, uploads (static assets)
+     * - _next/static, _next/image (static Next.js bundles)
+     * - favicon.ico, logo.png (branding images)
+     * - images, uploads, icons (static assets)
+     * - sw.js, manifest.webmanifest (PWA files)
      */
-    "/((?!_next/static|_next/image|favicon.ico|images|uploads).*)",
+    "/((?!_next/static|_next/image|favicon.ico|logo.png|images|uploads|icons|manifest.webmanifest|sw.js).*)",
   ],
 };
