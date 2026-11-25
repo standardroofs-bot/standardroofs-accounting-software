@@ -195,6 +195,14 @@ export default function StandardPayrollPage() {
     loadPayroll();
   }, [loadPayroll]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.style.overflow = payslipItem ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [payslipItem]);
+
   const handleTabChange = (nextCycle: "MONTHLY_OFFICE" | "BI_MONTHLY_TAMIL" | "BI_MONTHLY_HINDI") => {
     setCycleType(nextCycle);
     if (nextCycle === "MONTHLY_OFFICE") {
@@ -1135,17 +1143,28 @@ export default function StandardPayrollPage() {
 
       {/* OFFICIAL BRANDED PAYSLIP MODAL */}
       {payslipItem && run && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="max-w-4xl w-full space-y-3 my-auto">
-            <div className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-slate-200 shadow-sm print:hidden">
-              <span className="text-xs font-bold text-slate-800">
-                Official Payslip — {payslipItem.employeeName}
-              </span>
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-950/50 backdrop-blur-xs print:static print:p-0 print:bg-white"
+          onClick={() => setPayslipItem(null)}
+        >
+          <div
+            className="w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden print:max-h-none print:shadow-none print:border-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="shrink-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between print:hidden">
+              <div>
+                <div className="text-sm font-bold text-slate-900">
+                  Official Payslip — {payslipItem.employeeName}
+                </div>
+                <div className="text-[11px] text-slate-500 font-mono">
+                  {payslipItem.employeeCode} • {formatMonthLabel(run.month)}
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold cursor-pointer shadow-xs"
                 >
                   <Printer size={14} />
                   <span>Print / Save PDF</span>
@@ -1153,18 +1172,21 @@ export default function StandardPayrollPage() {
                 <button
                   type="button"
                   onClick={() => setPayslipItem(null)}
-                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+                  className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  aria-label="Close Payslip"
                 >
                   <X size={16} />
                 </button>
               </div>
             </div>
-            <BrandedPayslip
-              item={payslipItem}
-              month={run.month}
-              halfPeriod={run.halfPeriod}
-              status={run.status}
-            />
+            <div className="flex-1 overflow-y-auto p-6 print:overflow-visible print:p-0">
+              <BrandedPayslip
+                item={payslipItem}
+                month={run.month}
+                halfPeriod={run.halfPeriod}
+                status={run.status}
+              />
+            </div>
           </div>
         </div>
       )}

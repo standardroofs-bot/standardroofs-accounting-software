@@ -422,7 +422,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-[#0B1120] text-slate-300 flex flex-col border-r border-slate-800/80 shadow-[4px_0_24px_-4px_rgba(2,6,23,0.35)] ${
+      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-[#EAEFF5] text-slate-800 flex flex-col border-r border-slate-300/80 shadow-[2px_0_16px_-4px_rgba(15,23,42,0.06)] ${
         isCollapsed ? "w-20" : "w-[272px]"
       } ${
         isMobileOpen
@@ -431,7 +431,7 @@ export function Sidebar() {
       }`}
     >
       {/* Flagship Brand Header Lockup */}
-      <div className="h-16 flex items-center justify-between px-3.5 border-b border-slate-800/80 bg-slate-950/40 shrink-0">
+      <div className="h-16 flex items-center justify-between px-3.5 border-b border-slate-300/80 bg-[#E3E9F1]/70 shrink-0">
         <Link
           href="/"
           onClick={() => setIsMobileOpen(false)}
@@ -441,7 +441,7 @@ export function Sidebar() {
           <motion.div
             whileHover={{ scale: 1.04 }}
             transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            className="w-11 h-11 rounded-xl bg-white p-1.5 border border-indigo-400/50 shadow-[0_0_20px_rgba(79,70,229,0.45)] ring-2 ring-indigo-500/30 relative overflow-hidden flex items-center justify-center shrink-0 group"
+            className="w-11 h-11 rounded-xl bg-white p-1.5 border border-indigo-300/80 shadow-[0_4px_14px_-2px_rgba(79,70,229,0.22)] ring-2 ring-indigo-500/15 relative overflow-hidden flex items-center justify-center shrink-0 group"
           >
             <img
               src="/images/standard-roofs-logo.png"
@@ -455,20 +455,20 @@ export function Sidebar() {
               initial={{ x: "-100%" }}
               animate={{ x: "200%" }}
               transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut", repeatDelay: 2 }}
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent -skew-x-12 pointer-events-none"
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-500/15 to-transparent -skew-x-12 pointer-events-none"
             />
           </motion.div>
           {!isCollapsed && (
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-lg tracking-tight text-white leading-tight">
+                <span className="font-extrabold text-lg tracking-tight text-slate-900 leading-tight">
                   SR-Books
                 </span>
-                <span className="bg-indigo-500/25 text-indigo-200 border border-indigo-400/30 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md leading-none">
+                <span className="bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md leading-none shadow-2xs">
                   v2.6
                 </span>
               </div>
-              <span className="text-[10.5px] font-semibold tracking-wider uppercase text-indigo-300/80 truncate mt-0.5 leading-none">
+              <span className="text-[10.5px] font-semibold tracking-wider uppercase text-slate-600 truncate mt-0.5 leading-none">
                 STANDARD ROOFS · ERODE
               </span>
             </div>
@@ -479,14 +479,14 @@ export function Sidebar() {
         <div className="flex items-center">
           <button
             onClick={() => setIsMobileOpen(false)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 lg:hidden transition cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white/70 lg:hidden transition cursor-pointer"
             title="Close Menu"
           >
             <X size={18} />
           </button>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden lg:flex p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+            className="hidden lg:flex p-1.5 rounded-md hover:bg-white/70 text-slate-500 hover:text-slate-900 transition cursor-pointer"
             title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
             {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
@@ -494,12 +494,12 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* 4-Workspace Switcher Bar (Dark-Glass Obsidian Selector) */}
+      {/* 4-Workspace Switcher Bar (Frosted White Selector) */}
       {!isCollapsed ? (
-        <div className="p-2.5 border-b border-slate-800/80 bg-slate-950/30 relative">
+        <div className="p-2.5 border-b border-slate-300/80 bg-slate-200/40 relative">
           <button
             onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/70 hover:border-indigo-500/50 text-white transition text-left group cursor-pointer"
+            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white/90 border border-slate-300/80 shadow-xs hover:border-indigo-400 text-slate-900 transition text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div
@@ -516,17 +516,17 @@ export function Sidebar() {
                 )}
               </div>
               <div className="truncate">
-                <span className="text-[9.5px] font-bold tracking-wider text-slate-400 uppercase block leading-none">
+                <span className="text-[9.5px] font-bold tracking-wider text-slate-500 uppercase block leading-none">
                   Active Workspace
                 </span>
-                <span className="text-[12.5px] font-bold text-white group-hover:text-indigo-300 transition truncate block mt-0.5">
+                <span className="text-[12.5px] font-bold text-slate-900 group-hover:text-indigo-700 transition truncate block mt-0.5">
                   {currentWorkspace === "all" ? "All Modules" : activeWsConfig.title}
                 </span>
               </div>
             </div>
             <ChevronDown
               size={15}
-              className={`text-slate-400 group-hover:text-white transition-transform duration-200 shrink-0 ml-1 ${
+              className={`text-slate-500 group-hover:text-slate-900 transition-transform duration-200 shrink-0 ml-1 ${
                 showWorkspaceMenu ? "rotate-180" : ""
               }`}
             />
@@ -619,18 +619,18 @@ export function Sidebar() {
               {!isCollapsed ? (
                 <button
                   onClick={() => toggleSection(group.id)}
-                  className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10.5px] font-bold tracking-wider text-slate-400 hover:text-white uppercase transition group cursor-pointer"
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 text-[11px] font-bold tracking-wider text-slate-500 hover:text-slate-800 uppercase transition group cursor-pointer"
                 >
                   <span className="truncate">{group.title}</span>
                   <ChevronDown
                     size={14}
-                    className={`text-slate-500 group-hover:text-slate-300 transition-transform duration-200 ${
+                    className={`text-slate-500 group-hover:text-slate-700 transition-transform duration-200 ${
                       isOpen ? "" : "-rotate-90"
                     }`}
                   />
                 </button>
               ) : (
-                <div className="h-px bg-slate-800 my-2 mx-1" />
+                <div className="h-px bg-slate-300/80 my-2 mx-1" />
               )}
 
               {/* Items List (Gliding Active Pill via Framer Motion layoutId) */}
@@ -651,23 +651,23 @@ export function Sidebar() {
                         className={`flex items-center gap-2.5 px-3 py-2 text-[13.5px] transition-colors group relative rounded-xl ${
                           isActive
                             ? "text-white font-semibold"
-                            : "text-slate-300 hover:text-white font-medium"
+                            : "text-slate-700 hover:text-slate-900 font-medium"
                         }`}
                       >
                         {isActive && (
                           <motion.span
                             layoutId="srActiveSidebarPill"
-                            className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-semibold shadow-lg shadow-indigo-950/60 rounded-xl z-0"
+                            className="absolute inset-0 bg-indigo-600 text-white font-semibold shadow-sm shadow-indigo-600/25 rounded-xl z-0"
                             transition={{ type: "spring", stiffness: 380, damping: 30 }}
                           />
                         )}
                         {!isActive && (
-                          <span className="absolute inset-0 rounded-xl hover:bg-slate-800/70 transition-colors z-0" />
+                          <span className="absolute inset-0 rounded-xl hover:bg-white/70 transition-colors z-0" />
                         )}
                         <Icon
                           size={16}
                           className={`relative z-10 shrink-0 transition-transform duration-200 group-hover:scale-105 ${
-                            isActive ? "text-white" : "text-slate-400 group-hover:text-indigo-300"
+                            isActive ? "text-white" : "text-slate-600 group-hover:text-indigo-600"
                           }`}
                         />
                         {!isCollapsed && (
@@ -678,7 +678,7 @@ export function Sidebar() {
                                 className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md shrink-0 ml-1.5 ${
                                   isActive
                                     ? "bg-white/20 text-white"
-                                    : "bg-slate-800 text-slate-300 border border-slate-700/80"
+                                    : "bg-white/80 text-slate-700 border border-slate-300/80"
                                 }`}
                               >
                                 {item.badge}
@@ -698,17 +698,17 @@ export function Sidebar() {
 
       {/* Super Admin Status Footer */}
       {!isCollapsed && currentUser && (
-        <div className="p-3 border-t border-slate-800/80 bg-slate-950/60 text-xs flex items-center justify-between shrink-0">
+        <div className="p-3 border-t border-slate-300/80 bg-slate-200/70 text-xs flex items-center justify-between shrink-0 text-slate-900">
           <div className="truncate">
-            <div className="font-bold text-white truncate">
+            <div className="font-bold text-slate-900 truncate">
               {currentUser.email === "admin@standardroofs.in" || currentUser.role === "SUPER_ADMIN"
                 ? "Prabhakaran T"
                 : currentUser.name}
             </div>
-            <div className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
+            <div className="text-[10px] text-slate-600 flex items-center gap-1 font-medium">
               <span>{currentUser.role === "SUPER_ADMIN" ? "Super Admin" : currentUser.role?.replace(/_/g, " ")}</span>
               <span>•</span>
-              <span className="text-emerald-400 font-bold">Online</span>
+              <span className="text-emerald-700 font-bold">Online</span>
             </div>
           </div>
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 shadow-2xs shadow-emerald-500/50 animate-pulse" />
