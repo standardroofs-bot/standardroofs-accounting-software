@@ -130,7 +130,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
       .toUpperCase() || "PT";
 
   return (
-    <header className="h-14 bg-[#FCFBF9]/90 backdrop-blur-xl border-b border-stone-300/80 dark:border-slate-800 shadow-xs flex items-center justify-between px-3 sm:px-5 lg:px-6 sticky top-0 z-30 transition-colors whitespace-nowrap select-none">
+    <header className="h-14 bg-white/95 backdrop-blur-xl border-b border-slate-200/90 shadow-xs flex items-center justify-between px-3 sm:px-5 lg:px-6 sticky top-0 z-30 transition-colors whitespace-nowrap select-none">
       {/* Left: Hamburger (mobile) + Organization context + Search */}
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         {/* Mobile Hamburger Drawer Button */}
@@ -148,9 +148,9 @@ export function Header({ onQuickCreate }: HeaderProps) {
           className="flex items-center gap-2 hover:opacity-85 transition group cursor-pointer"
           title="Return to Home"
         >
-          <Building className="text-amber-700 dark:text-amber-500 group-hover:scale-105 transition shrink-0" size={18} />
+          <Building className="text-slate-900 dark:text-slate-100 group-hover:scale-105 transition shrink-0" size={18} />
           <div className="flex flex-col">
-            <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-100 group-hover:text-amber-700 dark:group-hover:text-amber-400 transition leading-none">
+            <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition leading-none">
               Standard Roofs
             </span>
             <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-none mt-0.5 hidden xs:inline">
@@ -160,13 +160,13 @@ export function Header({ onQuickCreate }: HeaderProps) {
         </Link>
 
         {/* Financial Year Selector */}
-        <div className="hidden sm:flex items-center gap-1.5 ml-2 px-2.5 py-1 rounded-md bg-stone-100/90 dark:bg-slate-800 border border-stone-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200">
-          <Calendar size={13} className="text-amber-700 dark:text-amber-500 shrink-0" />
+        <div className="hidden sm:flex items-center gap-1.5 ml-2 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200">
+          <Calendar size={13} className="text-slate-600 dark:text-slate-400 shrink-0" />
           <span>FY:</span>
           <select
             value={selectedFY}
             onChange={(e) => setSelectedFY(e.target.value)}
-            className="bg-transparent border-none text-xs font-bold text-stone-800 dark:text-stone-200 focus:outline-none cursor-pointer"
+            className="bg-transparent border-none text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
           >
             <option value="2026-27">2026-27 (Active)</option>
             <option value="2025-26">2025-26 (Archived)</option>
@@ -179,7 +179,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
           <input
             type="text"
             placeholder="Search accounts, invoices, materials, fleet..."
-            className="pl-8 pr-4 py-1.5 rounded-lg bg-[#F9F7F3] dark:bg-slate-800 border border-stone-300/80 dark:border-slate-700 text-xs w-48 lg:w-64 focus:outline-none focus:ring-1 focus:ring-amber-500 text-slate-800 dark:text-slate-200"
+            className="pl-8 pr-4 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs w-48 lg:w-64 focus:outline-none focus:ring-1 focus:ring-slate-900 text-slate-800 dark:text-slate-200"
           />
         </div>
       </div>
@@ -190,7 +190,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
         <div className="relative">
           <button
             onClick={() => setShowQuickMenu(!showQuickMenu)}
-            className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white text-xs font-bold shadow-md shadow-amber-600/20 transition active:scale-95 cursor-pointer"
+            className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition active:scale-95 cursor-pointer"
             title="Create New Transaction"
           >
             <Plus size={15} />
@@ -348,23 +348,23 @@ export function Header({ onQuickCreate }: HeaderProps) {
               setShowQuickMenu(false);
               setShowNotifications(false);
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-stone-800 dark:text-stone-200 border border-stone-300/80 dark:border-slate-700 text-xs font-semibold transition cursor-pointer shadow-2xs"
-            title="Switch Commercial Palette Theme (Persisted)"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold transition cursor-pointer shadow-2xs"
+            title="Switch Theme Preset (Persisted)"
           >
-            <Palette size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
-            <span className="hidden md:inline font-bold text-[11.5px]">{themeConfig.paletteLabel}</span>
+            <Palette size={14} className="text-slate-700 dark:text-slate-300 shrink-0" />
+            <span className="hidden md:inline font-semibold text-[11.5px]">{themeConfig.paletteLabel}</span>
             <div className="flex items-center -space-x-1 shrink-0">
               <span className="w-2.5 h-2.5 rounded-full border border-white dark:border-slate-800 shadow-2xs" style={{ backgroundColor: themeConfig.swatchPrimary }} />
               <span className="w-2.5 h-2.5 rounded-full border border-white dark:border-slate-800 shadow-2xs" style={{ backgroundColor: themeConfig.swatchSecondary }} />
             </div>
-            <ChevronDown size={11} className="text-stone-400" />
+            <ChevronDown size={11} className="text-slate-400" />
           </button>
 
           {showThemeMenu && (
-            <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-[#FCFBF9] dark:bg-slate-900 border border-stone-300 dark:border-slate-800 shadow-2xl p-2 z-50 text-xs animate-in fade-in zoom-in-95">
-              <div className="px-3 py-1.5 font-bold text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500 border-b border-stone-200 dark:border-slate-800 mb-1 flex items-center justify-between">
-                <span>Commercial ERP Palette</span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold">1-Click Live</span>
+            <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 text-xs animate-in fade-in zoom-in-95">
+              <div className="px-3 py-1.5 font-bold text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800 mb-1 flex items-center justify-between">
+                <span>Theme Presets</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-bold">1-Click Live</span>
               </div>
 
               <div className="space-y-1">
@@ -380,8 +380,8 @@ export function Header({ onQuickCreate }: HeaderProps) {
                       }}
                       className={`w-full flex items-center justify-between p-2.5 rounded-xl transition text-left cursor-pointer group ${
                         isSelected
-                          ? "bg-amber-100/70 dark:bg-slate-800 text-stone-900 dark:text-stone-50 border border-amber-300/80 dark:border-amber-500/40 shadow-xs"
-                          : "hover:bg-stone-200/50 dark:hover:bg-slate-800/60 text-stone-700 dark:text-stone-300 border border-transparent"
+                          ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50 border border-slate-300 dark:border-slate-700 shadow-xs"
+                          : "hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 border border-transparent"
                       }`}
                     >
                       <div className="flex items-start gap-2.5 min-w-0">
@@ -393,16 +393,16 @@ export function Header({ onQuickCreate }: HeaderProps) {
                           <div className="font-bold text-xs tracking-tight flex items-center gap-1.5">
                             {t.name}
                             {isSelected && (
-                              <span className="text-[9px] px-1 rounded bg-amber-600 text-white font-bold leading-tight">Active</span>
+                              <span className="text-[9px] px-1 rounded bg-slate-900 text-white font-bold leading-tight">Active</span>
                             )}
                           </div>
-                          <div className="text-[10.5px] text-stone-500 dark:text-stone-400 mt-0.5 leading-snug line-clamp-1">
+                          <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug line-clamp-1">
                             {t.tagline}
                           </div>
                         </div>
                       </div>
                       {isSelected ? (
-                        <Check size={14} className="text-amber-700 dark:text-amber-400 shrink-0 ml-1.5" />
+                        <Check size={14} className="text-slate-900 dark:text-slate-100 shrink-0 ml-1.5" />
                       ) : (
                         <div className="w-3.5 shrink-0" />
                       )}
@@ -417,16 +417,16 @@ export function Header({ onQuickCreate }: HeaderProps) {
         {/* Dark/Light mode toggle */}
         <button
           onClick={toggleDarkMode}
-          className="p-2 rounded-lg text-stone-500 hover:text-stone-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-stone-100 dark:hover:bg-slate-800 transition"
+          className="p-2 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
           title="Toggle Light/Dark Theme"
         >
           {isDark ? <Sun size={17} /> : <Moon size={17} />}
         </button>
 
         {/* User Badge & Logout */}
-        <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-3 border-l border-stone-200 dark:border-slate-800">
+        <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-3 border-l border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-600 to-orange-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
               {initials}
             </div>
             <div className="hidden sm:flex flex-col text-left truncate max-w-[140px]">

@@ -55,7 +55,7 @@
 }
 
 body {
-  background-color: #EDE9E1;
+  background-color: #F1F5F9;
   color: #334155;
   font-family: var(--font-sans), "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -64,44 +64,39 @@ body {
   padding: 0;
   -webkit-font-smoothing: antialiased;
   background-image: 
-    radial-gradient(at 15% 0%, rgba(217, 119, 6, 0.08) 0px, transparent 55%),
-    radial-gradient(at 85% 5%, rgba(5, 150, 105, 0.07) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(180, 83, 9, 0.06) 0px, transparent 60%);
+    radial-gradient(at 50% -10%, rgba(99, 102, 241, 0.08) 0px, transparent 60%),
+    radial-gradient(at 100% 100%, rgba(226, 232, 240, 0.5) 0px, transparent 50%);
   background-attachment: fixed;
   transition: background-color 0.3s ease, background-image 0.3s ease;
 }
 
-/* 4 Curated Commercial Themes */
-[data-theme="terracotta"] body {
-  background-color: #EDE9E1;
+/* 4 Curated Linear / Stripe Flagship Themes */
+:root, [data-theme="pearl_slate"] body {
+  background-color: #F1F5F9;
   background-image: 
-    radial-gradient(at 15% 0%, rgba(217, 119, 6, 0.08) 0px, transparent 55%),
-    radial-gradient(at 85% 5%, rgba(5, 150, 105, 0.07) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(180, 83, 9, 0.06) 0px, transparent 60%);
+    radial-gradient(at 50% -10%, rgba(99, 102, 241, 0.08) 0px, transparent 60%),
+    radial-gradient(at 100% 100%, rgba(226, 232, 240, 0.5) 0px, transparent 50%);
 }
 
-[data-theme="emerald_gold"] body {
-  background-color: #E4ECE8;
+[data-theme="cool_indigo"] body {
+  background-color: #F0F4FA;
   background-image: 
-    radial-gradient(at 15% 0%, rgba(5, 150, 105, 0.09) 0px, transparent 55%),
-    radial-gradient(at 85% 5%, rgba(217, 119, 6, 0.07) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 60%);
+    radial-gradient(at 50% -10%, rgba(37, 99, 235, 0.08) 0px, transparent 60%),
+    radial-gradient(at 100% 100%, rgba(224, 231, 255, 0.4) 0px, transparent 50%);
+}
+
+[data-theme="mint_forest"] body {
+  background-color: #F0F7F4;
+  background-image: 
+    radial-gradient(at 50% -10%, rgba(5, 150, 105, 0.08) 0px, transparent 60%),
+    radial-gradient(at 100% 100%, rgba(209, 250, 229, 0.4) 0px, transparent 50%);
 }
 
 [data-theme="lavender_plum"] body {
-  background-color: #EAE6F2;
+  background-color: #F4F0FA;
   background-image: 
-    radial-gradient(at 15% 0%, rgba(126, 34, 206, 0.08) 0px, transparent 55%),
-    radial-gradient(at 85% 5%, rgba(79, 70, 229, 0.07) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(168, 85, 247, 0.06) 0px, transparent 60%);
-}
-
-[data-theme="slate_copper"] body {
-  background-color: #E5E7EB;
-  background-image: 
-    radial-gradient(at 15% 0%, rgba(51, 65, 85, 0.08) 0px, transparent 55%),
-    radial-gradient(at 85% 5%, rgba(180, 83, 9, 0.07) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(100, 116, 139, 0.06) 0px, transparent 60%);
+    radial-gradient(at 50% -10%, rgba(124, 58, 237, 0.08) 0px, transparent 60%),
+    radial-gradient(at 100% 100%, rgba(243, 232, 255, 0.4) 0px, transparent 50%);
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -127,19 +122,19 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-mono), "JetBrains Mono", monospace;
 }
 
-/* Elevated Warm Ivory-Porcelain Glass Cards & Interactive Surfaces */
+/* Clean Pure-Porcelain Cards (Linear / Stripe Elevation) */
 .porcelain-card {
-  background: linear-gradient(135deg, #FCFBF9 50%, rgba(245, 239, 230, 0.85) 100%);
-  border: 1px solid rgba(214, 206, 194, 0.9);
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
   border-radius: 1rem;
-  box-shadow: 0 8px 28px -8px rgba(28, 25, 23, 0.09);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 6px 16px -4px rgba(15, 23, 42, 0.05);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .porcelain-card:hover {
-  box-shadow: 0 16px 36px -8px rgba(120, 53, 15, 0.12);
-  transform: translateY(-2px);
-  border-color: rgba(180, 83, 9, 0.4);
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 10px 24px -6px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1.5px);
+  border-color: #CBD5E1;
 }
 
 .dark .porcelain-card {

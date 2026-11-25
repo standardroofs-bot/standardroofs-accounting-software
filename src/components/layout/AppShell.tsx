@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 
-export type SRThemeKey = "terracotta" | "emerald_gold" | "lavender_plum" | "slate_copper";
+export type SRThemeKey = "pearl_slate" | "cool_indigo" | "mint_forest" | "lavender_plum";
 
 export interface SRThemeConfig {
   id: SRThemeKey;
@@ -32,73 +32,73 @@ export interface SRThemeConfig {
 }
 
 export const SR_THEMES: Record<SRThemeKey, SRThemeConfig> = {
-  terracotta: {
-    id: "terracotta",
-    name: "Warm Terracotta & Emerald",
-    paletteLabel: "Terracotta & Emerald",
-    tagline: "Warm Sand canvas, Linen-Stone sidebar, Emerald & Terracotta accents",
-    swatchPrimary: "#b45309",
-    swatchSecondary: "#047857",
-    canvasBg: "#EDE9E1",
-    sidebarGradient: "from-[#F5EFE6] via-[#EFE7DC] to-[#E7DDD0]",
-    sidebarBorder: "border-stone-300/90",
+  pearl_slate: {
+    id: "pearl_slate",
+    name: "Pearl Slate & Obsidian",
+    paletteLabel: "Pearl Slate & Obsidian",
+    tagline: "Neutral Pearl-Slate canvas, Pure Porcelain sidebar, Obsidian accents",
+    swatchPrimary: "#0f172a",
+    swatchSecondary: "#6366f1",
+    canvasBg: "#F1F5F9",
+    sidebarGradient: "from-white via-white to-slate-50/50",
+    sidebarBorder: "border-slate-200/90",
+    sidebarActiveBg: "bg-slate-900",
+    activePillGradient: "bg-slate-900",
+    activePillText: "text-white",
+    activeBadge: "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30",
+    primaryBtn: "bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/15",
+    headerBorder: "border-slate-200/90",
+  },
+  cool_indigo: {
+    id: "cool_indigo",
+    name: "Cool Ice & Royal Indigo",
+    paletteLabel: "Cool Ice & Indigo",
+    tagline: "Cool Ice canvas, Frosted Porcelain sidebar, Royal Indigo & Sky accents",
+    swatchPrimary: "#2563eb",
+    swatchSecondary: "#4f46e5",
+    canvasBg: "#F0F4FA",
+    sidebarGradient: "from-white via-[#F4F7FC] to-[#EDF2FA]",
+    sidebarBorder: "border-slate-200/90",
+    sidebarActiveBg: "bg-gradient-to-r from-blue-600 to-indigo-600",
+    activePillGradient: "from-blue-600 to-indigo-600",
+    activePillText: "text-white",
+    activeBadge: "bg-blue-100 text-blue-800 border border-blue-200",
+    primaryBtn: "from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-blue-600/20",
+    headerBorder: "border-slate-200/90",
+  },
+  mint_forest: {
+    id: "mint_forest",
+    name: "Mint Sage & Forest",
+    paletteLabel: "Mint Sage & Forest",
+    tagline: "Mint Sage canvas, Crisp Porcelain sidebar, Deep Forest & Mint accents",
+    swatchPrimary: "#047857",
+    swatchSecondary: "#10b981",
+    canvasBg: "#F0F7F4",
+    sidebarGradient: "from-white via-[#F2F8F5] to-[#EAF5EF]",
+    sidebarBorder: "border-emerald-200/80",
     sidebarActiveBg: "bg-gradient-to-r from-emerald-700 to-teal-700",
     activePillGradient: "from-emerald-700 to-teal-700",
     activePillText: "text-white",
-    activeBadge: "bg-amber-400/25 text-amber-100 border border-amber-300/40",
-    primaryBtn: "from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-amber-600/20",
-    headerBorder: "border-stone-300/80",
-  },
-  emerald_gold: {
-    id: "emerald_gold",
-    name: "Royal Emerald & Gold",
-    paletteLabel: "Emerald & Gold",
-    tagline: "Soft Sage-Mist canvas, Frosted Mint-Slate sidebar, Deep Forest & Gold",
-    swatchPrimary: "#047857",
-    swatchSecondary: "#d97706",
-    canvasBg: "#E4ECE8",
-    sidebarGradient: "from-[#EEF5F1] via-[#E4ECE8] to-[#DCE7E1]",
-    sidebarBorder: "border-emerald-300/80",
-    sidebarActiveBg: "bg-gradient-to-r from-emerald-800 to-teal-800",
-    activePillGradient: "from-emerald-800 to-teal-800",
-    activePillText: "text-amber-100",
-    activeBadge: "bg-amber-400/30 text-amber-200 border border-amber-300/50",
+    activeBadge: "bg-emerald-100 text-emerald-800 border border-emerald-200",
     primaryBtn: "from-emerald-700 to-teal-700 hover:from-emerald-800 hover:to-teal-800 text-white shadow-emerald-700/20",
-    headerBorder: "border-emerald-300/70",
+    headerBorder: "border-emerald-200/70",
   },
   lavender_plum: {
     id: "lavender_plum",
     name: "Soft Lavender & Plum",
     paletteLabel: "Lavender & Plum",
-    tagline: "Warm Lilac-Mist canvas, Frosted Velvet-Pearl sidebar, Deep Plum & Indigo",
+    tagline: "Soft Lilac canvas, Frosted Porcelain sidebar, Deep Plum & Indigo accents",
     swatchPrimary: "#7e22ce",
-    swatchSecondary: "#4f46e5",
-    canvasBg: "#EAE6F2",
-    sidebarGradient: "from-[#F3F0F9] via-[#EAE5F4] to-[#E0D8ED]",
-    sidebarBorder: "border-purple-300/80",
+    swatchSecondary: "#6366f1",
+    canvasBg: "#F4F0FA",
+    sidebarGradient: "from-white via-[#F7F4FC] to-[#F0EBF9]",
+    sidebarBorder: "border-purple-200/80",
     sidebarActiveBg: "bg-gradient-to-r from-purple-800 to-indigo-800",
     activePillGradient: "from-purple-800 to-indigo-800",
     activePillText: "text-white",
-    activeBadge: "bg-purple-300/30 text-purple-100 border border-purple-300/40",
+    activeBadge: "bg-purple-100 text-purple-800 border border-purple-200",
     primaryBtn: "from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white shadow-purple-700/20",
-    headerBorder: "border-purple-300/70",
-  },
-  slate_copper: {
-    id: "slate_copper",
-    name: "Executive Slate & Copper",
-    paletteLabel: "Slate & Copper",
-    tagline: "Cool Stone canvas, Warm Graphite-Pearl sidebar, Copper & Slate",
-    swatchPrimary: "#334155",
-    swatchSecondary: "#b45309",
-    canvasBg: "#E5E7EB",
-    sidebarGradient: "from-[#F1F3F6] via-[#E7EBF0] to-[#DCDFE6]",
-    sidebarBorder: "border-slate-300/80",
-    sidebarActiveBg: "bg-gradient-to-r from-slate-800 to-stone-800",
-    activePillGradient: "from-slate-800 to-stone-800",
-    activePillText: "text-amber-300",
-    activeBadge: "bg-amber-500/25 text-amber-200 border border-amber-400/40",
-    primaryBtn: "from-amber-700 to-stone-800 hover:from-amber-800 hover:to-stone-900 text-white shadow-stone-800/20",
-    headerBorder: "border-slate-300/70",
+    headerBorder: "border-purple-200/70",
   },
 };
 
@@ -170,7 +170,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [currentWorkspace, setCurrentWorkspaceState] = useState<string>("accounting_gst");
-  const [currentTheme, setCurrentThemeState] = useState<SRThemeKey>("terracotta");
+  const [currentTheme, setCurrentThemeState] = useState<SRThemeKey>("pearl_slate");
 
   // Read saved workspace & theme from localStorage on mount
   useEffect(() => {
@@ -184,7 +184,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         setCurrentThemeState(savedTheme);
         document.documentElement.setAttribute("data-theme", savedTheme);
       } else {
-        document.documentElement.setAttribute("data-theme", "terracotta");
+        setCurrentThemeState("pearl_slate");
+        document.documentElement.setAttribute("data-theme", "pearl_slate");
       }
     } catch (e) {
       // LocalStorage access safe fallback
@@ -199,7 +200,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     } catch (e) {}
   };
 
-  const themeConfig = SR_THEMES[currentTheme] || SR_THEMES.terracotta;
+  const themeConfig = SR_THEMES[currentTheme] || SR_THEMES.pearl_slate;
 
   const setCurrentWorkspace = (ws: string) => {
     setCurrentWorkspaceState(ws);
@@ -265,7 +266,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Main Content Area */}
         <div
           className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ease-in-out ${
-            isCollapsed ? "lg:ml-20" : "lg:ml-[272px]"
+            isCollapsed ? "lg:ml-20" : "lg:ml-[280px]"
           } ml-0 w-full min-w-0`}
         >
           <Header />
