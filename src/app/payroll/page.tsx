@@ -11,14 +11,13 @@ import {
   Printer,
   X,
   Search,
-  Landmark,
-  Wallet,
   Building2,
   Calendar,
-  Clock,
-  Sparkles,
   AlertCircle,
   Lock,
+  Unlock,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
 
@@ -110,6 +109,30 @@ export default function StandardPayrollPage() {
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [payslipItem, setPayslipItem] = useState<PayrollItem | null>(null);
 
+  // Full CRUD & Bulk states
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({
+    employeeName: "",
+    employeeCode: "",
+    company: "STANDARD_ROOFS",
+    totalWorkingDays: 26,
+    daysPresent: 26,
+    baseRate: 15000,
+    otAndIncentive: 0,
+    advanceDeduction: 0,
+    paymentChannel: "CASH",
+    notes: "",
+  });
+  const [addingRow, setAddingRow] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    danger?: boolean;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
@@ -132,6 +155,7 @@ export default function StandardPayrollPage() {
       if (data.success) {
         setRun(data.run);
         setAvailableRuns(data.availableRuns || []);
+        setSelectedIds([]);
       }
     } catch (err) {
       console.error(err);
@@ -150,12 +174,15 @@ export default function StandardPayrollPage() {
     if (nextCycle === "MONTHLY_OFFICE") {
       setHalfPeriod("FULL");
       setMonth("2026-10");
+      setAddForm((f) => ({ ...f, totalWorkingDays: 26, daysPresent: 26, baseRate: 15000 }));
     } else if (nextCycle === "BI_MONTHLY_TAMIL") {
       setHalfPeriod("FIRST_HALF");
       setMonth("2026-11");
+      setAddForm((f) => ({ ...f, totalWorkingDays: 15, daysPresent: 15, baseRate: 900 }));
     } else {
       setHalfPeriod("SECOND_HALF");
       setMonth("2026-09");
+      setAddForm((f) => ({ ...f, totalWorkingDays: 15, daysPresent: 15, baseRate: 700 }));
     }
   };
 
@@ -176,7 +203,7 @@ export default function StandardPayrollPage() {
       } else {
         showToast(data.error || "Sync failed", "error");
       }
-    } catch (err) {
+    } catch {
       showToast("Network error while syncing attendance", "error");
     } finally {
       setSyncing(false);
@@ -201,7 +228,7 @@ export default function StandardPayrollPage() {
       } else {
         showToast(data.error || "Import failed", "error");
       }
-    } catch (err) {
+    } catch {
       showToast("Error uploading Excel file", "error");
     } finally {
       setImporting(false);
@@ -229,10 +256,152 @@ export default function StandardPayrollPage() {
       } else {
         showToast(data.error || "Approval failed", "error");
       }
-    } catch (err) {
+    } catch {
       showToast("Error approving payroll run", "error");
     } finally {
       setApproving(false);
+    }
+  };
+
+  const handleReopenCycle = async () => {
+    if (!run) return;
+    setConfirmAction({
+      title: "Reopen Paid Cycle for Editing?",
+      message: `This will unlock ${formatMonthLabel(run.month)} (${run.halfPeriod}) back to DRAFT status and remove the linked summary Cash Book entry so HR can make corrections cleanly.`,
+      confirmLabel: "Reopen Cycle",
+      onConfirm: async () => {
+        const res = await fetch("/api/payroll/reopen", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ payrollRunId: run.id }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setRun(data.run);
+          showToast("Payroll cycle reopened to DRAFT for editing");
+        } else {
+          showToast(data.error || "Failed to reopen cycle", "error");
+        }
+        setConfirmAction(null);
+      },
+    });
+  };
+
+  const handleDeleteDraftCycle = async () => {
+    if (!run || run.status === "PAID") return;
+    setConfirmAction({
+      title: "Delete Draft Payroll Cycle?",
+      message: `Permanently delete ${formatMonthLabel(run.month)} (${run.halfPeriod}) and all ${run.items.length} rows inside it? This cannot be undone.`,
+      confirmLabel: "Delete Cycle",
+      danger: true,
+      onConfirm: async () => {
+        const res = await fetch(`/api/payroll/${run.id}`, { method: "DELETE" });
+        const data = await res.json();
+        if (data.success) {
+          setRun(null);
+          showToast("Draft payroll cycle deleted");
+          loadPayroll();
+        } else {
+          showToast(data.error || "Failed to delete cycle", "error");
+        }
+        setConfirmAction(null);
+      },
+    });
+  };
+
+  const handleAddRow = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addForm.employeeName.trim()) return;
+    setAddingRow(true);
+    try {
+      const effectiveHalf = cycleType === "MONTHLY_OFFICE" ? "FULL" : halfPeriod === "FULL" ? "FIRST_HALF" : halfPeriod;
+      const res = await fetch("/api/payroll/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cycleType,
+          month,
+          halfPeriod: effectiveHalf,
+          ...addForm,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowAddModal(false);
+        setAddForm((f) => ({ ...f, employeeName: "", employeeCode: "", notes: "" }));
+        showToast(`Added ${data.item.employeeName} to cycle`);
+        loadPayroll();
+      } else {
+        showToast(data.error || "Failed to add employee", "error");
+      }
+    } catch {
+      showToast("Error adding payroll row", "error");
+    } finally {
+      setAddingRow(false);
+    }
+  };
+
+  const handleDeleteRow = (item: PayrollItem) => {
+    setConfirmAction({
+      title: `Remove ${item.employeeName}?`,
+      message: `Delete ${item.employeeName} (${formatINR(item.netSalary)}) from this cycle? Parent totals will recalculate automatically.`,
+      confirmLabel: "Delete Row",
+      danger: true,
+      onConfirm: async () => {
+        const res = await fetch(`/api/payroll/items/${item.id}`, { method: "DELETE" });
+        const data = await res.json();
+        if (data.success && run) {
+          setRun({
+            ...run,
+            ...data.run,
+            items: run.items.filter((it) => it.id !== item.id),
+          });
+          setSelectedIds((prev) => prev.filter((x) => x !== item.id));
+          showToast(`Removed ${item.employeeName}`);
+        } else {
+          showToast(data.error || "Failed to delete row", "error");
+        }
+        setConfirmAction(null);
+      },
+    });
+  };
+
+  const handleBulkAction = async (action: "MARK_CLEARED" | "SET_CHANNEL" | "DELETE_SELECTED", paymentChannel?: string) => {
+    if (!run || selectedIds.length === 0) return;
+    const runBulk = async () => {
+      const res = await fetch("/api/payroll/items/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payrollRunId: run.id,
+          itemIds: selectedIds,
+          action,
+          paymentChannel,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRun(data.run);
+        setSelectedIds([]);
+        showToast(`Bulk update applied to ${selectedIds.length} rows`);
+      } else {
+        showToast(data.error || "Bulk update failed", "error");
+      }
+    };
+
+    if (action === "DELETE_SELECTED") {
+      setConfirmAction({
+        title: `Delete ${selectedIds.length} Selected Rows?`,
+        message: "Selected payroll rows will be permanently removed and totals recalculated.",
+        confirmLabel: "Delete Selected",
+        danger: true,
+        onConfirm: async () => {
+          await runBulk();
+          setConfirmAction(null);
+        },
+      });
+    } else {
+      await runBulk();
     }
   };
 
@@ -254,7 +423,7 @@ export default function StandardPayrollPage() {
       } else {
         showToast(data.error || "Update failed", "error");
       }
-    } catch (err) {
+    } catch {
       showToast("Failed to save inline edit", "error");
     }
   };
@@ -303,6 +472,15 @@ export default function StandardPayrollPage() {
   const displayBank = visibleItems.reduce((s, it) => s + it.paidBankOrGpay, 0);
   const displayCarryForward = visibleItems.reduce((s, it) => s + it.carryForwardBalance, 0);
 
+  const allSelected = visibleItems.length > 0 && visibleItems.every((it) => selectedIds.includes(it.id));
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(visibleItems.map((it) => it.id));
+    }
+  };
+
   return (
     <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-2 space-y-5 font-sans pb-16 text-slate-800">
       {/* 1. PAGE HEADER */}
@@ -343,6 +521,18 @@ export default function StandardPayrollPage() {
             onChange={handleImportExcel}
             className="hidden"
           />
+
+          {(!run || run.status !== "PAID") && (
+            <button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold transition cursor-pointer"
+            >
+              <Plus size={14} />
+              <span>+ Add Employee / Labour</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -366,42 +556,57 @@ export default function StandardPayrollPage() {
           <button
             type="button"
             onClick={handleSyncFromAttendance}
-            disabled={syncing}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+            disabled={syncing || run?.status === "PAID"}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold shadow-2xs transition cursor-pointer disabled:opacity-50"
           >
-            <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+            <RefreshCw size={14} className={syncing ? "animate-spin text-indigo-600" : "text-indigo-600"} />
             <span>{syncing ? "Syncing..." : "Sync from Attendance"}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleApproveRun}
-            disabled={!run || approving || run.status === "PAID"}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer disabled:opacity-50"
-          >
-            {run?.status === "PAID" ? <Lock size={14} /> : <CheckCircle2 size={14} />}
-            <span>
-              {approving
-                ? "Posting..."
-                : run?.status === "PAID"
-                ? "Posted to Accounts"
-                : "Approve & Post to Accounts"}
-            </span>
-          </button>
+          {run?.status === "PAID" ? (
+            <button
+              type="button"
+              onClick={handleReopenCycle}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold transition cursor-pointer"
+            >
+              <Unlock size={14} />
+              <span>Reopen Cycle for Editing</span>
+            </button>
+          ) : (
+            <>
+              {run && (
+                <button
+                  type="button"
+                  onClick={handleDeleteDraftCycle}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition cursor-pointer"
+                  title="Delete Draft Payroll Cycle"
+                >
+                  <Trash2 size={14} />
+                  <span className="hidden sm:inline">Delete Draft</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleApproveRun}
+                disabled={!run || approving}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle2 size={14} />
+                <span>{approving ? "Posting..." : "Approve & Post to Accounts"}</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       {/* 2. 3 SEGMENT TABS + PERIOD & COMPANY CONTROLS */}
       <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-3.5 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-        {/* Segment Tabs */}
         <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200/80">
           <button
             type="button"
             onClick={() => handleTabChange("MONTHLY_OFFICE")}
             className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-              cycleType === "MONTHLY_OFFICE"
-                ? "bg-indigo-600 text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
+              cycleType === "MONTHLY_OFFICE" ? "bg-indigo-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             Office Staff (Monthly Salary)
@@ -410,9 +615,7 @@ export default function StandardPayrollPage() {
             type="button"
             onClick={() => handleTabChange("BI_MONTHLY_TAMIL")}
             className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-              cycleType === "BI_MONTHLY_TAMIL"
-                ? "bg-indigo-600 text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
+              cycleType === "BI_MONTHLY_TAMIL" ? "bg-indigo-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             Tamil Labours (1–15 & 16–30 Wages)
@@ -421,18 +624,14 @@ export default function StandardPayrollPage() {
             type="button"
             onClick={() => handleTabChange("BI_MONTHLY_HINDI")}
             className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-              cycleType === "BI_MONTHLY_HINDI"
-                ? "bg-indigo-600 text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
+              cycleType === "BI_MONTHLY_HINDI" ? "bg-indigo-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             Hindi Crew (1–15 & 16–30 Wages)
           </button>
         </div>
 
-        {/* Filters */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Month Selector */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
             <Calendar size={13} className="text-indigo-600" />
             <select
@@ -448,16 +647,13 @@ export default function StandardPayrollPage() {
             </select>
           </div>
 
-          {/* Half-Period Selector */}
           {cycleType !== "MONTHLY_OFFICE" && (
             <div className="flex items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200 text-xs">
               <button
                 type="button"
                 onClick={() => setHalfPeriod("FIRST_HALF")}
                 className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
-                  halfPeriod === "FIRST_HALF"
-                    ? "bg-white text-indigo-700 shadow-2xs"
-                    : "text-slate-600 hover:text-slate-900"
+                  halfPeriod === "FIRST_HALF" ? "bg-white text-indigo-700 shadow-2xs" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 1st – 15th
@@ -466,9 +662,7 @@ export default function StandardPayrollPage() {
                 type="button"
                 onClick={() => setHalfPeriod("SECOND_HALF")}
                 className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
-                  halfPeriod === "SECOND_HALF"
-                    ? "bg-white text-indigo-700 shadow-2xs"
-                    : "text-slate-600 hover:text-slate-900"
+                  halfPeriod === "SECOND_HALF" ? "bg-white text-indigo-700 shadow-2xs" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 16th – 30th
@@ -476,7 +670,6 @@ export default function StandardPayrollPage() {
             </div>
           )}
 
-          {/* Company Filter */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
             <Building2 size={13} className="text-slate-500" />
             <select
@@ -490,7 +683,6 @@ export default function StandardPayrollPage() {
             </select>
           </div>
 
-          {/* Search */}
           <div className="relative">
             <Search size={14} className="absolute left-2.5 top-2 text-slate-400" />
             <input
@@ -508,60 +700,40 @@ export default function StandardPayrollPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Total Gross Payroll
-            </span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Gross Payroll</span>
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80">
               {visibleItems.length} Personnel
             </span>
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-2 tabular-nums">
-            {formatINR(displayGross)}
-          </div>
-          <p className="text-[11px] text-slate-500 mt-1">
-            Earned base wages before deductions
-          </p>
+          <div className="text-2xl font-extrabold text-slate-900 mt-2 tabular-nums">{formatINR(displayGross)}</div>
+          <p className="text-[11px] text-slate-500 mt-1">Earned base wages before deductions</p>
         </div>
 
         <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Total Deductions
-            </span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Deductions</span>
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200/80">
               Advances + Exp
             </span>
           </div>
-          <div className="text-2xl font-extrabold text-rose-600 mt-2 tabular-nums">
-            {formatINR(displayDeductions)}
-          </div>
-          <p className="text-[11px] text-slate-500 mt-1">
-            Mid-cycle cash advances & expense balances
-          </p>
+          <div className="text-2xl font-extrabold text-rose-600 mt-2 tabular-nums">{formatINR(displayDeductions)}</div>
+          <p className="text-[11px] text-slate-500 mt-1">Mid-cycle cash advances & expense balances</p>
         </div>
 
         <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Net Payable
-            </span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Net Payable</span>
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80">
               {formatMonthLabel(month)}
             </span>
           </div>
-          <div className="text-2xl font-extrabold text-indigo-700 mt-2 tabular-nums">
-            {formatINR(displayNet)}
-          </div>
-          <p className="text-[11px] text-slate-500 mt-1">
-            Includes OT, Night Duty & Prior Balances
-          </p>
+          <div className="text-2xl font-extrabold text-indigo-700 mt-2 tabular-nums">{formatINR(displayNet)}</div>
+          <p className="text-[11px] text-slate-500 mt-1">Includes OT, Night Duty & Prior Balances</p>
         </div>
 
         <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Disbursed & Balance
-            </span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Disbursed & Balance</span>
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
               Bal: {formatINR(displayCarryForward)}
             </span>
@@ -580,6 +752,50 @@ export default function StandardPayrollPage() {
         </div>
       </div>
 
+      {/* BULK ACTION BAR (when rows selected) */}
+      {selectedIds.length > 0 && run?.status !== "PAID" && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span className="font-bold text-indigo-900">{selectedIds.length} row(s) selected</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleBulkAction("MARK_CLEARED")}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer"
+            >
+              Mark Cleared
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBulkAction("SET_CHANNEL", "CASH")}
+              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold cursor-pointer"
+            >
+              Set Cash
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBulkAction("SET_CHANNEL", "ICICI")}
+              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold cursor-pointer"
+            >
+              Set ICICI
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBulkAction("SET_CHANNEL", "OFFICE_GPAY")}
+              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold cursor-pointer"
+            >
+              Set Office GPay
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBulkAction("DELETE_SELECTED")}
+              className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold cursor-pointer"
+            >
+              Delete Selected
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 4. INLINE-EDITABLE PAYROLL LEDGER TABLE */}
       <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-2 bg-slate-50/60">
@@ -596,7 +812,9 @@ export default function StandardPayrollPage() {
             </h2>
           </div>
           <div className="text-[11px] text-slate-500">
-            Click any highlighted numeric cell to edit inline — Net Salary & Carry-Forward auto-recalculate
+            {run?.status === "PAID"
+              ? "Cycle is locked (PAID). Click 'Reopen Cycle for Editing' to unlock."
+              : "Click any cell to edit inline (press Enter or click outside to save)"}
           </div>
         </div>
 
@@ -609,7 +827,7 @@ export default function StandardPayrollPage() {
               No payroll run recorded for {formatMonthLabel(month)} ({halfPeriod})
             </div>
             <p className="text-xs text-slate-500 max-w-md mx-auto">
-              Click <strong>Sync from Attendance</strong> to automatically pull payable days, OT hours, and prior balances from Standard Attendance, or choose a historical period below.
+              Click <strong>Sync from Attendance</strong> or <strong>+ Add Employee / Labour</strong> to start this cycle, or jump to an existing historical cycle below.
             </p>
             {availableRuns.length > 0 && (
               <div className="flex flex-wrap justify-center gap-1.5 pt-2">
@@ -634,7 +852,16 @@ export default function StandardPayrollPage() {
             <table className="w-full text-xs text-left border-collapse">
               <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-bold">
                 <tr>
-                  <th className="py-3 px-3">Employee</th>
+                  <th className="py-3 px-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleSelectAll}
+                      disabled={run?.status === "PAID"}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                  </th>
+                  <th className="py-3 px-2">Employee</th>
                   <th className="py-3 px-2 text-right">Days</th>
                   <th className="py-3 px-2 text-right">Rate (₹)</th>
                   <th className="py-3 px-2 text-right">Gross (₹)</th>
@@ -646,7 +873,7 @@ export default function StandardPayrollPage() {
                   <th className="py-3 px-2">Channel</th>
                   <th className="py-3 px-2 text-right">Balance</th>
                   <th className="py-3 px-2">Notes</th>
-                  <th className="py-3 px-3 text-center">Slip</th>
+                  <th className="py-3 px-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -655,7 +882,14 @@ export default function StandardPayrollPage() {
                     key={item.id}
                     item={item}
                     locked={run?.status === "PAID"}
+                    selected={selectedIds.includes(item.id)}
+                    onToggleSelect={() =>
+                      setSelectedIds((prev) =>
+                        prev.includes(item.id) ? prev.filter((x) => x !== item.id) : [...prev, item.id]
+                      )
+                    }
                     onPatch={handleInlinePatch}
+                    onDelete={() => handleDeleteRow(item)}
                     onPrint={() => setPayslipItem(item)}
                   />
                 ))}
@@ -665,15 +899,172 @@ export default function StandardPayrollPage() {
         )}
       </div>
 
+      {/* ADD EMPLOYEE / LABOUR MODAL */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <form onSubmit={handleAddRow} className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div className="font-bold text-sm text-slate-900">Add Employee / Ad-hoc Worker</div>
+              <button type="button" onClick={() => setShowAddModal(false)} className="text-slate-500 hover:text-slate-800 cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Full Name *</label>
+                <input
+                  required
+                  type="text"
+                  value={addForm.employeeName}
+                  onChange={(e) => setAddForm({ ...addForm, employeeName: e.target.value })}
+                  placeholder="e.g. Suresh P / New Welder"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Code (optional)</label>
+                  <input
+                    type="text"
+                    value={addForm.employeeCode}
+                    onChange={(e) => setAddForm({ ...addForm, employeeCode: e.target.value })}
+                    placeholder="e.g. SR025"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Company</label>
+                  <select
+                    value={addForm.company}
+                    onChange={(e) => setAddForm({ ...addForm, company: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
+                  >
+                    <option value="STANDARD_ROOFS">Standard Roofs</option>
+                    <option value="INVI_CREATION">Invi Creation</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Working Days</label>
+                  <input
+                    type="number"
+                    value={addForm.totalWorkingDays}
+                    onChange={(e) => setAddForm({ ...addForm, totalWorkingDays: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Days Present</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={addForm.daysPresent}
+                    onChange={(e) => setAddForm({ ...addForm, daysPresent: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Rate (₹)</label>
+                  <input
+                    type="number"
+                    value={addForm.baseRate}
+                    onChange={(e) => setAddForm({ ...addForm, baseRate: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">OT / Inc (₹)</label>
+                  <input
+                    type="number"
+                    value={addForm.otAndIncentive}
+                    onChange={(e) => setAddForm({ ...addForm, otAndIncentive: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Advance (₹)</label>
+                  <input
+                    type="number"
+                    value={addForm.advanceDeduction}
+                    onChange={(e) => setAddForm({ ...addForm, advanceDeduction: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Channel</label>
+                  <select
+                    value={addForm.paymentChannel}
+                    onChange={(e) => setAddForm({ ...addForm, paymentChannel: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
+                  >
+                    <option value="CASH">Cash</option>
+                    <option value="ICICI">ICICI</option>
+                    <option value="OFFICE_GPAY">GPay</option>
+                    <option value="AGENT_ACCOUNT">Agent</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Notes</label>
+                <input
+                  type="text"
+                  value={addForm.notes}
+                  onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })}
+                  placeholder="Optional remarks..."
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                />
+              </div>
+            </div>
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+              <button type="button" onClick={() => setShowAddModal(false)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold cursor-pointer">
+                Cancel
+              </button>
+              <button type="submit" disabled={addingRow} className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50">
+                {addingRow ? "Adding..." : "Add to Payroll"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* CONFIRMATION DIALOG */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-5 space-y-3">
+            <div className="text-sm font-extrabold text-slate-900">{confirmAction.title}</div>
+            <p className="text-xs text-slate-600 leading-relaxed">{confirmAction.message}</p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmAction(null)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmAction.onConfirm}
+                className={`px-3.5 py-1.5 rounded-lg text-white text-xs font-semibold cursor-pointer ${
+                  confirmAction.danger ? "bg-rose-600 hover:bg-rose-700" : "bg-indigo-600 hover:bg-indigo-700"
+                }`}
+              >
+                {confirmAction.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 5. PRINTABLE PAYSLIP MODAL */}
       {payslipItem && run && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div>
-                <div className="text-sm font-extrabold text-slate-900">
-                  Standard Roofs • Payslip
-                </div>
+                <div className="text-sm font-extrabold text-slate-900">Standard Roofs • Payslip</div>
                 <div className="text-[11px] text-slate-500">
                   {formatMonthLabel(run.month)} ({run.halfPeriod}) • {payslipItem.company}
                 </div>
@@ -687,11 +1078,7 @@ export default function StandardPayrollPage() {
                   <Printer size={13} />
                   <span>Print</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setPayslipItem(null)}
-                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 cursor-pointer"
-                >
+                <button type="button" onClick={() => setPayslipItem(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 cursor-pointer">
                   <X size={16} />
                 </button>
               </div>
@@ -700,9 +1087,7 @@ export default function StandardPayrollPage() {
             <div className="p-5 space-y-4 text-xs">
               <div className="flex justify-between items-start border-b border-slate-100 pb-3">
                 <div>
-                  <div className="text-base font-extrabold text-slate-900">
-                    {payslipItem.employeeName}
-                  </div>
+                  <div className="text-base font-extrabold text-slate-900">{payslipItem.employeeName}</div>
                   <div className="text-slate-500 font-mono">{payslipItem.employeeCode}</div>
                 </div>
                 <div className="text-right">
@@ -750,14 +1135,10 @@ export default function StandardPayrollPage() {
               <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-xl p-3 flex items-center justify-between">
                 <div>
                   <div className="text-[10px] font-bold uppercase text-indigo-700">Net Payable</div>
-                  <div className="text-xl font-extrabold text-indigo-900 tabular-nums">
-                    {formatINR(payslipItem.netSalary)}
-                  </div>
+                  <div className="text-xl font-extrabold text-indigo-900 tabular-nums">{formatINR(payslipItem.netSalary)}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] font-bold uppercase text-slate-500">
-                    Paid ({payslipItem.paymentChannel})
-                  </div>
+                  <div className="text-[10px] font-bold uppercase text-slate-500">Paid ({payslipItem.paymentChannel})</div>
                   <div className="text-sm font-bold text-emerald-700 tabular-nums">
                     {formatINR(payslipItem.paidCash + payslipItem.paidBankOrGpay)}
                   </div>
@@ -777,7 +1158,6 @@ export default function StandardPayrollPage() {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast && (
         <div
           className={`fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-xl text-xs font-bold text-white flex items-center gap-2 ${
@@ -795,14 +1175,21 @@ export default function StandardPayrollPage() {
 function PayrollTableRow({
   item,
   locked,
+  selected,
+  onToggleSelect,
   onPatch,
+  onDelete,
   onPrint,
 }: {
   item: PayrollItem;
   locked: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
   onPatch: (id: string, patch: Partial<PayrollItem>) => void;
+  onDelete: () => void;
   onPrint: () => void;
 }) {
+  const [empName, setEmpName] = useState(item.employeeName);
   const [daysPresent, setDaysPresent] = useState(String(item.daysPresent));
   const [baseRate, setBaseRate] = useState(String(item.baseRate));
   const [otPlus, setOtPlus] = useState(String(item.otAndIncentive + item.nightDutyAmount + item.lastMonthBalance));
@@ -812,6 +1199,7 @@ function PayrollTableRow({
   const [notes, setNotes] = useState(item.notes || "");
 
   useEffect(() => {
+    setEmpName(item.employeeName);
     setDaysPresent(String(item.daysPresent));
     setBaseRate(String(item.baseRate));
     setOtPlus(String(item.otAndIncentive + item.nightDutyAmount + item.lastMonthBalance));
@@ -827,11 +1215,39 @@ function PayrollTableRow({
     onPatch(item.id, { [field]: parsed });
   };
 
+  const handleEnterBlur = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
+  };
+
   return (
-    <tr className="hover:bg-slate-50/80 transition">
+    <tr className={`hover:bg-slate-50/80 transition ${selected ? "bg-indigo-50/40" : ""}`}>
       <td className="py-2.5 px-3">
-        <div className="font-bold text-slate-900 whitespace-nowrap">{item.employeeName}</div>
-        <div className="text-[10px] text-slate-400 font-mono">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          disabled={locked}
+          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+        />
+      </td>
+
+      <td className="py-2.5 px-2">
+        <input
+          type="text"
+          disabled={locked}
+          value={empName}
+          onChange={(e) => setEmpName(e.target.value)}
+          onKeyDown={handleEnterBlur}
+          onBlur={() => {
+            if (empName.trim() && empName.trim() !== item.employeeName) {
+              onPatch(item.id, { employeeName: empName.trim() });
+            }
+          }}
+          className="font-bold text-slate-900 bg-transparent border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white rounded px-1 py-0.5 w-32"
+        />
+        <div className="text-[10px] text-slate-400 font-mono px-1">
           {item.employeeCode} • {item.company === "INVI_CREATION" ? "Invi" : "SR"}
         </div>
       </td>
@@ -843,6 +1259,7 @@ function PayrollTableRow({
           disabled={locked}
           value={daysPresent}
           onChange={(e) => setDaysPresent(e.target.value)}
+          onKeyDown={handleEnterBlur}
           onBlur={() => commitNum("daysPresent", daysPresent, item.daysPresent)}
           className="w-14 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent font-semibold tabular-nums"
         />
@@ -855,14 +1272,13 @@ function PayrollTableRow({
           disabled={locked}
           value={baseRate}
           onChange={(e) => setBaseRate(e.target.value)}
+          onKeyDown={handleEnterBlur}
           onBlur={() => commitNum("baseRate", baseRate, item.baseRate)}
           className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent tabular-nums"
         />
       </td>
 
-      <td className="py-2.5 px-2 text-right font-semibold text-slate-800 tabular-nums">
-        {formatINR(item.grossSalary)}
-      </td>
+      <td className="py-2.5 px-2 text-right font-semibold text-slate-800 tabular-nums">{formatINR(item.grossSalary)}</td>
 
       <td className="py-2.5 px-2 text-right tabular-nums">
         <input
@@ -870,6 +1286,7 @@ function PayrollTableRow({
           disabled={locked}
           value={otPlus}
           onChange={(e) => setOtPlus(e.target.value)}
+          onKeyDown={handleEnterBlur}
           onBlur={() => {
             const val = Number(otPlus);
             if (!Number.isFinite(val)) return;
@@ -888,6 +1305,7 @@ function PayrollTableRow({
           disabled={locked}
           value={advDed}
           onChange={(e) => setAdvDed(e.target.value)}
+          onKeyDown={handleEnterBlur}
           onBlur={() => {
             const val = Number(advDed);
             if (!Number.isFinite(val)) return;
@@ -900,9 +1318,7 @@ function PayrollTableRow({
         />
       </td>
 
-      <td className="py-2.5 px-2 text-right font-extrabold text-indigo-700 tabular-nums">
-        {formatINR(item.netSalary)}
-      </td>
+      <td className="py-2.5 px-2 text-right font-extrabold text-indigo-700 tabular-nums">{formatINR(item.netSalary)}</td>
 
       <td className="py-2.5 px-2 text-right tabular-nums">
         <input
@@ -910,6 +1326,7 @@ function PayrollTableRow({
           disabled={locked}
           value={paidCash}
           onChange={(e) => setPaidCash(e.target.value)}
+          onKeyDown={handleEnterBlur}
           onBlur={() => commitNum("paidCash", paidCash, item.paidCash)}
           className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent tabular-nums"
         />
@@ -921,6 +1338,7 @@ function PayrollTableRow({
           disabled={locked}
           value={paidBank}
           onChange={(e) => setPaidBank(e.target.value)}
+          onKeyDown={handleEnterBlur}
           onBlur={() => commitNum("paidBankOrGpay", paidBank, item.paidBankOrGpay)}
           className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent tabular-nums"
         />
@@ -961,24 +1379,37 @@ function PayrollTableRow({
           value={notes}
           placeholder="Add note..."
           onChange={(e) => setNotes(e.target.value)}
+          onKeyDown={handleEnterBlur}
           onBlur={() => {
             if (notes !== (item.notes || "")) {
               onPatch(item.id, { notes });
             }
           }}
-          className="w-32 px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent text-[11px] text-slate-600 truncate"
+          className="w-28 px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent text-[11px] text-slate-600 truncate"
         />
       </td>
 
       <td className="py-2.5 px-3 text-center">
-        <button
-          type="button"
-          onClick={onPrint}
-          className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
-          title="View & Print Payslip"
-        >
-          <Printer size={14} />
-        </button>
+        <div className="flex items-center justify-center gap-1">
+          <button
+            type="button"
+            onClick={onPrint}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
+            title="View & Print Payslip"
+          >
+            <Printer size={14} />
+          </button>
+          {!locked && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+              title="Delete Row"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );

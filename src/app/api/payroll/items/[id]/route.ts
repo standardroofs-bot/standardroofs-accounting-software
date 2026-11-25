@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { recalculatePayrollRunTotals } from "@/lib/payrollTotals";
 
 export async function PATCH(
   req: NextRequest,
@@ -21,6 +22,14 @@ export async function PATCH(
       );
     }
 
+    if (existing.payrollRun.status === "PAID") {
+      return NextResponse.json(
+        { success: false, error: "Cycle is PAID & locked. Reopen cycle to edit." },
+        { status: 400 }
+      );
+    }
+
+    const employeeName = body.employeeName !== undefined ? String(body.employeeName).trim() : existing.employeeName;
     const totalWorkingDays = body.totalWorkingDays !== undefined ? Number(body.totalWorkingDays) : existing.totalWorkingDays;
     const daysPresent = body.daysPresent !== undefined ? Number(body.daysPresent) : existing.daysPresent;
     const baseRate = body.baseRate !== undefined ? Number(body.baseRate) : existing.baseRate;
@@ -61,6 +70,7 @@ export async function PATCH(
     const updatedItem = await prisma.payrollItem.update({
       where: { id },
       data: {
+        employeeName,
         totalWorkingDays,
         daysPresent,
         baseRate,
@@ -80,24 +90,7 @@ export async function PATCH(
       },
     });
 
-    // Recalculate parent PayrollRun totals
-    const allItems = await prisma.payrollItem.findMany({
-      where: { payrollRunId: existing.payrollRunId },
-    });
-
-    const runTotals = {
-      totalGross: Math.round(allItems.reduce((s, it) => s + it.grossSalary, 0) * 100) / 100,
-      totalDeductions:
-        Math.round(allItems.reduce((s, it) => s + it.advanceDeduction + it.expenseBalanceDeduction, 0) * 100) / 100,
-      totalNet: Math.round(allItems.reduce((s, it) => s + it.netSalary, 0) * 100) / 100,
-      paidCash: Math.round(allItems.reduce((s, it) => s + it.paidCash, 0) * 100) / 100,
-      paidBank: Math.round(allItems.reduce((s, it) => s + it.paidBankOrGpay, 0) * 100) / 100,
-    };
-
-    const updatedRun = await prisma.payrollRun.update({
-      where: { id: existing.payrollRunId },
-      data: runTotals,
-    });
+    const updatedRun = await recalculatePayrollRunTotals(existing.payrollRunId, prisma as any);
 
     return NextResponse.json({
       success: true,
@@ -108,6 +101,48 @@ export async function PATCH(
     console.error("[PATCH /api/payroll/items/[id]]", error);
     return NextResponse.json(
       { success: false, error: error.message || "Failed to update payroll item" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params;
+    const existing = await prisma.payrollItem.findUnique({
+      where: { id },
+      include: { payrollRun: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Payroll item not found" },
+        { status: 404 }
+      );
+    }
+
+    if (existing.payrollRun.status === "PAID") {
+      return NextResponse.json(
+        { success: false, error: "Cycle is PAID & locked. Reopen cycle to delete rows." },
+        { status: 400 }
+      );
+    }
+
+    await prisma.payrollItem.delete({ where: { id } });
+    const updatedRun = await recalculatePayrollRunTotals(existing.payrollRunId, prisma as any);
+
+    return NextResponse.json({
+      success: true,
+      deletedId: id,
+      run: updatedRun,
+    });
+  } catch (error: any) {
+    console.error("[DELETE /api/payroll/items/[id]]", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to delete payroll item" },
       { status: 500 }
     );
   }

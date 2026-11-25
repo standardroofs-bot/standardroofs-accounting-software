@@ -230,6 +230,7 @@ const WORKSPACES: WorkspaceConfig[] = [
         title: "Site Execution & Costing",
         items: [
           { name: "Standard Sites", href: "/projects", icon: Briefcase, moduleKey: "projects" },
+          { name: "Standard Sub-Contractors", href: "/contractors", icon: HardHat, badge: "Sub-Con", moduleKey: "projects" },
           { name: "Standard SRM Machines", href: "/machines", icon: Wrench, badge: "SRM", moduleKey: "machines" },
           { name: "Standard Fleet & Fuel", href: "/fleet", icon: Truck, badge: "2 Cargo", moduleKey: "fleet" },
           { name: "Standard Materials", href: "/inventory", icon: Warehouse, moduleKey: "inventory" },

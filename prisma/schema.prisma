@@ -309,6 +309,7 @@ model CashBookEntry {
   amount           Decimal       @db.Decimal(15, 2)
   purpose          String
   category         String        // Site Expenses, Fuel, Material Purchase, Customer Receipt, etc.
+  walletName       String        @default("Office Cash") // Office Cash | ICICI | Office Gpay | Ravi Gpay | Prabha Gpay | RBL | Periyasamy Gpay | Suji Cash
   counterpartyName String?
   receiptUrl       String?
   projectId        String?
@@ -1901,6 +1902,49 @@ model PayrollItem {
 
   @@index([payrollRunId])
   @@index([employeeId])
+}
+
+// -------------------------------------------------------------
+// PHASE 2: STANDARD SUB-CONTRACTORS & RUNNING LEDGER
+// -------------------------------------------------------------
+
+model SubContractor {
+  id             String                     @id @default(cuid())
+  name           String                     @unique
+  teamLead       String?
+  phone          String?
+  tradeCategory  String                     @default("Roofing & Fabrication")
+  openingBalance Float                      @default(0)
+  currentBalance Float                      @default(0)
+  isActive       Boolean                    @default(true)
+  notes          String?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  entries        SubContractorLedgerEntry[]
+}
+
+model SubContractorLedgerEntry {
+  id                String        @id @default(cuid())
+  subContractorId   String
+  entryDate         DateTime      @default(now())
+  siteName          String?
+  particulars       String
+  entryType         String        // WORK_BILL | EXTRA_LABOUR | MATERIAL_DEDUCTION | PAYMENT | ADJUSTMENT
+  sqft              Float         @default(0)
+  ratePerSqft       Float         @default(0)
+  otherAllowance    Float         @default(0)
+  materialReduction Float         @default(0)
+  amountToGive      Float         @default(0)
+  givenAmount       Float         @default(0)
+  runningBalance    Float         @default(0)
+  walletUsed        String?
+  notes             String?
+  createdAt         DateTime      @default(now())
+
+  subContractor     SubContractor @relation(fields: [subContractorId], references: [id], onDelete: Cascade)
+
+  @@index([subContractorId, entryDate])
 }
 
 

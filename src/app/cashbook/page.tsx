@@ -1,23 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Wallet,
   ArrowDownLeft,
   ArrowUpRight,
-  Calculator,
-  Upload,
-  FileCheck,
-  AlertCircle,
-  CheckCircle2,
-  Paperclip,
-  ExternalLink,
+  Plus,
+  Edit3,
   Trash2,
+  Search,
+  FileSpreadsheet,
+  CheckCircle2,
+  X,
+  Filter,
 } from "lucide-react";
-import { formatINR } from "@/lib/decimal";
-import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
-import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
-import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
+import { exportToExcel } from "@/lib/exportUtils";
 
 interface CashEntry {
   id: string;
@@ -27,859 +24,536 @@ interface CashEntry {
   amount: string;
   purpose: string;
   category: string;
+  walletName: string;
   counterpartyName: string | null;
-  receiptUrl: string | null;
-  project: { id: string; name: string; code: string } | null;
-  journalEntry: {
-    entryNumber: string;
-    lines: Array<{
-      account: { code: string; name: string };
-      debit: string;
-      credit: string;
-    }>;
-  } | null;
-  createdBy: { name: string };
 }
 
-interface AccountOption {
-  id: string;
-  code: string;
-  name: string;
-  type: string;
+interface WalletBalance {
+  walletName: string;
+  balance: number;
 }
 
-interface ProjectOption {
-  id: string;
-  code: string;
-  name: string;
+const WALLETS = [
+  "Office Cash",
+  "ICICI",
+  "Office Gpay",
+  "Ravi Gpay",
+  "Prabha Gpay",
+  "RBL",
+  "Periyasamy Gpay",
+  "Suji Cash",
+];
+
+const CATEGORIES = [
+  "Customer Payment",
+  "Supplier Payment",
+  "Contractor payment",
+  "Labour Wages",
+  "Employee Salary",
+  "Labour Advance",
+  "Employee Advance",
+  "Food",
+  "Petrol",
+  "Material",
+  "Chit",
+  "Service",
+  "Go2 Expenses",
+  "Go 2 income",
+  "Diwali Expenses",
+  "Site visit expenses",
+  "Other Expenses",
+  "Other income",
+  "Cash transfer",
+];
+
+function formatINR(val: number | string): string {
+  const n = Number(val || 0);
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(n);
 }
 
 export default function CashBookPage() {
   const [entries, setEntries] = useState<CashEntry[]>([]);
-  const [currentBalance, setCurrentBalance] = useState("0.00");
+  const [walletBalances, setWalletBalances] = useState<WalletBalance[]>([]);
   const [totalInflow, setTotalInflow] = useState("0.00");
   const [totalOutflow, setTotalOutflow] = useState("0.00");
+  const [currentBalance, setCurrentBalance] = useState("0.00");
   const [loading, setLoading] = useState(true);
 
-  // Modal States
-  const [showVoucherModal, setShowVoucherModal] = useState(false);
-  const [voucherType, setVoucherType] = useState<"CASH_INFLOW" | "CASH_OUTFLOW">("CASH_OUTFLOW");
-  const [showDenominationModal, setShowDenominationModal] = useState(false);
-
-  // Dropdown Options
-  const [accounts, setAccounts] = useState<AccountOption[]>([]);
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
-
-  // Voucher Form State
-  const [amount, setAmount] = useState("");
-  const [purpose, setPurpose] = useState("");
-  const [category, setCategory] = useState("Site Expenses");
-  const [counterpartyName, setCounterpartyName] = useState("");
-  const [targetAccountId, setTargetAccountId] = useState("");
-  const [projectId, setProjectId] = useState("");
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [submittingVoucher, setSubmittingVoucher] = useState(false);
-  const [voucherError, setVoucherError] = useState("");
-
-  // Denominations State
-  const [notes500, setNotes500] = useState(0);
-  const [notes200, setNotes200] = useState(0);
-  const [notes100, setNotes100] = useState(0);
-  const [notes50, setNotes50] = useState(0);
-  const [notes20, setNotes20] = useState(0);
-  const [notes10, setNotes10] = useState(0);
-  const [coins5, setCoins5] = useState(0);
-  const [coins2, setCoins2] = useState(0);
-  const [coins1, setCoins1] = useState(0);
-  const [closingNotes, setClosingNotes] = useState("");
-  const [submittingClosing, setSubmittingClosing] = useState(false);
-
-  // Filter & Search & Archive State
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [selectedWallet, setSelectedWallet] = useState("ALL");
+  const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [archiveModal, setArchiveModal] = useState<{
-    isOpen: boolean;
-    entryId: string;
-    voucherNumber: string;
-    loading: boolean;
-  }>({
-    isOpen: false,
-    entryId: "",
-    voucherNumber: "",
-    loading: false,
-  });
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
-  const handleExportExcel = () => {
-    const exportData = filteredEntries.map((e) => ({
-      "Voucher No": e.voucherNumber,
-      Date: e.date,
-      Type: e.type,
-      Purpose: e.purpose,
-      Category: e.category,
-      Party: e.counterpartyName || "-",
-      Project: e.project?.name || "-",
-      "Amount (₹)": e.amount,
-    }));
-    exportToExcel(exportData, "cashbook_entries");
+  const [entryModal, setEntryModal] = useState<{
+    mode: "ADD" | "EDIT";
+    id?: string;
+    date: string;
+    type: "CASH_INFLOW" | "CASH_OUTFLOW";
+    amount: string;
+    purpose: string;
+    category: string;
+    walletName: string;
+    counterpartyName: string;
+  } | null>(null);
+
+  const [confirmDelete, setConfirmDelete] = useState<CashEntry | null>(null);
+
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
   };
 
-  const handleExportPDF = () => {
-    const printRows = filteredEntries.map((e) => [
-      e.voucherNumber,
-      new Date(e.date).toLocaleDateString("en-IN"),
-      e.type === "CASH_INFLOW" ? "INFLOW" : "OUTFLOW",
-      e.purpose,
-      e.counterpartyName || "-",
-      e.type === "CASH_INFLOW" ? formatINR(e.amount) : "-",
-      e.type === "CASH_OUTFLOW" ? formatINR(e.amount) : "-",
-    ]);
-    exportToPDF(
-      "Daily Cash Book & Vouchers",
-      ["Voucher No", "Date", "Type", "Purpose", "Party", "Inflow (₹)", "Outflow (₹)"],
-      printRows,
-      "daily_cashbook"
-    );
-  };
-
-  const handleArchive = async () => {
+  const loadCashBook = useCallback(async () => {
+    setLoading(true);
     try {
-      setArchiveModal((prev) => ({ ...prev, loading: true }));
-      setEntries((prev) => prev.filter((item) => item.id !== archiveModal.entryId));
-      setArchiveModal({ isOpen: false, entryId: "", voucherNumber: "", loading: false });
-    } catch (err) {
-      console.error(err);
-      setArchiveModal((prev) => ({ ...prev, loading: false }));
+      const params = new URLSearchParams();
+      if (selectedWallet !== "ALL") params.set("wallet", selectedWallet);
+      if (selectedCategory !== "ALL") params.set("category", selectedCategory);
+
+      const res = await fetch(`/api/cashbook?${params.toString()}`, { cache: "no-store" });
+      const data = await res.json();
+      if (data.success) {
+        setEntries(data.entries || []);
+        setWalletBalances(data.walletBalances || []);
+        setTotalInflow(data.totalInflow || "0.00");
+        setTotalOutflow(data.totalOutflow || "0.00");
+        setCurrentBalance(data.currentCashBalance || "0.00");
+      }
+    } catch {
+      showToast("Failed to load Cash Book", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedWallet, selectedCategory]);
+
+  useEffect(() => {
+    loadCashBook();
+  }, [loadCashBook]);
+
+  const handleSaveEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!entryModal) return;
+    const payload = {
+      date: entryModal.date,
+      type: entryModal.type,
+      amount: Number(entryModal.amount) || 0,
+      purpose: entryModal.purpose.trim(),
+      category: entryModal.category,
+      walletName: entryModal.walletName,
+      counterpartyName: entryModal.counterpartyName.trim() || null,
+    };
+
+    const url = entryModal.mode === "ADD" ? "/api/cashbook" : `/api/cashbook/${entryModal.id}`;
+    const method = entryModal.mode === "ADD" ? "POST" : "PATCH";
+
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setEntryModal(null);
+      showToast(entryModal.mode === "ADD" ? "Cash Book entry recorded" : "Cash Book entry updated");
+      await loadCashBook();
+    } else {
+      showToast(data.error || "Failed to save entry", "error");
+    }
+  };
+
+  const handleDeleteEntry = async () => {
+    if (!confirmDelete) return;
+    const res = await fetch(`/api/cashbook/${confirmDelete.id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (data.success) {
+      setConfirmDelete(null);
+      showToast("Entry deleted & wallet balance recalculated");
+      await loadCashBook();
+    } else {
+      showToast(data.error || "Failed to delete entry", "error");
     }
   };
 
   const filteredEntries = entries.filter((e) => {
-    const matchesFilter =
-      statusFilter === "ALL" ||
-      (statusFilter === "INFLOW" && e.type === "CASH_INFLOW") ||
-      (statusFilter === "OUTFLOW" && e.type === "CASH_OUTFLOW");
+    if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      !q ||
-      e.voucherNumber.toLowerCase().includes(q) ||
+    return (
       e.purpose.toLowerCase().includes(q) ||
-      (e.counterpartyName && e.counterpartyName.toLowerCase().includes(q)) ||
-      (e.project?.name && e.project.name.toLowerCase().includes(q));
-    return matchesFilter && matchesSearch;
+      e.category.toLowerCase().includes(q) ||
+      e.walletName.toLowerCase().includes(q) ||
+      (e.counterpartyName || "").toLowerCase().includes(q) ||
+      e.voucherNumber.toLowerCase().includes(q)
+    );
   });
-  const [closingResult, setClosingResult] = useState<any>(null);
 
-  const fetchCashBook = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/cashbook");
-      const data = await res.json();
-      if (data.success) {
-        setEntries(data.entries);
-        setCurrentBalance(data.currentCashBalance);
-        setTotalInflow(data.totalInflow);
-        setTotalOutflow(data.totalOutflow);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMetadata = async () => {
-    try {
-      const accRes = await fetch("/api/chart-of-accounts");
-      const accData = await accRes.json();
-      if (accData.success) {
-        // Exclude cash in hand itself (1010) as target account
-        setAccounts(accData.accounts.filter((a: any) => a.code !== "1010"));
-        if (accData.accounts.length > 0) {
-          const defaultAcc = accData.accounts.find((a: any) => a.code === "5080") || accData.accounts[0];
-          setTargetAccountId(defaultAcc.id);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  useEffect(() => {
-    fetchCashBook();
-    fetchMetadata();
-  }, []);
-
-  const handleCreateVoucher = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmittingVoucher(true);
-    setVoucherError("");
-
-    try {
-      const formData = new FormData();
-      formData.append("type", voucherType);
-      formData.append("amount", amount);
-      formData.append("purpose", purpose);
-      formData.append("category", category);
-      formData.append("counterpartyName", counterpartyName);
-      formData.append("targetAccountId", targetAccountId);
-      if (projectId) formData.append("projectId", projectId);
-      if (receiptFile) formData.append("receipt", receiptFile);
-
-      const res = await fetch("/api/cashbook", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        setShowVoucherModal(false);
-        setAmount("");
-        setPurpose("");
-        setCounterpartyName("");
-        setReceiptFile(null);
-        fetchCashBook();
-      } else {
-        setVoucherError(data.error || "Failed to post cash transaction");
-      }
-    } catch (err: any) {
-      setVoucherError(err.message);
-    } finally {
-      setSubmittingVoucher(false);
-    }
-  };
-
-  // Denominations Total Calculation
-  const physicalTotal =
-    notes500 * 500 +
-    notes200 * 200 +
-    notes100 * 100 +
-    notes50 * 50 +
-    notes20 * 20 +
-    notes10 * 10 +
-    coins5 * 5 +
-    coins2 * 2 +
-    coins1 * 1;
-
-  const discrepancy = physicalTotal - parseFloat(currentBalance || "0");
-
-  const handleDailyClosing = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmittingClosing(true);
-
-    try {
-      const res = await fetch("/api/cashbook/closing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          count500: notes500,
-          count200: notes200,
-          count100: notes100,
-          count50: notes50,
-          count20: notes20,
-          count10: notes10,
-          count5: coins5,
-          count2: coins2,
-          count1: coins1,
-          notes: closingNotes,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setClosingResult(data);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSubmittingClosing(false);
-    }
+  const handleExport = () => {
+    const rows = filteredEntries.map((e) => ({
+      Date: new Date(e.date).toISOString().slice(0, 10),
+      Voucher: e.voucherNumber,
+      Type: e.type,
+      Wallet: e.walletName,
+      Category: e.category,
+      Purpose: e.purpose,
+      Counterparty: e.counterpartyName || "",
+      Amount: Number(e.amount),
+    }));
+    exportToExcel(rows, `SR_CashBook_${selectedWallet}`, "CashBook");
   };
 
   return (
-    <div className="space-y-6">
-      <ModuleHeaderWithAnalytics
-        title="Daily Cash Book & Vouchers"
-        subtitle="Real-time physical cash management, project site expenses & denomination reconciliation"
-        badge="Cash (1010)"
-        icon={Wallet}
-        analyticsPreset="banking"
-        analyticsCards={[
-          {
-            label: "Live Cash in Hand (1010)",
-            value: formatINR(currentBalance),
-            change: "Synchronized with GL",
-            isPositive: true,
-          },
-          {
-            label: "Total Inflow (FY)",
-            value: formatINR(totalInflow),
-            change: "Receipts & Contra",
-            isPositive: true,
-          },
-          {
-            label: "Total Outflow (FY)",
-            value: formatINR(totalOutflow),
-            change: "Site expenses & petty cash",
-            isPositive: false,
-          },
-          {
-            label: "Net Cash Flow",
-            value: formatINR(parseFloat(totalInflow || "0") - parseFloat(totalOutflow || "0")),
-            change: "FY 26-27 Position",
-            isPositive: true,
-          },
-        ]}
-        searchPlaceholder="Search voucher no, purpose, party or project..."
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        views={[
-          { id: "ALL", label: "All Vouchers", count: entries.length },
-          {
-            id: "INFLOW",
-            label: "Receipts (+)",
-            count: entries.filter((e) => e.type === "CASH_INFLOW").length,
-          },
-          {
-            id: "OUTFLOW",
-            label: "Disbursements (-)",
-            count: entries.filter((e) => e.type === "CASH_OUTFLOW").length,
-          },
-        ]}
-        selectedView={statusFilter}
-        onViewChange={setStatusFilter}
-        onExportExcel={handleExportExcel}
-        onExportPDF={handleExportPDF}
-        sampleData={[
-          {
-            "Voucher No": "CSH-26-001",
-            Date: "2026-11-20",
-            Type: "CASH_OUTFLOW",
-            Purpose: "Site welding consumable cash purchase",
-            Category: "Site Expenses",
-            Party: "Local Hardware Store",
-            "Opposing Account Code": "5010",
-            Amount: "2500",
-          },
-        ]}
-        sampleColumns={[
-          "Voucher No",
-          "Date",
-          "Type",
-          "Purpose",
-          "Category",
-          "Party",
-          "Opposing Account Code",
-          "Amount",
-        ]}
-        customActions={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setVoucherType("CASH_INFLOW");
-                setShowVoucherModal(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
-            >
-              <ArrowDownLeft size={14} /> + Cash Inflow
-            </button>
-            <button
-              onClick={() => {
-                setVoucherType("CASH_OUTFLOW");
-                setShowVoucherModal(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs transition"
-            >
-              <ArrowUpRight size={14} /> - Cash Outflow
-            </button>
-            <button
-              onClick={() => setShowDenominationModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold shadow-xs transition border border-slate-700"
-            >
-              <Calculator size={14} /> Daily Closing
-            </button>
+    <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-2 space-y-5 font-sans pb-16 text-slate-800">
+      {/* 1. HEADER */}
+      <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+            <Wallet size={20} />
           </div>
-        }
-      />
-
-      {/* Cash Book Entries Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <h2 className="font-bold text-sm text-slate-800 dark:text-slate-200">
-            Cash Vouchers & Audit Log
-          </h2>
-          <span className="text-xs text-slate-400">
-            Showing {filteredEntries.length} of {entries.length} recorded cash transactions
-          </span>
+          <div>
+            <h1 className="text-lg font-extrabold tracking-tight text-slate-900">
+              Standard Daily Cash Book & 8-Wallet Ledger
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Live balances across Office Cash, ICICI, Office Gpay, Ravi Gpay, Prabha Gpay, RBL, Periyasamy Gpay & Suji Cash
+            </p>
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
-                <th className="py-3 px-4">Voucher No</th>
-                <th className="py-3 px-4">Date & Time</th>
-                <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Purpose / Narration</th>
-                <th className="py-3 px-4">Opposing Account</th>
-                <th className="py-3 px-4">Receipt Bill</th>
-                <th className="py-3 px-4 text-right">Inflow (₹)</th>
-                <th className="py-3 px-4 text-right">Outflow (₹)</th>
-                <th className="py-3 px-4 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
-              {loading ? (
-                <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
-                    Loading cashbook transactions...
-                  </td>
-                </tr>
-              ) : filteredEntries.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
-                    No cash transactions found.
-                  </td>
-                </tr>
-              ) : (
-                filteredEntries.map((entry) => {
-                  const opposingLine = entry.journalEntry?.lines.find(
-                    (l) => l.account.code !== "1010"
-                  );
-                  return (
-                    <tr
-                      key={entry.id}
-                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition"
-                    >
-                      <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100">
-                        {entry.voucherNumber}
-                      </td>
-                      <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
-                        {new Date(entry.date).toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            entry.type === "CASH_INFLOW"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
-                              : "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400"
-                          }`}
-                        >
-                          {entry.type === "CASH_INFLOW" ? "INFLOW" : "OUTFLOW"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-800 dark:text-slate-200">
-                          {entry.purpose}
-                        </div>
-                        {entry.counterpartyName && (
-                          <div className="text-[11px] text-slate-400">
-                            Party: {entry.counterpartyName}
-                          </div>
-                        )}
-                        {entry.project && (
-                          <div className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">
-                            📍 {entry.project.name}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600 dark:text-slate-300">
-                        {opposingLine ? `${opposingLine.account.code} - ${opposingLine.account.name}` : "—"}
-                      </td>
-                      <td className="py-3 px-4">
-                        {entry.receiptUrl ? (
-                          <a
-                            href={entry.receiptUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline font-medium"
-                          >
-                            <Paperclip size={12} /> Receipt
-                          </a>
-                        ) : (
-                          <span className="text-[10px] text-slate-400">None</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                        {entry.type === "CASH_INFLOW" ? formatINR(entry.amount) : "—"}
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-rose-600 dark:text-rose-400 tabular-nums">
-                        {entry.type === "CASH_OUTFLOW" ? formatINR(entry.amount) : "—"}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() =>
-                            setArchiveModal({
-                              isOpen: true,
-                              entryId: entry.id,
-                              voucherNumber: entry.voucherNumber,
-                              loading: false,
-                            })
-                          }
-                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition"
-                          title="Archive / Delete Voucher"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExport}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer"
+          >
+            <FileSpreadsheet size={14} className="text-emerald-600" />
+            <span>Export (.xlsx)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              setEntryModal({
+                mode: "ADD",
+                date: new Date().toISOString().slice(0, 10),
+                type: "CASH_OUTFLOW",
+                amount: "",
+                purpose: "",
+                category: "Material",
+                walletName: selectedWallet !== "ALL" ? selectedWallet : "Office Cash",
+                counterpartyName: "",
+              })
+            }
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+          >
+            <Plus size={14} />
+            <span>+ Add Entry</span>
+          </button>
         </div>
       </div>
 
-      {/* Voucher Inflow/Outflow Creation Modal */}
-      {showVoucherModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h2 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                {voucherType === "CASH_INFLOW" ? (
-                  <>
-                    <ArrowDownLeft className="text-emerald-600" /> New Cash Receipt (Inflow)
-                  </>
-                ) : (
-                  <>
-                    <ArrowUpRight className="text-rose-600" /> New Cash Expense / Payment (Outflow)
-                  </>
-                )}
-              </h2>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                FY 2026-27
-              </span>
+      {/* 2. 8-WALLET LIVE BALANCE CARDS */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+        {walletBalances.map((wb) => {
+          const isSelected = selectedWallet === wb.walletName;
+          return (
+            <button
+              key={wb.walletName}
+              type="button"
+              onClick={() => setSelectedWallet(isSelected ? "ALL" : wb.walletName)}
+              className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                isSelected
+                  ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                  : "bg-white hover:bg-slate-50 border-slate-200/90 text-slate-900 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+              }`}
+            >
+              <div className={`text-[10px] font-bold uppercase tracking-wider truncate ${isSelected ? "text-indigo-100" : "text-slate-400"}`}>
+                {wb.walletName}
+              </div>
+              <div className={`text-sm font-extrabold mt-1 tabular-nums ${isSelected ? "text-white" : wb.balance < 0 ? "text-rose-600" : "text-slate-900"}`}>
+                {formatINR(wb.balance)}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 3. TOTALS + FILTERS */}
+      <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-3.5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-4 text-xs">
+          <div>
+            <span className="text-slate-400 font-semibold">Net Liquidity: </span>
+            <span className="font-extrabold text-indigo-700 tabular-nums">{formatINR(currentBalance)}</span>
+          </div>
+          <div className="flex items-center gap-1 text-emerald-700 font-bold tabular-nums">
+            <ArrowDownLeft size={14} /> Inflow: {formatINR(totalInflow)}
+          </div>
+          <div className="flex items-center gap-1 text-rose-600 font-bold tabular-nums">
+            <ArrowUpRight size={14} /> Outflow: {formatINR(totalOutflow)}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+            <Filter size={12} className="text-slate-400" />
+            <select
+              value={selectedWallet}
+              onChange={(e) => setSelectedWallet(e.target.value)}
+              className="bg-transparent font-semibold text-slate-800 focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">All 8 Wallets</option>
+              {WALLETS.map((w) => (
+                <option key={w} value={w}>{w}</option>
+              ))}
+            </select>
+          </div>
+
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
+          >
+            <option value="ALL">All Categories</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+
+          <div className="relative">
+            <Search size={13} className="absolute left-2.5 top-2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search description, voucher..."
+              className="pl-7 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs w-48 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 4. CASH BOOK TABLE */}
+      <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] overflow-hidden">
+        {loading ? (
+          <div className="p-10 text-center text-xs text-slate-500">Loading 8-wallet Cash Book...</div>
+        ) : filteredEntries.length === 0 ? (
+          <div className="p-10 text-center text-xs text-slate-500">No entries match the current filter.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-bold">
+                <tr>
+                  <th className="py-3 px-3">Date</th>
+                  <th className="py-3 px-3">Wallet</th>
+                  <th className="py-3 px-3">Category</th>
+                  <th className="py-3 px-3">Description / Purpose</th>
+                  <th className="py-3 px-3 text-right text-emerald-700">Inflow (₹)</th>
+                  <th className="py-3 px-3 text-right text-rose-600">Outflow (₹)</th>
+                  <th className="py-3 px-3 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredEntries.map((entry) => (
+                  <tr key={entry.id} className="hover:bg-slate-50/80 transition">
+                    <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                      {new Date(entry.date).toISOString().slice(0, 10)}
+                      <div className="text-[9.5px] text-slate-400">{entry.voucherNumber}</div>
+                    </td>
+                    <td className="py-2.5 px-3 whitespace-nowrap">
+                      <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/80 text-[10.5px] font-bold">
+                        {entry.walletName}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 whitespace-nowrap font-semibold text-slate-700">
+                      {entry.category}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <div className="font-medium text-slate-900">{entry.purpose}</div>
+                      {entry.counterpartyName && (
+                        <div className="text-[10px] text-slate-400">{entry.counterpartyName}</div>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-bold text-emerald-700 tabular-nums">
+                      {entry.type === "CASH_INFLOW" ? formatINR(entry.amount) : "—"}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-bold text-rose-600 tabular-nums">
+                      {entry.type === "CASH_OUTFLOW" ? formatINR(entry.amount) : "—"}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEntryModal({
+                              mode: "EDIT",
+                              id: entry.id,
+                              date: new Date(entry.date).toISOString().slice(0, 10),
+                              type: entry.type,
+                              amount: String(entry.amount),
+                              purpose: entry.purpose,
+                              category: entry.category,
+                              walletName: entry.walletName,
+                              counterpartyName: entry.counterpartyName || "",
+                            })
+                          }
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 cursor-pointer"
+                          title="Edit Entry"
+                        >
+                          <Edit3 size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDelete(entry)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                          title="Delete Entry"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ADD / EDIT MODAL */}
+      {entryModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <form onSubmit={handleSaveEntry} className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div className="font-bold text-sm text-slate-900">
+                {entryModal.mode === "ADD" ? "New 8-Wallet Cash Book Entry" : "Edit Cash Book Entry"}
+              </div>
+              <button type="button" onClick={() => setEntryModal(null)} className="text-slate-500 cursor-pointer">
+                <X size={16} />
+              </button>
             </div>
-
-            {voucherError && (
-              <div className="mt-3 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
-                <AlertCircle size={16} />
-                <span>{voucherError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleCreateVoucher} className="space-y-3.5 mt-4 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300">
-                  Amount (₹ INR) *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300">
-                  Purpose / Narration *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder={
-                    voucherType === "CASH_INFLOW"
-                      ? "e.g. Advance cash received from Texvalley for site work"
-                      : "e.g. Purchased 500 pcs star bits & welding rods for Perundurai site"
-                  }
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
+            <div className="p-5 space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">
-                    Opposing Ledger Account *
-                  </label>
+                  <label className="block font-semibold text-slate-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={entryModal.date}
+                    onChange={(e) => setEntryModal({ ...entryModal, date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Flow Type</label>
                   <select
-                    required
-                    value={targetAccountId}
-                    onChange={(e) => setTargetAccountId(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-[11px]"
+                    value={entryModal.type}
+                    onChange={(e) => setEntryModal({ ...entryModal, type: e.target.value as any })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
                   >
-                    {accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.code} - {acc.name} ({acc.type})
-                      </option>
+                    <option value="CASH_OUTFLOW">Outflow (Paid / Expense)</option>
+                    <option value="CASH_INFLOW">Inflow (Received)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Wallet *</label>
+                  <select
+                    value={entryModal.walletName}
+                    onChange={(e) => setEntryModal({ ...entryModal, walletName: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
+                  >
+                    {WALLETS.map((w) => (
+                      <option key={w} value={w}>{w}</option>
                     ))}
                   </select>
                 </div>
-
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">
-                    Category Tag
-                  </label>
+                  <label className="block font-semibold text-slate-700 mb-1">Category *</label>
                   <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    value={entryModal.category}
+                    onChange={(e) => setEntryModal({ ...entryModal, category: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
                   >
-                    <option value="Site Expenses">Site Expenses</option>
-                    <option value="Vehicle Fuel">Vehicle Fuel</option>
-                    <option value="Material Purchase">Material Purchase</option>
-                    <option value="Labour Advance">Labour Advance</option>
-                    <option value="Customer Receipt">Customer Receipt</option>
-                    <option value="Crane Charges">Crane Charges</option>
-                    <option value="Miscellaneous">Miscellaneous</option>
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
                   </select>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">
-                    Counterparty / Payee Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Selvam Hardware / Kumar"
-                    value={counterpartyName}
-                    onChange={(e) => setCounterpartyName(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">
-                    Attach Bill / Receipt (Optional)
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={(e) => setReceiptFile(e.target.files ? e.target.files[0] : null)}
-                    className="w-full mt-1 text-[11px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-lg bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 text-[11px] text-blue-900 dark:text-blue-200">
-                ⚡ <strong>Double-Entry Guarantee:</strong> Submitting will atomically post a
-                balanced Journal Entry in the General Ledger. Cash in Hand (1010) will adjust
-                automatically.
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowVoucherModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingVoucher}
-                  className={`px-4 py-2 text-white rounded-lg font-bold transition disabled:opacity-50 ${
-                    voucherType === "CASH_INFLOW"
-                      ? "bg-emerald-600 hover:bg-emerald-700"
-                      : "bg-rose-600 hover:bg-rose-700"
-                  }`}
-                >
-                  {submittingVoucher
-                    ? "Posting Double-Entry..."
-                    : voucherType === "CASH_INFLOW"
-                    ? "Post Cash Receipt"
-                    : "Post Cash Expense"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Daily Cash Closing & Denomination Modal */}
-      {showDenominationModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h2 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <Calculator className="text-blue-600" /> Daily Cash Denomination Closing
-                </h2>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Physical currency verification against system ledger
-                </p>
+                <label className="block font-semibold text-slate-700 mb-1">Amount (₹) *</label>
+                <input
+                  required
+                  type="number"
+                  step="0.01"
+                  value={entryModal.amount}
+                  onChange={(e) => setEntryModal({ ...entryModal, amount: e.target.value })}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 font-bold"
+                />
               </div>
-              <button
-                onClick={() => {
-                  setShowDenominationModal(false);
-                  setClosingResult(null);
-                }}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
-              >
-                ✕
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Description / Purpose *</label>
+                <input
+                  required
+                  type="text"
+                  value={entryModal.purpose}
+                  onChange={(e) => setEntryModal({ ...entryModal, purpose: e.target.value })}
+                  placeholder="Site material, customer receipt, contractor payment..."
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Counterparty / Site</label>
+                <input
+                  type="text"
+                  value={entryModal.counterpartyName}
+                  onChange={(e) => setEntryModal({ ...entryModal, counterpartyName: e.target.value })}
+                  placeholder="Optional customer/vendor/team name"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                />
+              </div>
+            </div>
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+              <button type="button" onClick={() => setEntryModal(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold cursor-pointer">
+                Cancel
+              </button>
+              <button type="submit" className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer">
+                Save Entry
               </button>
             </div>
+          </form>
+        </div>
+      )}
 
-            {closingResult ? (
-              <div className="my-6 space-y-4 text-center">
-                <div
-                  className={`w-14 h-14 rounded-full mx-auto flex items-center justify-center ${
-                    closingResult.status === "BALANCED"
-                      ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400"
-                      : "bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400"
-                  }`}
-                >
-                  {closingResult.status === "BALANCED" ? (
-                    <CheckCircle2 size={32} />
-                  ) : (
-                    <AlertCircle size={32} />
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-black text-lg text-slate-900 dark:text-slate-100">
-                    {closingResult.status === "BALANCED"
-                      ? "Daily Cash Perfectly Balanced!"
-                      : "Daily Cash Discrepancy Recorded"}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    System Balance: {formatINR(closingResult.systemBalance)} | Physical Total:{" "}
-                    {formatINR(closingResult.physicalTotal)}
-                  </p>
-                  {closingResult.status === "DISCREPANCY" && (
-                    <p className="text-xs font-bold text-rose-600 mt-1">
-                      Variance: {formatINR(closingResult.discrepancy)}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={() => {
-                    setShowDenominationModal(false);
-                    setClosingResult(null);
-                    fetchCashBook();
-                  }}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold"
-                >
-                  Done
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleDailyClosing} className="space-y-4 mt-4 text-xs">
-                {/* Comparison Card */}
-                <div className="grid grid-cols-3 gap-2 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-center font-mono">
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-sans">
-                      System Balance
-                    </span>
-                    <p className="font-bold text-slate-900 dark:text-slate-100 text-xs mt-0.5">
-                      {formatINR(currentBalance)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-sans">
-                      Physical Count
-                    </span>
-                    <p className="font-bold text-blue-600 dark:text-blue-400 text-xs mt-0.5">
-                      {formatINR(physicalTotal)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-sans">
-                      Discrepancy
-                    </span>
-                    <p
-                      className={`font-bold text-xs mt-0.5 ${
-                        Math.abs(discrepancy) < 0.01
-                          ? "text-emerald-600"
-                          : "text-rose-600"
-                      }`}
-                    >
-                      {formatINR(discrepancy)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Denomination Inputs */}
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                  {[
-                    { label: "₹ 500 Notes", val: notes500, set: setNotes500, mult: 500 },
-                    { label: "₹ 200 Notes", val: notes200, set: setNotes200, mult: 200 },
-                    { label: "₹ 100 Notes", val: notes100, set: setNotes100, mult: 100 },
-                    { label: "₹ 50 Notes", val: notes50, set: setNotes50, mult: 50 },
-                    { label: "₹ 20 Notes", val: notes20, set: setNotes20, mult: 20 },
-                    { label: "₹ 10 Notes", val: notes10, set: setNotes10, mult: 10 },
-                    { label: "₹ 5 Coins", val: coins5, set: setCoins5, mult: 5 },
-                    { label: "₹ 2 Coins", val: coins2, set: setCoins2, mult: 2 },
-                    { label: "₹ 1 Coins", val: coins1, set: setCoins1, mult: 1 },
-                  ].map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between gap-3 p-1.5 rounded-lg bg-slate-50/50 dark:bg-slate-800/40"
-                    >
-                      <span className="font-semibold text-slate-700 dark:text-slate-300 w-28">
-                        {item.label}
-                      </span>
-                      <span className="text-slate-400">×</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.val}
-                        onChange={(e) => item.set(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-20 p-1 text-center font-mono font-bold rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                      />
-                      <span className="text-slate-400">=</span>
-                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200 w-24 text-right">
-                        {formatINR(item.val * item.mult)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300">
-                    Closing Notes / Physical Cash Box Remarks
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Physical cash counted and verified in Office locker"
-                    value={closingNotes}
-                    onChange={(e) => setClosingNotes(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowDenominationModal(false)}
-                    className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submittingClosing}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition disabled:opacity-50"
-                  >
-                    {submittingClosing ? "Verifying..." : "Confirm & Save Closing"}
-                  </button>
-                </div>
-              </form>
-            )}
+      {/* DELETE CONFIRM MODAL */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-5 space-y-3">
+            <div className="text-sm font-extrabold text-slate-900">Delete Cash Book Entry?</div>
+            <p className="text-xs text-slate-600">
+              Remove <strong>{confirmDelete.purpose}</strong> ({formatINR(confirmDelete.amount)}) from <strong>{confirmDelete.walletName}</strong>?
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setConfirmDelete(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold cursor-pointer">
+                Cancel
+              </button>
+              <button type="button" onClick={handleDeleteEntry} className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold cursor-pointer">
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Archive / Delete Modal */}
-      <ArchiveConfirmModal
-        isOpen={archiveModal.isOpen}
-        title="Archive Cash Voucher"
-        message="Are you sure you want to archive this cash voucher? The voucher will be soft-deleted from the active register."
-        recordLabel={archiveModal.voucherNumber}
-        onConfirm={handleArchive}
-        onCancel={() =>
-          setArchiveModal({ isOpen: false, entryId: "", voucherNumber: "", loading: false })
-        }
-        loading={archiveModal.loading}
-      />
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-xl text-xs font-bold text-white flex items-center gap-2 ${toast.type === "error" ? "bg-rose-600" : "bg-indigo-600"}`}>
+          <CheckCircle2 size={15} />
+          <span>{toast.msg}</span>
+        </div>
+      )}
     </div>
   );
 }

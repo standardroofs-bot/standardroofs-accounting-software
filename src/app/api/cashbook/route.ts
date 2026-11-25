@@ -5,28 +5,48 @@ import { getStorageService } from "@/lib/storage";
 import { CashFlowType, VoucherType } from "@prisma/client";
 import { toDecimal } from "@/lib/decimal";
 
+const STANDARD_WALLETS = [
+  "Office Cash",
+  "ICICI",
+  "Office Gpay",
+  "Ravi Gpay",
+  "Prabha Gpay",
+  "RBL",
+  "Periyasamy Gpay",
+  "Suji Cash",
+];
+
+function normalizeWalletName(raw?: string | null): string {
+  const s = (raw || "Office Cash").trim();
+  const lower = s.toLowerCase();
+  if (lower.includes("office cash")) return "Office Cash";
+  if (lower.includes("icici")) return "ICICI";
+  if (lower.includes("office gpay")) return "Office Gpay";
+  if (lower.includes("ravi")) return "Ravi Gpay";
+  if (lower.includes("prabha")) return "Prabha Gpay";
+  if (lower.includes("rbl")) return "RBL";
+  if (lower.includes("periyasamy")) return "Periyasamy Gpay";
+  if (lower.includes("suji")) return "Suji Cash";
+  return s || "Office Cash";
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const date = searchParams.get("date"); // YYYY-MM-DD (optional)
+    const date = searchParams.get("date");
+    const walletFilter = searchParams.get("wallet");
+    const categoryFilter = searchParams.get("category");
 
-    const fy = await prisma.financialYear.findFirst({
-      where: { isCurrent: true },
-    });
+    const fy =
+      (await prisma.financialYear.findFirst({ where: { isCurrent: true } })) ||
+      (await prisma.financialYear.findFirst());
 
     if (!fy) {
       return NextResponse.json({ success: false, error: "Active Financial Year not found" }, { status: 404 });
     }
 
-    const whereClause: any = { financialYearId: fy.id };
-    if (date) {
-      const startOfDay = new Date(`${date}T00:00:00.000Z`);
-      const endOfDay = new Date(`${date}T23:59:59.999Z`);
-      whereClause.date = { gte: startOfDay, lte: endOfDay };
-    }
-
-    const entries = await prisma.cashBookEntry.findMany({
-      where: whereClause,
+    const allFyEntries = await prisma.cashBookEntry.findMany({
+      where: { financialYearId: fy.id },
       include: {
         project: { select: { id: true, name: true, code: true } },
         journalEntry: {
@@ -40,12 +60,38 @@ export async function GET(request: Request) {
         },
         createdBy: { select: { id: true, name: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     });
 
-    // Get Cash in Hand account balance
-    const cashAccount = await prisma.account.findUnique({
-      where: { code: "1010" },
+    // Compute live 8-wallet balances from all FY entries
+    const walletMap: Record<string, number> = {};
+    for (const w of STANDARD_WALLETS) walletMap[w] = 0;
+
+    for (const e of allFyEntries) {
+      const w = normalizeWalletName(e.walletName);
+      if (walletMap[w] === undefined) walletMap[w] = 0;
+      const amt = Number(e.amount);
+      walletMap[w] += e.type === CashFlowType.CASH_INFLOW ? amt : -amt;
+    }
+
+    const walletBalances = STANDARD_WALLETS.map((w) => ({
+      walletName: w,
+      balance: Math.round((walletMap[w] || 0) * 100) / 100,
+    }));
+
+    // Filter entries for table
+    const entries = allFyEntries.filter((e) => {
+      if (date) {
+        const dStr = new Date(e.date).toISOString().slice(0, 10);
+        if (dStr !== date) return false;
+      }
+      if (walletFilter && walletFilter !== "ALL") {
+        if (normalizeWalletName(e.walletName) !== walletFilter) return false;
+      }
+      if (categoryFilter && categoryFilter !== "ALL") {
+        if (e.category !== categoryFilter) return false;
+      }
+      return true;
     });
 
     const totalInflow = entries
@@ -56,11 +102,14 @@ export async function GET(request: Request) {
       .filter((e) => e.type === CashFlowType.CASH_OUTFLOW)
       .reduce((sum, e) => sum.plus(toDecimal(e.amount)), toDecimal(0));
 
+    const totalAllWallets = walletBalances.reduce((s, w) => s + w.balance, 0);
+
     return NextResponse.json({
       success: true,
-      currentCashBalance: cashAccount ? toDecimal(cashAccount.currentBalance).toFixed(2) : "0.00",
+      currentCashBalance: totalAllWallets.toFixed(2),
       totalInflow: totalInflow.toFixed(2),
       totalOutflow: totalOutflow.toFixed(2),
+      walletBalances,
       entries,
     });
   } catch (error: any) {
@@ -70,19 +119,46 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    const type = formData.get("type") as string; // CASH_INFLOW | CASH_OUTFLOW
-    const amountStr = formData.get("amount") as string;
-    const purpose = formData.get("purpose") as string;
-    const category = (formData.get("category") as string) || "General Site Expense";
-    const counterpartyName = formData.get("counterpartyName") as string;
-    const targetAccountId = formData.get("targetAccountId") as string; // Opposing COA account
-    const projectId = (formData.get("projectId") as string) || null;
-    const receiptFile = formData.get("receipt") as File | null;
+    const contentType = request.headers.get("content-type") || "";
+    let type = "CASH_OUTFLOW";
+    let amountStr = "0";
+    let purpose = "";
+    let category = "General Site Expense";
+    let walletName = "Office Cash";
+    let counterpartyName = "";
+    let targetAccountId = "";
+    let projectId: string | null = null;
+    let dateStr = "";
+    let receiptFile: File | null = null;
 
-    if (!type || !amountStr || !purpose || !targetAccountId) {
+    if (contentType.includes("application/json")) {
+      const body = await request.json();
+      type = body.type || "CASH_OUTFLOW";
+      amountStr = String(body.amount || "0");
+      purpose = body.purpose || "";
+      category = body.category || "General Site Expense";
+      walletName = normalizeWalletName(body.walletName);
+      counterpartyName = body.counterpartyName || "";
+      targetAccountId = body.targetAccountId || "";
+      projectId = body.projectId || null;
+      dateStr = body.date || "";
+    } else {
+      const formData = await request.formData();
+      type = (formData.get("type") as string) || "CASH_OUTFLOW";
+      amountStr = (formData.get("amount") as string) || "0";
+      purpose = (formData.get("purpose") as string) || "";
+      category = (formData.get("category") as string) || "General Site Expense";
+      walletName = normalizeWalletName(formData.get("walletName") as string);
+      counterpartyName = (formData.get("counterpartyName") as string) || "";
+      targetAccountId = (formData.get("targetAccountId") as string) || "";
+      projectId = (formData.get("projectId") as string) || null;
+      dateStr = (formData.get("date") as string) || "";
+      receiptFile = formData.get("receipt") as File | null;
+    }
+
+    if (!type || !amountStr || !purpose) {
       return NextResponse.json(
-        { success: false, error: "Type, Amount, Purpose and Account are required" },
+        { success: false, error: "Type, Amount, and Purpose are required" },
         { status: 400 }
       );
     }
@@ -92,9 +168,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Amount must be greater than zero" }, { status: 400 });
     }
 
-    const fy = await prisma.financialYear.findFirst({
-      where: { isCurrent: true },
-    });
+    const fy =
+      (await prisma.financialYear.findFirst({ where: { isCurrent: true } })) ||
+      (await prisma.financialYear.findFirst());
     if (!fy) {
       return NextResponse.json({ success: false, error: "Active Financial Year not found" }, { status: 404 });
     }
@@ -104,11 +180,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "No system user found" }, { status: 500 });
     }
 
-    const cashAccount = await prisma.account.findUniqueOrThrow({
-      where: { code: "1010" },
+    const cashAccount = await prisma.account.findFirst({
+      where: { subType: "CASH" },
     });
 
-    // Handle receipt upload if provided
+    if (!targetAccountId) {
+      const fallback = await prisma.account.findFirst({
+        where: { type: type === CashFlowType.CASH_INFLOW ? "INCOME" : "EXPENSE" },
+      });
+      if (fallback) targetAccountId = fallback.id;
+    }
+
     let receiptUrl: string | null = null;
     if (receiptFile && receiptFile.size > 0) {
       const buffer = Buffer.from(await receiptFile.arrayBuffer());
@@ -123,72 +205,49 @@ export async function POST(request: Request) {
       receiptUrl = uploadRes.url;
     }
 
-    // Determine voucher sequence type and number
     const voucherSeqType = type === CashFlowType.CASH_INFLOW ? "CASH_RECEIPT" : "CASH_PAYMENT";
     const voucherInfo = await getNextVoucherNumber(fy.id, voucherSeqType);
+    const entryDate = dateStr ? new Date(dateStr) : new Date();
 
-    // Prepare Double-Entry Journal Lines:
-    // Inflow: Debit Cash in Hand (1010), Credit Target Account
-    // Outflow: Debit Target Account, Credit Cash in Hand (1010)
-    const journalLines =
-      type === CashFlowType.CASH_INFLOW
-        ? [
-            {
-              accountId: cashAccount.id,
-              debit: amount,
-              credit: 0,
-              narration: `Cash Received: ${purpose}`,
-              projectId: projectId || undefined,
-            },
-            {
-              accountId: targetAccountId,
-              debit: 0,
-              credit: amount,
-              narration: `Cash Received: ${purpose}`,
-              projectId: projectId || undefined,
-            },
-          ]
-        : [
-            {
-              accountId: targetAccountId,
-              debit: amount,
-              credit: 0,
-              narration: `Cash Paid: ${purpose}`,
-              projectId: projectId || undefined,
-            },
-            {
-              accountId: cashAccount.id,
-              debit: 0,
-              credit: amount,
-              narration: `Cash Paid: ${purpose}`,
-              projectId: projectId || undefined,
-            },
-          ];
+    let journalEntryId: string | null = null;
+    if (cashAccount && targetAccountId) {
+      const journalLines =
+        type === CashFlowType.CASH_INFLOW
+          ? [
+              { accountId: cashAccount.id, debit: amount, credit: 0, narration: `${walletName}: ${purpose}`, projectId: projectId || undefined },
+              { accountId: targetAccountId, debit: 0, credit: amount, narration: `${walletName}: ${purpose}`, projectId: projectId || undefined },
+            ]
+          : [
+              { accountId: targetAccountId, debit: amount, credit: 0, narration: `${walletName}: ${purpose}`, projectId: projectId || undefined },
+              { accountId: cashAccount.id, debit: 0, credit: amount, narration: `${walletName}: ${purpose}`, projectId: projectId || undefined },
+            ];
 
-    const journalEntry = await postDoubleEntryTransaction({
-      voucherType: type === CashFlowType.CASH_INFLOW ? VoucherType.RECEIPT : VoucherType.PAYMENT,
-      financialYearId: fy.id,
-      entryNumber: voucherInfo.voucherNumber,
-      date: new Date(),
-      narration: `Cash Book: ${purpose} (${counterpartyName || "Counterparty"})`,
-      createdById: defaultUser.id,
-      lines: journalLines,
-    });
+      const je = await postDoubleEntryTransaction({
+        voucherType: type === CashFlowType.CASH_INFLOW ? VoucherType.RECEIPT : VoucherType.PAYMENT,
+        financialYearId: fy.id,
+        entryNumber: voucherInfo.voucherNumber,
+        date: entryDate,
+        narration: `Cash Book (${walletName}): ${purpose}`,
+        createdById: defaultUser.id,
+        lines: journalLines,
+      });
+      journalEntryId = je.id;
+    }
 
-    // Create the CashBookEntry linked to the JournalEntry
     const cashEntry = await prisma.cashBookEntry.create({
       data: {
         voucherNumber: voucherInfo.voucherNumber,
-        date: new Date(),
+        date: entryDate,
         type: type as CashFlowType,
         amount: amount.toFixed(2),
         purpose,
         category,
+        walletName,
         counterpartyName: counterpartyName || null,
         receiptUrl,
         projectId,
         financialYearId: fy.id,
-        journalEntryId: journalEntry.id,
+        journalEntryId,
         createdById: defaultUser.id,
       },
     });
@@ -196,7 +255,6 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       entry: cashEntry,
-      journalEntry,
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
