@@ -295,7 +295,7 @@ export function HomeVisualDashboard({
       {/* 1. COMMERCIAL ZOHO SAAS EXECUTIVE HEADER */}
       <div className="porcelain-card rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04),0_6px_16px_-4px_rgba(15,23,42,0.05)] flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900">
         <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black shadow-md shadow-slate-900/15 text-sm shrink-0 ring-2 ring-slate-900/10">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500 via-emerald-500 to-indigo-600 text-white flex items-center justify-center font-black shadow-md shadow-teal-600/20 text-sm shrink-0 ring-2 ring-teal-500/20">
             SR
           </div>
           <div>
@@ -331,7 +331,7 @@ export function HomeVisualDashboard({
               onClick={() => setActiveView("visual")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeView === "visual"
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs border border-slate-200/80"
+                  ? "bg-white dark:bg-slate-900 text-teal-800 dark:text-teal-400 shadow-xs border border-teal-200/80"
                   : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -343,7 +343,7 @@ export function HomeVisualDashboard({
               onClick={() => setActiveView("table")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeView === "table"
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs border border-slate-200/80"
+                  ? "bg-white dark:bg-slate-900 text-teal-800 dark:text-teal-400 shadow-xs border border-teal-200/80"
                   : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -364,7 +364,7 @@ export function HomeVisualDashboard({
 
           <Link
             href="/invoices/new"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md shadow-slate-900/15 transition active:scale-95"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition active:scale-95"
           >
             <Receipt size={14} />
             <span>+ Tax Invoice #{nextInvoiceNo}</span>
@@ -455,11 +455,11 @@ export function HomeVisualDashboard({
 
         {/* KPI 3: Total Payables (AP) */}
         <div className="porcelain-card p-5 rounded-2xl bg-white border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.04),0_6px_16px_-4px_rgba(15,23,42,0.05)] hover:shadow-md overflow-hidden relative">
-          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-600" />
+          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-indigo-500 via-sky-500 to-teal-500" />
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300">
+                <span className="w-6 h-6 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-700 dark:text-indigo-400">
                   <Receipt size={13} />
                 </span>
                 Total Payables (AP)
@@ -474,8 +474,8 @@ export function HomeVisualDashboard({
               </div>
               {/* Mini Sparkline */}
               <svg className="w-16 h-7 shrink-0 overflow-visible" viewBox="0 0 60 24">
-                <path d="M 0 10 L 60 10" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round" />
-                <circle cx="60" cy="10" r="3" fill="#64748b" />
+                <path d="M 0 10 L 60 10" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" />
+                <circle cx="60" cy="10" r="3" fill="#6366f1" />
               </svg>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2 tabular-nums">
@@ -484,7 +484,7 @@ export function HomeVisualDashboard({
             </div>
           </div>
           <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full mt-4 overflow-hidden">
-            <div className="bg-slate-600 h-full w-[10%]" />
+            <div className="bg-indigo-600 h-full w-[10%]" />
           </div>
         </div>
 
@@ -529,7 +529,7 @@ export function HomeVisualDashboard({
         <div className="space-y-6">
           {/* CHART 1: INTERACTIVE CASH FLOW & WORKING CAPITAL TRAJECTORY */}
           <div className="porcelain-card rounded-2xl bg-white border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 space-y-4 shadow-[0_1px_3px_rgba(15,23,42,0.04),0_6px_16px_-4px_rgba(15,23,42,0.05)] overflow-hidden relative">
-            <div className="h-1 -mx-6 -mt-6 mb-4 bg-gradient-to-r from-slate-900 via-indigo-600 to-blue-600" />
+            <div className="h-1 -mx-6 -mt-6 mb-4 bg-gradient-to-r from-teal-600 via-sky-600 to-indigo-600" />
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800 pb-4">
               <div>
                 <div className="flex items-center gap-2">
@@ -724,32 +724,32 @@ export function HomeVisualDashboard({
 
               {/* Floating Rich Tooltip */}
               {hoveredMonth && (
-                <div className="absolute top-2 right-6 bg-slate-900/95 backdrop-blur-md text-white border border-slate-700/80 p-3.5 rounded-2xl shadow-xl text-xs space-y-1.5 animate-in fade-in z-30 min-w-[220px]">
-                  <div className="flex items-center justify-between border-b border-slate-700 pb-1.5">
-                    <span className="font-extrabold text-blue-300">{hoveredMonth.month} 2026 Position</span>
+                <div className="absolute top-2 right-6 bg-white/95 backdrop-blur-md text-slate-800 border border-teal-200/90 p-3.5 rounded-2xl shadow-xl text-xs space-y-1.5 animate-in fade-in z-30 min-w-[220px]">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                    <span className="font-extrabold text-blue-700">{hoveredMonth.month} 2026 Position</span>
                     {hoveredMonth.isCurrent && (
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
                         Live Month
                       </span>
                     )}
                   </div>
                   <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-400">Collections (Inflow):</span>
-                    <span className="tabular-nums font-bold text-emerald-400">{formatINR(hoveredMonth.inflow)}</span>
+                    <span className="text-slate-500">Collections (Inflow):</span>
+                    <span className="tabular-nums font-bold text-emerald-600">{formatINR(hoveredMonth.inflow)}</span>
                   </div>
                   <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-400">Site Costs (Outflow):</span>
-                    <span className="tabular-nums font-bold text-rose-400">{formatINR(hoveredMonth.outflow)}</span>
+                    <span className="text-slate-500">Site Costs (Outflow):</span>
+                    <span className="tabular-nums font-bold text-rose-600">{formatINR(hoveredMonth.outflow)}</span>
                   </div>
-                  <div className="flex justify-between items-center text-[11px] border-t border-slate-800 pt-1">
-                    <span className="text-slate-300 font-semibold">Net Cash Surplus:</span>
-                    <span className="tabular-nums font-bold text-blue-300">
+                  <div className="flex justify-between items-center text-[11px] border-t border-slate-200 pt-1">
+                    <span className="text-slate-700 font-semibold">Net Cash Surplus:</span>
+                    <span className="tabular-nums font-bold text-blue-700">
                       {formatINR(hoveredMonth.inflow - hoveredMonth.outflow)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-[11px] pt-0.5">
-                    <span className="text-slate-300 font-semibold">Closing Liquidity:</span>
-                    <span className="tabular-nums font-extrabold text-white">{formatINR(hoveredMonth.closing)}</span>
+                    <span className="text-slate-700 font-semibold">Closing Liquidity:</span>
+                    <span className="tabular-nums font-extrabold text-slate-900">{formatINR(hoveredMonth.closing)}</span>
                   </div>
                 </div>
               )}
@@ -818,24 +818,24 @@ export function HomeVisualDashboard({
 
                 {/* Floating Bar Hover Tooltip */}
                 {hoveredBarMonth && (
-                  <div className="absolute top-0 right-2 z-20 bg-slate-900/95 backdrop-blur-md text-white border border-slate-700 px-3 py-2 rounded-xl shadow-lg text-[11px] space-y-1">
-                    <div className="flex items-center justify-between gap-3 border-b border-slate-700/80 pb-1">
-                      <strong className="text-blue-400 font-bold">{hoveredBarMonth.month} 2026</strong>
-                      <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/70 px-1.5 py-0.2 rounded">
+                  <div className="absolute top-0 right-2 z-20 bg-white/95 backdrop-blur-md text-slate-800 border border-teal-200/90 px-3 py-2 rounded-xl shadow-lg text-[11px] space-y-1">
+                    <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-1">
+                      <strong className="text-blue-700 font-bold">{hoveredBarMonth.month} 2026</strong>
+                      <span className="text-[9px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200">
                         +{Math.round(((hoveredBarMonth.inflow - hoveredBarMonth.outflow) / (hoveredBarMonth.inflow || 1)) * 100)}% Margin
                       </span>
                     </div>
                     <div className="flex justify-between gap-4">
-                      <span className="text-slate-400">Invoiced Receipts:</span>
-                      <strong className="text-emerald-400 tabular-nums">{formatINR(hoveredBarMonth.inflow)}</strong>
+                      <span className="text-slate-500">Invoiced Receipts:</span>
+                      <strong className="text-emerald-600 tabular-nums">{formatINR(hoveredBarMonth.inflow)}</strong>
                     </div>
                     <div className="flex justify-between gap-4">
-                      <span className="text-slate-400">Site Disbursements:</span>
-                      <strong className="text-rose-400 tabular-nums">{formatINR(hoveredBarMonth.outflow)}</strong>
+                      <span className="text-slate-500">Site Disbursements:</span>
+                      <strong className="text-rose-600 tabular-nums">{formatINR(hoveredBarMonth.outflow)}</strong>
                     </div>
-                    <div className="flex justify-between gap-4 border-t border-slate-800 pt-0.5">
-                      <span className="text-slate-300">Net Site Profit:</span>
-                      <strong className="text-white tabular-nums">
+                    <div className="flex justify-between gap-4 border-t border-slate-200 pt-0.5">
+                      <span className="text-slate-600">Net Site Profit:</span>
+                      <strong className="text-slate-900 tabular-nums">
                         {formatINR(hoveredBarMonth.inflow - hoveredBarMonth.outflow)}
                       </strong>
                     </div>

@@ -203,8 +203,8 @@ export default function RecycleBinPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold border border-slate-700 animate-in fade-in slide-in-from-bottom-3">
-          <RotateCcw className="text-emerald-400" size={16} />
+        <div className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-teal-700 to-emerald-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold border border-teal-500/30 animate-in fade-in slide-in-from-bottom-3">
+          <RotateCcw className="text-emerald-300" size={16} />
           <span>{toastMsg}</span>
         </div>
       )}

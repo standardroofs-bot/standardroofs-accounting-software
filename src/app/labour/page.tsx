@@ -789,24 +789,24 @@ export default function LabourWorkforceMasterPage() {
         {viewMode === "table" ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white font-bold uppercase text-xs tracking-wider border-b border-slate-800">
+              <thead className="bg-gradient-to-r from-indigo-50 via-sky-50 to-teal-50 text-slate-800 font-bold uppercase text-xs tracking-wider border-b border-indigo-200/80">
                 <tr>
-                  <th className="py-3.5 px-4 text-slate-200">Personnel Profile</th>
-                  <th className="py-3.5 px-4 text-slate-200">
+                  <th className="py-3.5 px-4 text-slate-700">Personnel Profile</th>
+                  <th className="py-3.5 px-4 text-slate-700">
                     {activeSegment === "CONTRACTOR" ? "Trade Specialty" : "Designation / Role"}
                   </th>
-                  <th className="py-3.5 px-4 text-right text-slate-200">
+                  <th className="py-3.5 px-4 text-right text-slate-700">
                     {activeSegment === "SR_OFFICE" || activeSegment === "INVI_OFFICE"
                       ? "Monthly Salary"
                       : activeSegment === "CONTRACTOR"
                       ? "Contract / Rate"
                       : "Daily Wage"}
                   </th>
-                  <th className="py-3.5 px-4 text-slate-200">Contact & Location</th>
-                  <th className="py-3.5 px-4 text-slate-200">Aadhaar & PAN / DL</th>
-                  <th className="py-3.5 px-4 text-slate-200">Bank Remittance</th>
-                  <th className="py-3.5 px-4 text-center text-slate-200">KYC Status</th>
-                  <th className="py-3.5 px-4 text-right text-slate-200">Actions</th>
+                  <th className="py-3.5 px-4 text-slate-700">Contact & Location</th>
+                  <th className="py-3.5 px-4 text-slate-700">Aadhaar & PAN / DL</th>
+                  <th className="py-3.5 px-4 text-slate-700">Bank Remittance</th>
+                  <th className="py-3.5 px-4 text-center text-slate-700">KYC Status</th>
+                  <th className="py-3.5 px-4 text-right text-slate-700">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">

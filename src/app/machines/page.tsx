@@ -899,21 +899,21 @@ export default function MachinesPage() {
 
           {/* Team Custody Sheet Card */}
           {teamMetadata[selectedTeam] && (
-            <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 rounded-2xl p-6 text-white border border-slate-800 shadow-md">
+            <div className="bg-gradient-to-r from-teal-50 via-sky-50 to-indigo-50 rounded-2xl p-6 text-slate-800 border border-teal-200/80 shadow-md">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                    <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-teal-500/15 text-teal-800 border border-teal-500/25">
                       TRACKING SHEET: {selectedTeam}
                     </span>
-                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/20 text-emerald-300">
+                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/15 text-emerald-800 border border-emerald-500/25">
                       Status: Active Team Custody
                     </span>
                   </div>
-                  <h3 className="text-xl font-bold mt-2">
+                  <h3 className="text-xl font-bold mt-2 text-slate-900">
                     {teamMetadata[selectedTeam].lead || "Site Assignment"}
                   </h3>
-                  <div className="flex flex-wrap gap-4 text-xs text-slate-300 mt-1.5">
+                  <div className="flex flex-wrap gap-4 text-xs text-slate-600 mt-1.5">
                     {teamMetadata[selectedTeam].phone && <span>Mobile: {teamMetadata[selectedTeam].phone}</span>}
                     <span>Vehicle: {teamMetadata[selectedTeam].vehicle}</span>
                     <span>Issued By: {teamMetadata[selectedTeam].issuedBy}</span>
@@ -928,9 +928,9 @@ export default function MachinesPage() {
                       setTransferTo("OFFICE");
                       setShowTransferModal(true);
                     }}
-                    className="px-3.5 py-2 text-xs font-bold rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-2 text-xs font-bold rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-teal-200/90 shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
+                    <RotateCcw className="w-3.5 h-3.5 text-teal-600" />
                     Return Items to Office
                   </button>
 

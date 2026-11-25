@@ -752,7 +752,7 @@ export default function BankingPage() {
           bankAccounts.map((bank) => (
             <div
               key={bank.id}
-              className="bg-linear-to-br from-slate-900 via-slate-800 to-slate-950 text-white p-6 rounded-2xl shadow-lg border border-slate-700/60 relative overflow-hidden"
+              className="bg-linear-to-br from-blue-700 via-indigo-700 to-teal-700 text-white p-6 rounded-2xl shadow-lg shadow-indigo-700/15 border border-blue-500/50 relative overflow-hidden"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">

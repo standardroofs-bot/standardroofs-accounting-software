@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 
-export type SRThemeKey = "pearl_slate" | "cool_indigo" | "mint_forest" | "lavender_plum";
+export type SRThemeKey = "mint_teal" | "cool_indigo" | "mint_forest" | "lavender_plum";
 
 export interface SRThemeConfig {
   id: SRThemeKey;
@@ -32,22 +32,22 @@ export interface SRThemeConfig {
 }
 
 export const SR_THEMES: Record<SRThemeKey, SRThemeConfig> = {
-  pearl_slate: {
-    id: "pearl_slate",
-    name: "Pearl Slate & Obsidian",
-    paletteLabel: "Pearl Slate & Obsidian",
-    tagline: "Neutral Pearl-Slate canvas, Pure Porcelain sidebar, Obsidian accents",
-    swatchPrimary: "#0f172a",
-    swatchSecondary: "#6366f1",
-    canvasBg: "#F1F5F9",
-    sidebarGradient: "from-white via-white to-slate-50/50",
-    sidebarBorder: "border-slate-200/90",
-    sidebarActiveBg: "bg-slate-900",
-    activePillGradient: "bg-slate-900",
+  mint_teal: {
+    id: "mint_teal",
+    name: "Mint Teal & Sky Pearl",
+    paletteLabel: "Mint Teal & Sky",
+    tagline: "Cool Mist canvas, Mint-Aqua sidebar, Emerald & Teal accents",
+    swatchPrimary: "#0d9488",
+    swatchSecondary: "#059669",
+    canvasBg: "#E5ECF6",
+    sidebarGradient: "from-[#E6F4F1] via-[#EBF3FA] to-[#E4ECF7]",
+    sidebarBorder: "border-teal-200/80",
+    sidebarActiveBg: "bg-gradient-to-r from-teal-600 to-emerald-600",
+    activePillGradient: "bg-gradient-to-r from-teal-600 to-emerald-600",
     activePillText: "text-white",
-    activeBadge: "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30",
-    primaryBtn: "bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/15",
-    headerBorder: "border-slate-200/90",
+    activeBadge: "bg-teal-100 text-teal-800 border border-teal-200",
+    primaryBtn: "bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-md shadow-teal-600/20",
+    headerBorder: "border-teal-200/80",
   },
   cool_indigo: {
     id: "cool_indigo",
@@ -170,22 +170,24 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [currentWorkspace, setCurrentWorkspaceState] = useState<string>("accounting_gst");
-  const [currentTheme, setCurrentThemeState] = useState<SRThemeKey>("pearl_slate");
+  const [currentTheme, setCurrentThemeState] = useState<SRThemeKey>("mint_teal");
 
-  // Read saved workspace & theme from localStorage on mount
+  // Read saved workspace & theme from localStorage on mount (migrating away from any obsolete/dark theme)
   useEffect(() => {
     try {
       const saved = localStorage.getItem("sr_workspace");
       if (saved) setCurrentWorkspaceState(saved);
       const savedCollapsed = localStorage.getItem("sr_sidebar_collapsed");
       if (savedCollapsed !== null) setIsCollapsed(savedCollapsed === "true");
-      const savedTheme = localStorage.getItem("sr_books_theme") as SRThemeKey;
-      if (savedTheme && SR_THEMES[savedTheme]) {
-        setCurrentThemeState(savedTheme);
-        document.documentElement.setAttribute("data-theme", savedTheme);
+      
+      const savedTheme = localStorage.getItem("sr_books_theme");
+      if (!savedTheme || savedTheme === "pearl_slate" || savedTheme === "terracotta_emerald" || !SR_THEMES[savedTheme as SRThemeKey]) {
+        localStorage.setItem("sr_books_theme", "mint_teal");
+        setCurrentThemeState("mint_teal");
+        document.documentElement.setAttribute("data-theme", "mint_teal");
       } else {
-        setCurrentThemeState("pearl_slate");
-        document.documentElement.setAttribute("data-theme", "pearl_slate");
+        setCurrentThemeState(savedTheme as SRThemeKey);
+        document.documentElement.setAttribute("data-theme", savedTheme);
       }
     } catch (e) {
       // LocalStorage access safe fallback
@@ -200,7 +202,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     } catch (e) {}
   };
 
-  const themeConfig = SR_THEMES[currentTheme] || SR_THEMES.pearl_slate;
+  const themeConfig = SR_THEMES[currentTheme] || SR_THEMES.mint_teal;
 
   const setCurrentWorkspace = (ws: string) => {
     setCurrentWorkspaceState(ws);

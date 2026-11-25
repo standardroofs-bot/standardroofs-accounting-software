@@ -130,7 +130,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
       .toUpperCase() || "PT";
 
   return (
-    <header className="h-14 bg-white/95 backdrop-blur-xl border-b border-slate-200/90 shadow-xs flex items-center justify-between px-3 sm:px-5 lg:px-6 sticky top-0 z-30 transition-colors whitespace-nowrap select-none">
+    <header className="h-14 bg-white/95 backdrop-blur-xl border-b border-teal-200/80 shadow-xs flex items-center justify-between px-3 sm:px-5 lg:px-6 sticky top-0 z-30 transition-colors whitespace-nowrap select-none">
       {/* Left: Hamburger (mobile) + Organization context + Search */}
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         {/* Mobile Hamburger Drawer Button */}
@@ -190,7 +190,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
         <div className="relative">
           <button
             onClick={() => setShowQuickMenu(!showQuickMenu)}
-            className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition active:scale-95 cursor-pointer"
+            className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition active:scale-95 cursor-pointer"
             title="Create New Transaction"
           >
             <Plus size={15} />
@@ -348,7 +348,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
               setShowQuickMenu(false);
               setShowNotifications(false);
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold transition cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-teal-800 dark:text-slate-200 border border-teal-200/90 dark:border-slate-700 text-xs font-semibold transition cursor-pointer shadow-2xs"
             title="Switch Theme Preset (Persisted)"
           >
             <Palette size={14} className="text-slate-700 dark:text-slate-300 shrink-0" />
@@ -393,7 +393,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
                           <div className="font-bold text-xs tracking-tight flex items-center gap-1.5">
                             {t.name}
                             {isSelected && (
-                              <span className="text-[9px] px-1 rounded bg-slate-900 text-white font-bold leading-tight">Active</span>
+                              <span className="text-[9px] px-1 rounded bg-teal-600 text-white font-bold leading-tight">Active</span>
                             )}
                           </div>
                           <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug line-clamp-1">
@@ -426,7 +426,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
         {/* User Badge & Logout */}
         <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-3 border-l border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 via-emerald-500 to-indigo-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm ring-2 ring-teal-500/20">
               {initials}
             </div>
             <div className="hidden sm:flex flex-col text-left truncate max-w-[140px]">

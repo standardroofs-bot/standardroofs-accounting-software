@@ -324,56 +324,56 @@ export default function ReportsPage() {
 
               {/* Executive Site vs. Office P&L Summary */}
               {data.siteVsOfficePnL && (
-                <div className="bg-gradient-to-r from-slate-900 to-blue-950 text-white rounded-xl p-6 shadow-md border border-slate-800 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                <div className="bg-gradient-to-r from-indigo-50 via-sky-50 to-teal-50 text-slate-800 rounded-2xl p-6 shadow-md border border-indigo-200/80 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-200/70">
                     <div>
-                      <h3 className="text-base font-black tracking-tight text-white flex items-center gap-2">
-                        <Sparkles className="text-amber-400" size={18} />
+                      <h3 className="text-base font-black tracking-tight text-slate-900 flex items-center gap-2">
+                        <Sparkles className="text-amber-500" size={18} />
                         Executive Site vs. Office P&L Summary
                       </h3>
-                      <p className="text-xs text-slate-300 mt-0.5">
+                      <p className="text-xs text-slate-600 mt-0.5">
                         Clear separation of operational site performance from Erode office overheads
                       </p>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Net Company Result</span>
-                      <div className={`text-xl font-black font-mono ${data.siteVsOfficePnL.isCompanyProfitable ? "text-emerald-400" : "text-rose-400"}`}>
+                      <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Net Company Result</span>
+                      <div className={`text-xl font-black font-mono ${data.siteVsOfficePnL.isCompanyProfitable ? "text-emerald-700" : "text-rose-600"}`}>
                         ₹ {data.siteVsOfficePnL.netCompanyProfit.toLocaleString("en-IN", { minimumFractionDigits: 2 })} ({data.siteVsOfficePnL.netCompanyMarginPct}%)
                       </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                    <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold">1. Total Site Revenue</span>
-                      <div className="text-base font-black text-white font-mono mt-1">
+                    <div className="p-3 bg-white/90 rounded-xl border border-indigo-200/80 shadow-2xs">
+                      <span className="text-[10px] text-slate-500 uppercase font-bold">1. Total Site Revenue</span>
+                      <div className="text-base font-black text-slate-900 font-mono mt-1">
                         ₹ {data.siteVsOfficePnL.totalSiteRevenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                       </div>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">All Roofing Projects</span>
+                      <span className="text-[10px] text-slate-500 block mt-0.5">All Roofing Projects</span>
                     </div>
 
-                    <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold">2. Direct Site Costs</span>
-                      <div className="text-base font-black text-rose-300 font-mono mt-1">
+                    <div className="p-3 bg-white/90 rounded-xl border border-indigo-200/80 shadow-2xs">
+                      <span className="text-[10px] text-slate-500 uppercase font-bold">2. Direct Site Costs</span>
+                      <div className="text-base font-black text-rose-600 font-mono mt-1">
                         ₹ {data.siteVsOfficePnL.totalDirectSiteCosts.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                       </div>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">Material, Labour & Transport</span>
+                      <span className="text-[10px] text-slate-500 block mt-0.5">Material, Labour & Transport</span>
                     </div>
 
-                    <div className="p-3 bg-emerald-950/40 rounded-lg border border-emerald-500/30">
-                      <span className="text-[10px] text-emerald-400 uppercase font-bold">3. Gross Site Profit</span>
-                      <div className="text-base font-black text-emerald-300 font-mono mt-1">
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-300 shadow-2xs">
+                      <span className="text-[10px] text-emerald-800 uppercase font-bold">3. Gross Site Profit</span>
+                      <div className="text-base font-black text-emerald-700 font-mono mt-1">
                         ₹ {data.siteVsOfficePnL.grossSiteProfit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                       </div>
-                      <span className="text-[10px] text-emerald-400 block mt-0.5">{data.siteVsOfficePnL.grossSiteMarginPct}% Gross Margin</span>
+                      <span className="text-[10px] text-emerald-700 block mt-0.5">{data.siteVsOfficePnL.grossSiteMarginPct}% Gross Margin</span>
                     </div>
 
-                    <div className="p-3 bg-amber-950/40 rounded-lg border border-amber-500/30">
-                      <span className="text-[10px] text-amber-400 uppercase font-bold">4. Office Overheads</span>
-                      <div className="text-base font-black text-amber-300 font-mono mt-1">
+                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-300 shadow-2xs">
+                      <span className="text-[10px] text-amber-800 uppercase font-bold">4. Office Overheads</span>
+                      <div className="text-base font-black text-amber-700 font-mono mt-1">
                         ₹ {data.siteVsOfficePnL.totalOfficeOverheads.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                       </div>
-                      <span className="text-[10px] text-amber-400 block mt-0.5">Rent, EB, Staff, Admin</span>
+                      <span className="text-[10px] text-amber-700 block mt-0.5">Rent, EB, Staff, Admin</span>
                     </div>
                   </div>
                 </div>

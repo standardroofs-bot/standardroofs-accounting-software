@@ -420,7 +420,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-white text-slate-800 flex flex-col border-r border-slate-200/90 shadow-[2px_0_16px_-6px_rgba(15,23,42,0.05)] backdrop-blur-md ${
+      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-gradient-to-b from-[#E6F4F1] via-[#EBF3FA] to-[#E4ECF7] text-slate-800 flex flex-col border-r border-teal-200/80 shadow-[4px_0_24px_-12px_rgba(13,148,136,0.14)] backdrop-blur-md ${
         isCollapsed ? "w-20" : "w-[280px]"
       } ${
         isMobileOpen
@@ -429,14 +429,14 @@ export function Sidebar() {
       }`}
     >
       {/* Brand Header */}
-      <div className="h-14 flex items-center justify-between px-3.5 border-b border-slate-200/80 bg-white shrink-0">
+      <div className="h-14 flex items-center justify-between px-3.5 border-b border-teal-200/60 bg-transparent shrink-0">
         <Link
           href="/"
           onClick={() => setIsMobileOpen(false)}
           className="flex items-center gap-2.5 overflow-hidden hover:opacity-95 transition group cursor-pointer"
           title="Return to Home"
         >
-          <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center p-1 shrink-0 shadow-2xs border border-slate-200 group-hover:border-slate-400 transition">
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center p-1 shrink-0 shadow-2xs border border-teal-200/80 group-hover:border-teal-400 transition">
             <img
               src="/logo.png"
               alt="Standard Roofs Logo"
@@ -445,13 +445,13 @@ export function Sidebar() {
           </div>
           {!isCollapsed && (
             <div className="flex flex-col truncate">
-              <span className="font-extrabold text-xs tracking-tight text-slate-900 leading-none group-hover:text-indigo-600 transition flex items-center gap-1.5">
+              <span className="font-extrabold text-xs tracking-tight text-slate-900 leading-none group-hover:text-teal-700 transition flex items-center gap-1.5">
                 SR-Books
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 border border-slate-200/90">
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-teal-100/80 text-teal-800 border border-teal-200/90">
                   v2.6
                 </span>
               </span>
-              <span className="text-[10px] text-slate-500 truncate mt-0.5 font-medium">
+              <span className="text-[10px] text-slate-600 truncate mt-0.5 font-medium">
                 Standard Roofs • Erode
               </span>
             </div>
@@ -479,10 +479,10 @@ export function Sidebar() {
 
       {/* 4-Workspace Switcher Bar (Tactile Pure Porcelain Selector with Custom Duotone Emblems) */}
       {!isCollapsed ? (
-        <div className="p-2.5 border-b border-slate-200/80 bg-slate-50/50 relative">
+        <div className="p-2.5 border-b border-teal-200/60 bg-teal-50/40 relative">
           <button
             onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 hover:shadow-xs transition text-left group cursor-pointer"
+            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white/95 border border-teal-200/80 shadow-2xs hover:border-teal-300 hover:shadow-xs transition text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div
@@ -633,24 +633,24 @@ export function Sidebar() {
                         title={isCollapsed ? item.name : undefined}
                         className={`flex items-center gap-2 px-2.5 py-2 text-[13px] transition-colors group relative rounded-xl ${
                           isActive
-                            ? `${themeConfig.activePillText} font-semibold`
-                            : "text-slate-600 hover:text-slate-950 font-medium"
+                            ? "text-white font-semibold"
+                            : "text-slate-700 hover:text-slate-950 font-medium"
                         }`}
                       >
                         {isActive && (
                           <motion.span
                             layoutId="srActiveSidebarPill"
-                            className={`absolute inset-0 ${themeConfig.activePillGradient} shadow-md shadow-slate-900/15 rounded-xl z-0`}
+                            className="absolute inset-0 bg-gradient-to-r from-teal-600 to-emerald-600 shadow-md shadow-teal-600/25 rounded-xl z-0"
                             transition={{ type: "spring", stiffness: 380, damping: 30 }}
                           />
                         )}
                         {!isActive && (
-                          <span className="absolute inset-0 rounded-xl hover:bg-slate-100/80 transition-colors z-0" />
+                          <span className="absolute inset-0 rounded-xl hover:bg-teal-100/60 transition-colors z-0" />
                         )}
                         <Icon
                           size={16}
                           className={`relative z-10 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-                            isActive ? "text-white" : "text-slate-400 group-hover:text-slate-700"
+                            isActive ? "text-white" : "text-teal-700/70 group-hover:text-teal-900"
                           }`}
                         />
                         {!isCollapsed && (
@@ -660,8 +660,8 @@ export function Sidebar() {
                               <span
                                 className={`text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded-md shrink-0 ml-1.5 ${
                                   isActive
-                                    ? themeConfig.activeBadge
-                                    : "bg-slate-100 text-slate-600 border border-slate-200"
+                                    ? "bg-teal-950/20 text-white border border-white/20"
+                                    : "bg-teal-100/70 text-teal-800 border border-teal-200/80"
                                 }`}
                               >
                                 {item.badge}
@@ -681,7 +681,7 @@ export function Sidebar() {
 
       {/* Super Admin Status Footer */}
       {!isCollapsed && currentUser && (
-        <div className="p-3 border-t border-slate-200/80 bg-white text-xs flex items-center justify-between shrink-0 shadow-2xs">
+        <div className="p-3 border-t border-teal-200/60 bg-white/70 text-xs flex items-center justify-between shrink-0 shadow-2xs">
           <div className="truncate">
             <div className="font-bold text-slate-900 truncate">
               {currentUser.email === "admin@standardroofs.in" || currentUser.role === "SUPER_ADMIN"

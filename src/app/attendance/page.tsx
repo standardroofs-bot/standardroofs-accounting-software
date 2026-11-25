@@ -1150,8 +1150,8 @@ export default function AttendancePage() {
 
       {/* Floating Toast Alert */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-2xl border border-slate-700 text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
-          <Sparkles size={14} className="text-emerald-400" />
+        <div className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-teal-700 to-emerald-700 text-white px-4 py-2.5 rounded-xl shadow-2xl border border-teal-500/30 text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+          <Sparkles size={14} className="text-emerald-300" />
           <span>{toastMessage}</span>
         </div>
       )}

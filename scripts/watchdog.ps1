@@ -50,13 +50,7 @@ function Test-ServerHealthy {
 
 function Start-NextServer {
   Write-Host "[Watchdog] $(Get-Date -Format 'HH:mm:ss') Starting Next.js Production Server..." -ForegroundColor Yellow
-  $standaloneDir = Join-Path $ProjectRoot ".next\standalone"
-  $serverScript = Join-Path $standaloneDir "server.js"
-  if (Test-Path $serverScript) {
-    Start-Process -FilePath "node.exe" -ArgumentList "server.js" -WorkingDirectory $standaloneDir -RedirectStandardOutput $ServerOutLog -RedirectStandardError $ServerErrLog -WindowStyle Hidden
-  } else {
-    Start-Process -FilePath "npm.cmd" -ArgumentList "run start" -WorkingDirectory $ProjectRoot -RedirectStandardOutput $ServerOutLog -RedirectStandardError $ServerErrLog -WindowStyle Hidden
-  }
+  Start-Process -FilePath "node.exe" -ArgumentList ".next\standalone\server.js" -WorkingDirectory $ProjectRoot -RedirectStandardOutput $ServerOutLog -RedirectStandardError $ServerErrLog -WindowStyle Hidden
   Start-Sleep -Seconds 2
 }
 
