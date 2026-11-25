@@ -849,8 +849,11 @@ model EmployeeOrLabour {
   baseWage           Decimal            @default(0.00) @db.Decimal(15, 2) // Per day / 15-day base wage
   dailyWage          Decimal            @default(0.00) @db.Decimal(15, 2) // Per day wage for site labours
   monthlySalary      Decimal            @default(0.00) @db.Decimal(15, 2) // Fixed monthly salary for office staff
-  cashAdvanceBalance Decimal            @default(0.00) @db.Decimal(15, 2)
-  dateOfJoining      DateTime?
+  cashAdvanceBalance      Decimal            @default(0.00) @db.Decimal(15, 2)
+  defaultVehicleAllowance Float              @default(0)
+  location                String             @default("ERODE")
+  state                   String             @default("TAMIL NADU")
+  dateOfJoining           DateTime?
   active             Boolean            @default(true)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -1883,10 +1886,12 @@ model PayrollItem {
   company                 String     @default("STANDARD_ROOFS") // STANDARD_ROOFS | INVI_CREATION
   totalWorkingDays        Float      @default(25)
   daysPresent             Float      @default(0)
+  leaveDays               Float      @default(0)
   baseRate                Float      @default(0)
   grossSalary             Float      @default(0)
   otAndIncentive          Float      @default(0)
   nightDutyAmount         Float      @default(0)
+  vehicleAllowance        Float      @default(0)
   lastMonthBalance        Float      @default(0)
   advanceDeduction        Float      @default(0)
   expenseBalanceDeduction Float      @default(0)
@@ -1897,6 +1902,14 @@ model PayrollItem {
   carryForwardBalance     Float      @default(0)
   isCleared               Boolean    @default(false)
   notes                   String?
+  designation             String?
+  joiningDate             String?
+  location                String?
+  state                   String?
+  mobileNo                String?
+  aadhaarNo               String?
+  bankName                String?
+  accountNo               String?
 
   payrollRun              PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
 

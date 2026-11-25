@@ -158,6 +158,9 @@ export async function POST(request: Request) {
       twelfthDetails,
       graduationDetails,
       experienceJson,
+      location,
+      state,
+      defaultVehicleAllowance = 0,
     } = body;
 
     if (!name || !name.trim()) {
@@ -305,6 +308,9 @@ export async function POST(request: Request) {
         graduationDetails: graduationDetails || null,
         experienceJson: experienceJson || null,
         tradeSpecialty: tradeSpecialty || null,
+        location: location || "Erode",
+        state: state || "Tamil Nadu",
+        defaultVehicleAllowance: Number(defaultVehicleAllowance) || 0,
         status: "ACTIVE",
         active: true,
       },

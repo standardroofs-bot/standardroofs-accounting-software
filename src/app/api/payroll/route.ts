@@ -4,26 +4,32 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
+    const runId = searchParams.get("runId");
     const cycleType = searchParams.get("cycleType") || "MONTHLY_OFFICE";
     const month = searchParams.get("month") || "2026-10";
     const halfPeriod = searchParams.get("halfPeriod") || (cycleType === "MONTHLY_OFFICE" ? "FULL" : "FIRST_HALF");
     const companyFilter = searchParams.get("companyFilter") || "ALL";
 
-    const run = await prisma.payrollRun.findUnique({
-      where: {
-        cycleType_month_halfPeriod_companyFilter: {
-          cycleType,
-          month,
-          halfPeriod,
-          companyFilter: "ALL",
-        },
-      },
-      include: {
-        items: {
-          orderBy: [{ employeeName: "asc" }],
-        },
-      },
-    });
+    const run = runId
+      ? await prisma.payrollRun.findUnique({
+          where: { id: runId },
+          include: { items: { orderBy: [{ employeeName: "asc" }] } },
+        })
+      : await prisma.payrollRun.findUnique({
+          where: {
+            cycleType_month_halfPeriod_companyFilter: {
+              cycleType,
+              month,
+              halfPeriod,
+              companyFilter: "ALL",
+            },
+          },
+          include: {
+            items: {
+              orderBy: [{ employeeName: "asc" }],
+            },
+          },
+        });
 
     const availableRuns = await prisma.payrollRun.findMany({
       where: { cycleType },

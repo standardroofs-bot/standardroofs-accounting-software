@@ -16,10 +16,7 @@ export async function PATCH(
     });
 
     if (!existing) {
-      return NextResponse.json(
-        { success: false, error: "Payroll item not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, error: "Payroll item not found" }, { status: 404 });
     }
 
     if (existing.payrollRun.status === "PAID") {
@@ -32,6 +29,10 @@ export async function PATCH(
     const employeeName = body.employeeName !== undefined ? String(body.employeeName).trim() : existing.employeeName;
     const totalWorkingDays = body.totalWorkingDays !== undefined ? Number(body.totalWorkingDays) : existing.totalWorkingDays;
     const daysPresent = body.daysPresent !== undefined ? Number(body.daysPresent) : existing.daysPresent;
+    const leaveDays =
+      body.leaveDays !== undefined
+        ? Number(body.leaveDays)
+        : Math.max(0, Math.round((totalWorkingDays - daysPresent) * 100) / 100);
     const baseRate = body.baseRate !== undefined ? Number(body.baseRate) : existing.baseRate;
 
     let grossSalary = existing.grossSalary;
@@ -40,12 +41,15 @@ export async function PATCH(
     } else if (body.daysPresent !== undefined || body.baseRate !== undefined || body.totalWorkingDays !== undefined) {
       grossSalary =
         existing.category === "OFFICE"
-          ? Math.round((baseRate / (totalWorkingDays || 26)) * daysPresent)
+          ? baseRate <= 2500
+            ? Math.round(baseRate * daysPresent)
+            : Math.round((baseRate / (totalWorkingDays || 26)) * daysPresent)
           : Math.round(baseRate * daysPresent);
     }
 
     const otAndIncentive = body.otAndIncentive !== undefined ? Number(body.otAndIncentive) : existing.otAndIncentive;
     const nightDutyAmount = body.nightDutyAmount !== undefined ? Number(body.nightDutyAmount) : existing.nightDutyAmount;
+    const vehicleAllowance = body.vehicleAllowance !== undefined ? Number(body.vehicleAllowance) : existing.vehicleAllowance;
     const lastMonthBalance = body.lastMonthBalance !== undefined ? Number(body.lastMonthBalance) : existing.lastMonthBalance;
     const advanceDeduction = body.advanceDeduction !== undefined ? Number(body.advanceDeduction) : existing.advanceDeduction;
     const expenseBalanceDeduction =
@@ -54,7 +58,13 @@ export async function PATCH(
         : existing.expenseBalanceDeduction;
 
     const netSalary = Math.round(
-      grossSalary + otAndIncentive + nightDutyAmount + lastMonthBalance - advanceDeduction - expenseBalanceDeduction
+      grossSalary +
+        otAndIncentive +
+        nightDutyAmount +
+        vehicleAllowance +
+        lastMonthBalance -
+        advanceDeduction -
+        expenseBalanceDeduction
     );
 
     const paidCash = body.paidCash !== undefined ? Number(body.paidCash) : existing.paidCash;
@@ -73,10 +83,12 @@ export async function PATCH(
         employeeName,
         totalWorkingDays,
         daysPresent,
+        leaveDays,
         baseRate,
         grossSalary,
         otAndIncentive,
         nightDutyAmount,
+        vehicleAllowance,
         lastMonthBalance,
         advanceDeduction,
         expenseBalanceDeduction,
@@ -87,6 +99,14 @@ export async function PATCH(
         carryForwardBalance,
         isCleared,
         notes,
+        designation: body.designation !== undefined ? body.designation : existing.designation,
+        joiningDate: body.joiningDate !== undefined ? body.joiningDate : existing.joiningDate,
+        location: body.location !== undefined ? body.location : existing.location,
+        state: body.state !== undefined ? body.state : existing.state,
+        mobileNo: body.mobileNo !== undefined ? body.mobileNo : existing.mobileNo,
+        aadhaarNo: body.aadhaarNo !== undefined ? body.aadhaarNo : existing.aadhaarNo,
+        bankName: body.bankName !== undefined ? body.bankName : existing.bankName,
+        accountNo: body.accountNo !== undefined ? body.accountNo : existing.accountNo,
       },
     });
 
@@ -118,10 +138,7 @@ export async function DELETE(
     });
 
     if (!existing) {
-      return NextResponse.json(
-        { success: false, error: "Payroll item not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, error: "Payroll item not found" }, { status: 404 });
     }
 
     if (existing.payrollRun.status === "PAID") {

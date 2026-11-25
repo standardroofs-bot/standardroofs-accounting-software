@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import {
   Coins,
   Users,
@@ -14,37 +15,19 @@ import {
   Building2,
   Calendar,
   AlertCircle,
-  Lock,
   Unlock,
   Plus,
   Trash2,
+  Wallet,
+  CalendarPlus,
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
+import { BrandedPayslip, BrandedPayslipItem } from "@/components/payroll/BrandedPayslip";
 
-interface PayrollItem {
-  id: string;
+interface PayrollItem extends BrandedPayslipItem {
   payrollRunId: string;
   employeeId: string;
-  employeeName: string;
-  employeeCode: string;
-  category: string;
-  company: string;
-  totalWorkingDays: number;
-  daysPresent: number;
-  baseRate: number;
-  grossSalary: number;
-  otAndIncentive: number;
-  nightDutyAmount: number;
-  lastMonthBalance: number;
-  advanceDeduction: number;
-  expenseBalanceDeduction: number;
-  netSalary: number;
-  paidCash: number;
-  paidBankOrGpay: number;
-  paymentChannel: string;
-  carryForwardBalance: number;
   isCleared: boolean;
-  notes: string | null;
 }
 
 interface PayrollRun {
@@ -74,6 +57,7 @@ interface AvailableRunSummary {
 }
 
 const MONTHS_LIST = [
+  "2027-03", "2027-02", "2027-01",
   "2026-12", "2026-11", "2026-10", "2026-09", "2026-08", "2026-07",
   "2026-06", "2026-05", "2026-04", "2026-03", "2026-02", "2026-01",
   "2025-12", "2025-11",
@@ -104,14 +88,24 @@ export default function StandardPayrollPage() {
   const [availableRuns, setAvailableRuns] = useState<AvailableRunSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [pullingAdv, setPullingAdv] = useState(false);
   const [approving, setApproving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-  const [payslipItem, setPayslipItem] = useState<PayrollItem | null>(null);
 
-  // Full CRUD & Bulk states
+  // Modals & Drawers
+  const [payslipItem, setPayslipItem] = useState<PayrollItem | null>(null);
+  const [drawerItem, setDrawerItem] = useState<PayrollItem | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showNewCycleModal, setShowNewCycleModal] = useState(false);
+  const [newCycleForm, setNewCycleForm] = useState({
+    month: "2026-11",
+    cycleType: "MONTHLY_OFFICE" as "MONTHLY_OFFICE" | "BI_MONTHLY_TAMIL" | "BI_MONTHLY_HINDI",
+    halfPeriod: "FULL" as "FULL" | "FIRST_HALF" | "SECOND_HALF",
+    workingDays: 26,
+  });
+
   const [addForm, setAddForm] = useState({
     employeeName: "",
     employeeCode: "",
@@ -157,8 +151,7 @@ export default function StandardPayrollPage() {
         setAvailableRuns(data.availableRuns || []);
         setSelectedIds([]);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       showToast("Failed to load payroll data", "error");
     } finally {
       setLoading(false);
@@ -186,20 +179,39 @@ export default function StandardPayrollPage() {
     }
   };
 
-  const handleSyncFromAttendance = async () => {
+  const handleSyncFromAttendance = async (overrideParams?: {
+    cycleType: "MONTHLY_OFFICE" | "BI_MONTHLY_TAMIL" | "BI_MONTHLY_HINDI";
+    month: string;
+    halfPeriod: "FULL" | "FIRST_HALF" | "SECOND_HALF";
+    workingDays?: number;
+  }) => {
     setSyncing(true);
     try {
-      const effectiveHalf = cycleType === "MONTHLY_OFFICE" ? "FULL" : halfPeriod === "FULL" ? "FIRST_HALF" : halfPeriod;
+      const targetCycle = overrideParams?.cycleType || cycleType;
+      const targetMonth = overrideParams?.month || month;
+      const targetHalf =
+        overrideParams?.halfPeriod ||
+        (targetCycle === "MONTHLY_OFFICE" ? "FULL" : halfPeriod === "FULL" ? "FIRST_HALF" : halfPeriod);
+
       const res = await fetch("/api/payroll/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cycleType, month, halfPeriod: effectiveHalf }),
+        body: JSON.stringify({
+          cycleType: targetCycle,
+          month: targetMonth,
+          halfPeriod: targetHalf,
+          workingDays: overrideParams?.workingDays,
+          defaultFullDaysIfNoAttendance: true,
+        }),
       });
       const data = await res.json();
       if (data.success) {
+        setCycleType(targetCycle);
+        setMonth(targetMonth);
+        setHalfPeriod(targetHalf);
         setRun(data.run);
-        showToast(`Synced ${data.syncedEmployees} personnel from Standard Attendance`);
-        loadPayroll();
+        setShowNewCycleModal(false);
+        showToast(`Opened ${formatMonthLabel(targetMonth)} (${data.syncedEmployees} personnel synced)`);
       } else {
         showToast(data.error || "Sync failed", "error");
       }
@@ -210,6 +222,29 @@ export default function StandardPayrollPage() {
     }
   };
 
+  const handlePullAdvances = async () => {
+    if (!run) return;
+    setPullingAdv(true);
+    try {
+      const res = await fetch("/api/payroll/sync-advances", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payrollRunId: run.id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRun(data.run);
+        showToast(`Scanned ${data.cashBookAdvancesScanned} CashBook advances • Updated ${data.matchedCount} workers`);
+      } else {
+        showToast(data.error || "Failed to pull advances", "error");
+      }
+    } catch {
+      showToast("Error scanning Cash Book advances", "error");
+    } finally {
+      setPullingAdv(false);
+    }
+  };
+
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -217,10 +252,7 @@ export default function StandardPayrollPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/payroll/import", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch("/api/payroll/import", { method: "POST", body: formData });
       const data = await res.json();
       if (data.success) {
         showToast(`Imported ${data.runsImported} runs (${data.itemsImported} rows) from Excel`);
@@ -263,12 +295,12 @@ export default function StandardPayrollPage() {
     }
   };
 
-  const handleReopenCycle = async () => {
+  const handleReopenCycle = () => {
     if (!run) return;
     setConfirmAction({
-      title: "Reopen Paid Cycle for Editing?",
-      message: `This will unlock ${formatMonthLabel(run.month)} (${run.halfPeriod}) back to DRAFT status and remove the linked summary Cash Book entry so HR can make corrections cleanly.`,
-      confirmLabel: "Reopen Cycle",
+      title: "Unlock & Reopen Paid Cycle?",
+      message: `Unlock ${formatMonthLabel(run.month)} (${run.halfPeriod}) back to DRAFT status so HR can edit attendance days, allowances, or payouts?`,
+      confirmLabel: "Unlock Cycle",
       onConfirm: async () => {
         const res = await fetch("/api/payroll/reopen", {
           method: "POST",
@@ -278,20 +310,20 @@ export default function StandardPayrollPage() {
         const data = await res.json();
         if (data.success) {
           setRun(data.run);
-          showToast("Payroll cycle reopened to DRAFT for editing");
+          showToast("Payroll cycle unlocked to DRAFT");
         } else {
-          showToast(data.error || "Failed to reopen cycle", "error");
+          showToast(data.error || "Failed to unlock cycle", "error");
         }
         setConfirmAction(null);
       },
     });
   };
 
-  const handleDeleteDraftCycle = async () => {
+  const handleDeleteDraftCycle = () => {
     if (!run || run.status === "PAID") return;
     setConfirmAction({
       title: "Delete Draft Payroll Cycle?",
-      message: `Permanently delete ${formatMonthLabel(run.month)} (${run.halfPeriod}) and all ${run.items.length} rows inside it? This cannot be undone.`,
+      message: `Permanently delete ${formatMonthLabel(run.month)} (${run.halfPeriod}) and all ${run.items.length} rows inside it?`,
       confirmLabel: "Delete Cycle",
       danger: true,
       onConfirm: async () => {
@@ -318,12 +350,7 @@ export default function StandardPayrollPage() {
       const res = await fetch("/api/payroll/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cycleType,
-          month,
-          halfPeriod: effectiveHalf,
-          ...addForm,
-        }),
+        body: JSON.stringify({ cycleType, month, halfPeriod: effectiveHalf, ...addForm }),
       });
       const data = await res.json();
       if (data.success) {
@@ -344,7 +371,7 @@ export default function StandardPayrollPage() {
   const handleDeleteRow = (item: PayrollItem) => {
     setConfirmAction({
       title: `Remove ${item.employeeName}?`,
-      message: `Delete ${item.employeeName} (${formatINR(item.netSalary)}) from this cycle? Parent totals will recalculate automatically.`,
+      message: `Delete ${item.employeeName} (${formatINR(item.netSalary)}) from this cycle?`,
       confirmLabel: "Delete Row",
       danger: true,
       onConfirm: async () => {
@@ -357,6 +384,7 @@ export default function StandardPayrollPage() {
             items: run.items.filter((it) => it.id !== item.id),
           });
           setSelectedIds((prev) => prev.filter((x) => x !== item.id));
+          if (drawerItem?.id === item.id) setDrawerItem(null);
           showToast(`Removed ${item.employeeName}`);
         } else {
           showToast(data.error || "Failed to delete row", "error");
@@ -372,12 +400,7 @@ export default function StandardPayrollPage() {
       const res = await fetch("/api/payroll/items/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          payrollRunId: run.id,
-          itemIds: selectedIds,
-          action,
-          paymentChannel,
-        }),
+        body: JSON.stringify({ payrollRunId: run.id, itemIds: selectedIds, action, paymentChannel }),
       });
       const data = await res.json();
       if (data.success) {
@@ -419,6 +442,7 @@ export default function StandardPayrollPage() {
           ...data.run,
           items: run.items.map((it) => (it.id === itemId ? data.item : it)),
         });
+        if (drawerItem?.id === itemId) setDrawerItem(data.item);
         showToast(`Updated ${data.item.employeeName}`);
       } else {
         showToast(data.error || "Update failed", "error");
@@ -434,22 +458,21 @@ export default function StandardPayrollPage() {
       "#": idx + 1,
       Code: it.employeeCode,
       Name: it.employeeName,
-      Company: it.company,
+      Designation: it.designation || "",
       "Working Days": it.totalWorkingDays,
       "Days Present": it.daysPresent,
+      Leave: it.leaveDays,
       "Base Rate (₹)": it.baseRate,
       "Gross Salary (₹)": it.grossSalary,
-      "OT / Incentive (₹)": it.otAndIncentive,
-      "Night Duty (₹)": it.nightDutyAmount,
+      "OT / Night (₹)": it.otAndIncentive + it.nightDutyAmount,
+      "Vehicle (₹)": it.vehicleAllowance || 0,
       "Prev Balance (₹)": it.lastMonthBalance,
       "Advance Ded (₹)": it.advanceDeduction,
-      "Expense Ded (₹)": it.expenseBalanceDeduction,
       "Net Salary (₹)": it.netSalary,
       "Paid Cash (₹)": it.paidCash,
       "Paid Bank/GPay (₹)": it.paidBankOrGpay,
       Channel: it.paymentChannel,
       "Carry Fwd Bal (₹)": it.carryForwardBalance,
-      Cleared: it.isCleared ? "YES" : "NO",
       Notes: it.notes || "",
     }));
     exportToExcel(rows, `SR_Payroll_${cycleType}_${month}_${halfPeriod}`, "Payroll");
@@ -461,6 +484,7 @@ export default function StandardPayrollPage() {
     return (
       it.employeeName.toLowerCase().includes(q) ||
       it.employeeCode.toLowerCase().includes(q) ||
+      (it.designation || "").toLowerCase().includes(q) ||
       (it.notes || "").toLowerCase().includes(q)
     );
   });
@@ -473,13 +497,6 @@ export default function StandardPayrollPage() {
   const displayCarryForward = visibleItems.reduce((s, it) => s + it.carryForwardBalance, 0);
 
   const allSelected = visibleItems.length > 0 && visibleItems.every((it) => selectedIds.includes(it.id));
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(visibleItems.map((it) => it.id));
-    }
-  };
 
   return (
     <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-2 space-y-5 font-sans pb-16 text-slate-800">
@@ -492,7 +509,7 @@ export default function StandardPayrollPage() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-extrabold tracking-tight text-slate-900">
-                Standard Payroll & Wage Disbursement
+                Standard Payroll & Official Payslips
               </h1>
               {run && (
                 <span
@@ -507,60 +524,82 @@ export default function StandardPayrollPage() {
               )}
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Monthly Office Salary, 15-Day Tamil Labours & Hindi Crew Wages synced with Standard Attendance & General Ledger
+              Past, Current & Future Payroll Cycles • Attendance Sync • Cash Book Advance Pull • Batch Branded Payslips
             </p>
           </div>
         </div>
 
-        {/* Action Toolbar */}
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={handleImportExcel}
-            className="hidden"
-          />
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" />
+
+          <button
+            type="button"
+            onClick={() => setShowNewCycleModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold transition cursor-pointer"
+          >
+            <CalendarPlus size={14} />
+            <span>+ New Cycle</span>
+          </button>
 
           {(!run || run.status !== "PAID") && (
             <button
               type="button"
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold transition cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer"
             >
-              <Plus size={14} />
-              <span>+ Add Employee / Labour</span>
+              <Plus size={14} className="text-indigo-600" />
+              <span>+ Add Worker</span>
             </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => handleSyncFromAttendance()}
+            disabled={syncing || run?.status === "PAID"}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={syncing ? "animate-spin text-indigo-600" : "text-indigo-600"} />
+            <span>{syncing ? "Syncing..." : "Sync Attendance"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePullAdvances}
+            disabled={!run || pullingAdv || run.status === "PAID"}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+          >
+            <Wallet size={14} className="text-amber-600" />
+            <span>{pullingAdv ? "Pulling..." : "Pull Advances"}</span>
+          </button>
+
+          {run && (
+            <Link
+              href={`/payroll/payslips?runId=${run.id}&cycleType=${run.cycleType}&month=${run.month}&halfPeriod=${run.halfPeriod}`}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition"
+            >
+              <Printer size={14} className="text-indigo-600" />
+              <span>All Payslips</span>
+            </Link>
           )}
 
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold shadow-2xs transition cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
           >
-            <Upload size={14} className="text-indigo-600" />
-            <span>{importing ? "Importing..." : "Import Excel (.xlsx)"}</span>
+            <Upload size={14} className="text-slate-600" />
+            <span>{importing ? "Importing..." : "Import"}</span>
           </button>
 
           <button
             type="button"
             onClick={handleExportExcel}
             disabled={!run || visibleItems.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold shadow-2xs transition cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
           >
             <FileSpreadsheet size={14} className="text-emerald-600" />
-            <span>Export (.xlsx)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSyncFromAttendance}
-            disabled={syncing || run?.status === "PAID"}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold shadow-2xs transition cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={syncing ? "animate-spin text-indigo-600" : "text-indigo-600"} />
-            <span>{syncing ? "Syncing..." : "Sync from Attendance"}</span>
+            <span>Export</span>
           </button>
 
           {run?.status === "PAID" ? (
@@ -570,7 +609,7 @@ export default function StandardPayrollPage() {
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold transition cursor-pointer"
             >
               <Unlock size={14} />
-              <span>Reopen Cycle for Editing</span>
+              <span>Unlock & Edit</span>
             </button>
           ) : (
             <>
@@ -578,11 +617,10 @@ export default function StandardPayrollPage() {
                 <button
                   type="button"
                   onClick={handleDeleteDraftCycle}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition cursor-pointer"
+                  className="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition cursor-pointer"
                   title="Delete Draft Payroll Cycle"
                 >
                   <Trash2 size={14} />
-                  <span className="hidden sm:inline">Delete Draft</span>
                 </button>
               )}
               <button
@@ -592,7 +630,7 @@ export default function StandardPayrollPage() {
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer disabled:opacity-50"
               >
                 <CheckCircle2 size={14} />
-                <span>{approving ? "Posting..." : "Approve & Post to Accounts"}</span>
+                <span>{approving ? "Posting..." : "Approve & Post"}</span>
               </button>
             </>
           )}
@@ -640,9 +678,7 @@ export default function StandardPayrollPage() {
               className="bg-transparent font-semibold text-slate-800 focus:outline-none cursor-pointer"
             >
               {MONTHS_LIST.map((m) => (
-                <option key={m} value={m}>
-                  {formatMonthLabel(m)}
-                </option>
+                <option key={m} value={m}>{formatMonthLabel(m)}</option>
               ))}
             </select>
           </div>
@@ -689,7 +725,7 @@ export default function StandardPayrollPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search name, code, notes..."
+              placeholder="Search name, role, notes..."
               className="pl-8 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs w-44 focus:outline-none focus:ring-1 focus:ring-indigo-600"
             />
           </div>
@@ -728,7 +764,7 @@ export default function StandardPayrollPage() {
             </span>
           </div>
           <div className="text-2xl font-extrabold text-indigo-700 mt-2 tabular-nums">{formatINR(displayNet)}</div>
-          <p className="text-[11px] text-slate-500 mt-1">Includes OT, Night Duty & Prior Balances</p>
+          <p className="text-[11px] text-slate-500 mt-1">Includes OT, Vehicle & Prior Balances</p>
         </div>
 
         <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
@@ -752,44 +788,24 @@ export default function StandardPayrollPage() {
         </div>
       </div>
 
-      {/* BULK ACTION BAR (when rows selected) */}
+      {/* BULK ACTION BAR */}
       {selectedIds.length > 0 && run?.status !== "PAID" && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
           <span className="font-bold text-indigo-900">{selectedIds.length} row(s) selected</span>
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleBulkAction("MARK_CLEARED")}
-              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer"
-            >
+            <button type="button" onClick={() => handleBulkAction("MARK_CLEARED")} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer">
               Mark Cleared
             </button>
-            <button
-              type="button"
-              onClick={() => handleBulkAction("SET_CHANNEL", "CASH")}
-              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold cursor-pointer"
-            >
+            <button type="button" onClick={() => handleBulkAction("SET_CHANNEL", "CASH")} className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold cursor-pointer">
               Set Cash
             </button>
-            <button
-              type="button"
-              onClick={() => handleBulkAction("SET_CHANNEL", "ICICI")}
-              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold cursor-pointer"
-            >
+            <button type="button" onClick={() => handleBulkAction("SET_CHANNEL", "ICICI")} className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold cursor-pointer">
               Set ICICI
             </button>
-            <button
-              type="button"
-              onClick={() => handleBulkAction("SET_CHANNEL", "OFFICE_GPAY")}
-              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold cursor-pointer"
-            >
+            <button type="button" onClick={() => handleBulkAction("SET_CHANNEL", "OFFICE_GPAY")} className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold cursor-pointer">
               Set Office GPay
             </button>
-            <button
-              type="button"
-              onClick={() => handleBulkAction("DELETE_SELECTED")}
-              className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold cursor-pointer"
-            >
+            <button type="button" onClick={() => handleBulkAction("DELETE_SELECTED")} className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold cursor-pointer">
               Delete Selected
             </button>
           </div>
@@ -812,9 +828,7 @@ export default function StandardPayrollPage() {
             </h2>
           </div>
           <div className="text-[11px] text-slate-500">
-            {run?.status === "PAID"
-              ? "Cycle is locked (PAID). Click 'Reopen Cycle for Editing' to unlock."
-              : "Click any cell to edit inline (press Enter or click outside to save)"}
+            Click any employee name to open the full <strong>Payroll & Payslip Drawer</strong>, or edit numbers inline
           </div>
         </div>
 
@@ -827,7 +841,7 @@ export default function StandardPayrollPage() {
               No payroll run recorded for {formatMonthLabel(month)} ({halfPeriod})
             </div>
             <p className="text-xs text-slate-500 max-w-md mx-auto">
-              Click <strong>Sync from Attendance</strong> or <strong>+ Add Employee / Labour</strong> to start this cycle, or jump to an existing historical cycle below.
+              Click <strong>+ New Cycle</strong> or <strong>Sync Attendance</strong> to auto-generate this cycle with all active workers and prior carry-forward balances.
             </p>
             {availableRuns.length > 0 && (
               <div className="flex flex-wrap justify-center gap-1.5 pt-2">
@@ -856,7 +870,7 @@ export default function StandardPayrollPage() {
                     <input
                       type="checkbox"
                       checked={allSelected}
-                      onChange={toggleSelectAll}
+                      onChange={() => setSelectedIds(allSelected ? [] : visibleItems.map((it) => it.id))}
                       disabled={run?.status === "PAID"}
                       className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                     />
@@ -865,7 +879,7 @@ export default function StandardPayrollPage() {
                   <th className="py-3 px-2 text-right">Days</th>
                   <th className="py-3 px-2 text-right">Rate (₹)</th>
                   <th className="py-3 px-2 text-right">Gross (₹)</th>
-                  <th className="py-3 px-2 text-right">+ OT / Night / Prev</th>
+                  <th className="py-3 px-2 text-right">+ OT / Veh / Prev</th>
                   <th className="py-3 px-2 text-right">- Adv / Exp</th>
                   <th className="py-3 px-2 text-right text-indigo-700">Net Salary</th>
                   <th className="py-3 px-2 text-right">Paid Cash</th>
@@ -888,6 +902,7 @@ export default function StandardPayrollPage() {
                         prev.includes(item.id) ? prev.filter((x) => x !== item.id) : [...prev, item.id]
                       )
                     }
+                    onOpenDrawer={() => setDrawerItem(item)}
                     onPatch={handleInlinePatch}
                     onDelete={() => handleDeleteRow(item)}
                     onPrint={() => setPayslipItem(item)}
@@ -899,13 +914,110 @@ export default function StandardPayrollPage() {
         )}
       </div>
 
+      {/* CREATE / OPEN ANY MONTH CYCLE MODAL */}
+      {showNewCycleModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div className="font-bold text-sm text-slate-900">Create / Open Any Month Cycle</div>
+              <button type="button" onClick={() => setShowNewCycleModal(false)} className="text-slate-500 cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Month (Past, Current or Future)</label>
+                <input
+                  type="month"
+                  value={newCycleForm.month}
+                  onChange={(e) => setNewCycleForm({ ...newCycleForm, month: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 font-semibold"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Payroll Cycle Type</label>
+                <select
+                  value={newCycleForm.cycleType}
+                  onChange={(e) => {
+                    const next = e.target.value as any;
+                    setNewCycleForm({
+                      ...newCycleForm,
+                      cycleType: next,
+                      halfPeriod: next === "MONTHLY_OFFICE" ? "FULL" : "FIRST_HALF",
+                      workingDays: next === "MONTHLY_OFFICE" ? 26 : 15,
+                    });
+                  }}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white font-semibold"
+                >
+                  <option value="MONTHLY_OFFICE">Office Staff (Monthly Salary)</option>
+                  <option value="BI_MONTHLY_TAMIL">Tamil Labours (1–15 & 16–30 Wages)</option>
+                  <option value="BI_MONTHLY_HINDI">Hindi Crew (1–15 & 16–30 Wages)</option>
+                </select>
+              </div>
+              {newCycleForm.cycleType !== "MONTHLY_OFFICE" && (
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Half Period</label>
+                  <select
+                    value={newCycleForm.halfPeriod}
+                    onChange={(e) => setNewCycleForm({ ...newCycleForm, halfPeriod: e.target.value as any })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white font-semibold"
+                  >
+                    <option value="FIRST_HALF">1st – 15th</option>
+                    <option value="SECOND_HALF">16th – End of Month</option>
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Scheduled Working Days</label>
+                <input
+                  type="number"
+                  value={newCycleForm.workingDays}
+                  onChange={(e) => setNewCycleForm({ ...newCycleForm, workingDays: Number(e.target.value) })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 font-semibold"
+                />
+              </div>
+            </div>
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+              <button type="button" onClick={() => setShowNewCycleModal(false)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold cursor-pointer">
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={syncing}
+                onClick={() => handleSyncFromAttendance(newCycleForm)}
+                className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+              >
+                {syncing ? "Generating..." : "Generate / Open Cycle"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* INTERACTIVE SLIDE-OVER PAYROLL & ATTENDANCE DRAWER */}
+      {drawerItem && (
+        <PayrollDetailDrawer
+          item={drawerItem}
+          locked={run?.status === "PAID"}
+          onClose={() => setDrawerItem(null)}
+          onSave={async (patch) => {
+            await handleInlinePatch(drawerItem.id, patch);
+          }}
+          onViewPayslip={() => {
+            setPayslipItem(drawerItem);
+            setDrawerItem(null);
+          }}
+          onDelete={() => handleDeleteRow(drawerItem)}
+        />
+      )}
+
       {/* ADD EMPLOYEE / LABOUR MODAL */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <form onSubmit={handleAddRow} className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="font-bold text-sm text-slate-900">Add Employee / Ad-hoc Worker</div>
-              <button type="button" onClick={() => setShowAddModal(false)} className="text-slate-500 hover:text-slate-800 cursor-pointer">
+              <button type="button" onClick={() => setShowAddModal(false)} className="text-slate-500 cursor-pointer">
                 <X size={16} />
               </button>
             </div>
@@ -918,7 +1030,7 @@ export default function StandardPayrollPage() {
                   value={addForm.employeeName}
                   onChange={(e) => setAddForm({ ...addForm, employeeName: e.target.value })}
                   placeholder="e.g. Suresh P / New Welder"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -947,59 +1059,29 @@ export default function StandardPayrollPage() {
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Working Days</label>
-                  <input
-                    type="number"
-                    value={addForm.totalWorkingDays}
-                    onChange={(e) => setAddForm({ ...addForm, totalWorkingDays: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
+                  <input type="number" value={addForm.totalWorkingDays} onChange={(e) => setAddForm({ ...addForm, totalWorkingDays: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Days Present</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={addForm.daysPresent}
-                    onChange={(e) => setAddForm({ ...addForm, daysPresent: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
+                  <input type="number" step="0.5" value={addForm.daysPresent} onChange={(e) => setAddForm({ ...addForm, daysPresent: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Rate (₹)</label>
-                  <input
-                    type="number"
-                    value={addForm.baseRate}
-                    onChange={(e) => setAddForm({ ...addForm, baseRate: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
+                  <input type="number" value={addForm.baseRate} onChange={(e) => setAddForm({ ...addForm, baseRate: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">OT / Inc (₹)</label>
-                  <input
-                    type="number"
-                    value={addForm.otAndIncentive}
-                    onChange={(e) => setAddForm({ ...addForm, otAndIncentive: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
+                  <input type="number" value={addForm.otAndIncentive} onChange={(e) => setAddForm({ ...addForm, otAndIncentive: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Advance (₹)</label>
-                  <input
-                    type="number"
-                    value={addForm.advanceDeduction}
-                    onChange={(e) => setAddForm({ ...addForm, advanceDeduction: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
+                  <input type="number" value={addForm.advanceDeduction} onChange={(e) => setAddForm({ ...addForm, advanceDeduction: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Channel</label>
-                  <select
-                    value={addForm.paymentChannel}
-                    onChange={(e) => setAddForm({ ...addForm, paymentChannel: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
-                  >
+                  <select value={addForm.paymentChannel} onChange={(e) => setAddForm({ ...addForm, paymentChannel: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white">
                     <option value="CASH">Cash</option>
                     <option value="ICICI">ICICI</option>
                     <option value="OFFICE_GPAY">GPay</option>
@@ -1009,13 +1091,7 @@ export default function StandardPayrollPage() {
               </div>
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Notes</label>
-                <input
-                  type="text"
-                  value={addForm.notes}
-                  onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })}
-                  placeholder="Optional remarks..."
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                />
+                <input type="text" value={addForm.notes} onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })} placeholder="Optional remarks..." className="w-full px-3 py-2 rounded-lg border border-slate-200" />
               </div>
             </div>
             <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
@@ -1037,11 +1113,7 @@ export default function StandardPayrollPage() {
             <div className="text-sm font-extrabold text-slate-900">{confirmAction.title}</div>
             <p className="text-xs text-slate-600 leading-relaxed">{confirmAction.message}</p>
             <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setConfirmAction(null)}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold cursor-pointer"
-              >
+              <button type="button" onClick={() => setConfirmAction(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold cursor-pointer">
                 Cancel
               </button>
               <button
@@ -1058,116 +1130,240 @@ export default function StandardPayrollPage() {
         </div>
       )}
 
-      {/* 5. PRINTABLE PAYSLIP MODAL */}
+      {/* OFFICIAL BRANDED PAYSLIP MODAL */}
       {payslipItem && run && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div>
-                <div className="text-sm font-extrabold text-slate-900">Standard Roofs • Payslip</div>
-                <div className="text-[11px] text-slate-500">
-                  {formatMonthLabel(run.month)} ({run.halfPeriod}) • {payslipItem.company}
-                </div>
-              </div>
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-4xl w-full space-y-3 my-auto">
+            <div className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-slate-200 shadow-sm print:hidden">
+              <span className="text-xs font-bold text-slate-800">
+                Official Payslip — {payslipItem.employeeName}
+              </span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer"
                 >
-                  <Printer size={13} />
-                  <span>Print</span>
+                  <Printer size={14} />
+                  <span>Print / Save PDF</span>
                 </button>
-                <button type="button" onClick={() => setPayslipItem(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => setPayslipItem(null)}
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+                >
                   <X size={16} />
                 </button>
               </div>
             </div>
-
-            <div className="p-5 space-y-4 text-xs">
-              <div className="flex justify-between items-start border-b border-slate-100 pb-3">
-                <div>
-                  <div className="text-base font-extrabold text-slate-900">{payslipItem.employeeName}</div>
-                  <div className="text-slate-500 font-mono">{payslipItem.employeeCode}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-slate-500">Attendance</div>
-                  <div className="font-bold text-slate-900 tabular-nums">
-                    {payslipItem.daysPresent} / {payslipItem.totalWorkingDays} Days
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <div className="font-bold text-slate-500 uppercase text-[10px]">Earnings</div>
-                  <div className="flex justify-between">
-                    <span>Gross Pay</span>
-                    <span className="font-bold tabular-nums">{formatINR(payslipItem.grossSalary)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>OT / Incentive</span>
-                    <span className="font-bold tabular-nums">{formatINR(payslipItem.otAndIncentive)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Night Duty</span>
-                    <span className="font-bold tabular-nums">{formatINR(payslipItem.nightDutyAmount)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Prior Balance</span>
-                    <span className="font-bold tabular-nums">{formatINR(payslipItem.lastMonthBalance)}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="font-bold text-slate-500 uppercase text-[10px]">Deductions</div>
-                  <div className="flex justify-between text-rose-600">
-                    <span>Advance Deducted</span>
-                    <span className="font-bold tabular-nums">-{formatINR(payslipItem.advanceDeduction)}</span>
-                  </div>
-                  <div className="flex justify-between text-rose-600">
-                    <span>Expense Balance</span>
-                    <span className="font-bold tabular-nums">-{formatINR(payslipItem.expenseBalanceDeduction)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-xl p-3 flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] font-bold uppercase text-indigo-700">Net Payable</div>
-                  <div className="text-xl font-extrabold text-indigo-900 tabular-nums">{formatINR(payslipItem.netSalary)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[10px] font-bold uppercase text-slate-500">Paid ({payslipItem.paymentChannel})</div>
-                  <div className="text-sm font-bold text-emerald-700 tabular-nums">
-                    {formatINR(payslipItem.paidCash + payslipItem.paidBankOrGpay)}
-                  </div>
-                  <div className="text-[10px] text-slate-500 tabular-nums">
-                    Carry Fwd: {formatINR(payslipItem.carryForwardBalance)}
-                  </div>
-                </div>
-              </div>
-
-              {payslipItem.notes && (
-                <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                  <strong>Notes:</strong> {payslipItem.notes}
-                </div>
-              )}
-            </div>
+            <BrandedPayslip
+              item={payslipItem}
+              month={run.month}
+              halfPeriod={run.halfPeriod}
+              status={run.status}
+            />
           </div>
         </div>
       )}
 
       {toast && (
-        <div
-          className={`fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-xl text-xs font-bold text-white flex items-center gap-2 ${
-            toast.type === "error" ? "bg-rose-600" : "bg-indigo-600"
-          }`}
-        >
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-xl text-xs font-bold text-white flex items-center gap-2 ${toast.type === "error" ? "bg-rose-600" : "bg-indigo-600"}`}>
           <CheckCircle2 size={15} />
           <span>{toast.msg}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+function PayrollDetailDrawer({
+  item,
+  locked,
+  onClose,
+  onSave,
+  onViewPayslip,
+  onDelete,
+}: {
+  item: PayrollItem;
+  locked: boolean;
+  onClose: () => void;
+  onSave: (patch: Partial<PayrollItem>) => Promise<void>;
+  onViewPayslip: () => void;
+  onDelete: () => void;
+}) {
+  const [form, setForm] = useState({
+    totalWorkingDays: item.totalWorkingDays,
+    daysPresent: item.daysPresent,
+    baseRate: item.baseRate,
+    otAndIncentive: item.otAndIncentive,
+    nightDutyAmount: item.nightDutyAmount,
+    vehicleAllowance: item.vehicleAllowance || 0,
+    lastMonthBalance: item.lastMonthBalance,
+    advanceDeduction: item.advanceDeduction,
+    expenseBalanceDeduction: item.expenseBalanceDeduction,
+    paidCash: item.paidCash,
+    paidBankOrGpay: item.paidBankOrGpay,
+    paymentChannel: item.paymentChannel,
+    notes: item.notes || "",
+  });
+
+  const leaveDays = Math.max(0, Math.round((form.totalWorkingDays - form.daysPresent) * 100) / 100);
+  const gross =
+    item.category === "OFFICE"
+      ? form.baseRate <= 2500
+        ? Math.round(form.baseRate * form.daysPresent)
+        : Math.round((form.baseRate / (form.totalWorkingDays || 26)) * form.daysPresent)
+      : Math.round(form.baseRate * form.daysPresent);
+  const net = Math.round(
+    gross +
+      form.otAndIncentive +
+      form.nightDutyAmount +
+      form.vehicleAllowance +
+      form.lastMonthBalance -
+      form.advanceDeduction -
+      form.expenseBalanceDeduction
+  );
+  const balance = Math.round((net - (form.paidCash + form.paidBankOrGpay)) * 100) / 100;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex justify-end">
+      <div className="bg-white w-full max-w-md h-full shadow-2xl border-l border-slate-200 flex flex-col">
+        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+          <div>
+            <div className="text-sm font-extrabold text-slate-900">{item.employeeName}</div>
+            <div className="text-[11px] text-slate-500 font-mono">
+              {item.employeeCode} • {item.designation || item.category}
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 cursor-pointer">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+          {/* Attendance Summary */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <div className="text-[10px] text-slate-400 font-bold uppercase">Working</div>
+              <div className="text-sm font-extrabold text-slate-800">{form.totalWorkingDays} Days</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400 font-bold uppercase">Present</div>
+              <div className="text-sm font-extrabold text-emerald-700">{form.daysPresent} Days</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400 font-bold uppercase">Leave</div>
+              <div className="text-sm font-extrabold text-rose-600">{leaveDays} Days</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Working Days</label>
+              <input type="number" disabled={locked} value={form.totalWorkingDays} onChange={(e) => setForm({ ...form, totalWorkingDays: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Days Present</label>
+              <input type="number" step="0.5" disabled={locked} value={form.daysPresent} onChange={(e) => setForm({ ...form, daysPresent: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Base Rate (₹)</label>
+              <input type="number" disabled={locked} value={form.baseRate} onChange={(e) => setForm({ ...form, baseRate: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">OT / Incentive (₹)</label>
+              <input type="number" disabled={locked} value={form.otAndIncentive} onChange={(e) => setForm({ ...form, otAndIncentive: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Vehicle Allowance (₹)</label>
+              <input type="number" disabled={locked} value={form.vehicleAllowance} onChange={(e) => setForm({ ...form, vehicleAllowance: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Last Month Bal (₹)</label>
+              <input type="number" disabled={locked} value={form.lastMonthBalance} onChange={(e) => setForm({ ...form, lastMonthBalance: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+            </div>
+            <div>
+              <label className="block font-semibold text-rose-700 mb-1">Advance Ded (₹)</label>
+              <input type="number" disabled={locked} value={form.advanceDeduction} onChange={(e) => setForm({ ...form, advanceDeduction: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+            </div>
+            <div>
+              <label className="block font-semibold text-rose-700 mb-1">Expense Bal Ded (₹)</label>
+              <input type="number" disabled={locked} value={form.expenseBalanceDeduction} onChange={(e) => setForm({ ...form, expenseBalanceDeduction: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Paid Cash (₹)</label>
+              <input type="number" disabled={locked} value={form.paidCash} onChange={(e) => setForm({ ...form, paidCash: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Paid Bank / GPay (₹)</label>
+              <input type="number" disabled={locked} value={form.paidBankOrGpay} onChange={(e) => setForm({ ...form, paidBankOrGpay: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Payment Channel</label>
+            <select disabled={locked} value={form.paymentChannel} onChange={(e) => setForm({ ...form, paymentChannel: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white">
+              <option value="CASH">Cash</option>
+              <option value="ICICI">ICICI</option>
+              <option value="OFFICE_GPAY">Office GPay</option>
+              <option value="AGENT_ACCOUNT">Agent Account</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Notes</label>
+            <input type="text" disabled={locked} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+          </div>
+
+          {/* Live Summary */}
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] font-bold uppercase text-indigo-700">Live Net Salary</div>
+              <div className="text-xl font-extrabold text-indigo-900 tabular-nums">{formatINR(net)}</div>
+            </div>
+            <div className="text-right">
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  balance > 0
+                    ? "bg-amber-100 text-amber-800"
+                    : balance < 0
+                    ? "bg-rose-100 text-rose-800"
+                    : "bg-emerald-100 text-emerald-800"
+                }`}
+              >
+                {balance > 0 ? "Pending Balance" : balance < 0 ? "Advance to Recover" : "Cleared"}
+              </span>
+              <div className="text-sm font-extrabold text-slate-900 mt-1 tabular-nums">{formatINR(balance)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={onViewPayslip} className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-indigo-700 cursor-pointer">
+              <Printer size={13} />
+              <span>Official Payslip</span>
+            </button>
+            {!locked && (
+              <button type="button" onClick={onDelete} className="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer" title="Delete Row">
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+          {!locked && (
+            <button
+              type="button"
+              onClick={async () => {
+                await onSave(form);
+                onClose();
+              }}
+              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer"
+            >
+              Save Changes
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1177,6 +1373,7 @@ function PayrollTableRow({
   locked,
   selected,
   onToggleSelect,
+  onOpenDrawer,
   onPatch,
   onDelete,
   onPrint,
@@ -1185,24 +1382,27 @@ function PayrollTableRow({
   locked: boolean;
   selected: boolean;
   onToggleSelect: () => void;
+  onOpenDrawer: () => void;
   onPatch: (id: string, patch: Partial<PayrollItem>) => void;
   onDelete: () => void;
   onPrint: () => void;
 }) {
-  const [empName, setEmpName] = useState(item.employeeName);
   const [daysPresent, setDaysPresent] = useState(String(item.daysPresent));
   const [baseRate, setBaseRate] = useState(String(item.baseRate));
-  const [otPlus, setOtPlus] = useState(String(item.otAndIncentive + item.nightDutyAmount + item.lastMonthBalance));
+  const [otPlus, setOtPlus] = useState(
+    String(item.otAndIncentive + item.nightDutyAmount + (item.vehicleAllowance || 0) + item.lastMonthBalance)
+  );
   const [advDed, setAdvDed] = useState(String(item.advanceDeduction + item.expenseBalanceDeduction));
   const [paidCash, setPaidCash] = useState(String(item.paidCash));
   const [paidBank, setPaidBank] = useState(String(item.paidBankOrGpay));
   const [notes, setNotes] = useState(item.notes || "");
 
   useEffect(() => {
-    setEmpName(item.employeeName);
     setDaysPresent(String(item.daysPresent));
     setBaseRate(String(item.baseRate));
-    setOtPlus(String(item.otAndIncentive + item.nightDutyAmount + item.lastMonthBalance));
+    setOtPlus(
+      String(item.otAndIncentive + item.nightDutyAmount + (item.vehicleAllowance || 0) + item.lastMonthBalance)
+    );
     setAdvDed(String(item.advanceDeduction + item.expenseBalanceDeduction));
     setPaidCash(String(item.paidCash));
     setPaidBank(String(item.paidBankOrGpay));
@@ -1216,9 +1416,7 @@ function PayrollTableRow({
   };
 
   const handleEnterBlur = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.currentTarget.blur();
-    }
+    if (e.key === "Enter") e.currentTarget.blur();
   };
 
   return (
@@ -1234,22 +1432,18 @@ function PayrollTableRow({
       </td>
 
       <td className="py-2.5 px-2">
-        <input
-          type="text"
-          disabled={locked}
-          value={empName}
-          onChange={(e) => setEmpName(e.target.value)}
-          onKeyDown={handleEnterBlur}
-          onBlur={() => {
-            if (empName.trim() && empName.trim() !== item.employeeName) {
-              onPatch(item.id, { employeeName: empName.trim() });
-            }
-          }}
-          className="font-bold text-slate-900 bg-transparent border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white rounded px-1 py-0.5 w-32"
-        />
-        <div className="text-[10px] text-slate-400 font-mono px-1">
-          {item.employeeCode} • {item.company === "INVI_CREATION" ? "Invi" : "SR"}
-        </div>
+        <button
+          type="button"
+          onClick={onOpenDrawer}
+          className="text-left group cursor-pointer"
+        >
+          <div className="font-bold text-slate-900 group-hover:text-indigo-600 transition whitespace-nowrap">
+            {item.employeeName}
+          </div>
+          <div className="text-[10px] text-slate-400 font-mono">
+            {item.employeeCode} • {item.designation || (item.company === "INVI_CREATION" ? "Invi" : "SR")}
+          </div>
+        </button>
       </td>
 
       <td className="py-2.5 px-2 text-right tabular-nums">
@@ -1290,9 +1484,9 @@ function PayrollTableRow({
           onBlur={() => {
             const val = Number(otPlus);
             if (!Number.isFinite(val)) return;
-            const prevSum = item.otAndIncentive + item.nightDutyAmount + item.lastMonthBalance;
+            const prevSum = item.otAndIncentive + item.nightDutyAmount + (item.vehicleAllowance || 0) + item.lastMonthBalance;
             if (val !== prevSum) {
-              onPatch(item.id, { otAndIncentive: val, nightDutyAmount: 0, lastMonthBalance: 0 });
+              onPatch(item.id, { otAndIncentive: val, nightDutyAmount: 0, vehicleAllowance: 0, lastMonthBalance: 0 });
             }
           }}
           className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent text-emerald-700 font-semibold tabular-nums"
@@ -1381,9 +1575,7 @@ function PayrollTableRow({
           onChange={(e) => setNotes(e.target.value)}
           onKeyDown={handleEnterBlur}
           onBlur={() => {
-            if (notes !== (item.notes || "")) {
-              onPatch(item.id, { notes });
-            }
+            if (notes !== (item.notes || "")) onPatch(item.id, { notes });
           }}
           className="w-28 px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent text-[11px] text-slate-600 truncate"
         />
@@ -1395,7 +1587,7 @@ function PayrollTableRow({
             type="button"
             onClick={onPrint}
             className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
-            title="View & Print Payslip"
+            title="View & Print Official Payslip"
           >
             <Printer size={14} />
           </button>

@@ -107,6 +107,9 @@ export default function LabourWorkforceMasterPage() {
     bankAccountNumber: "",
     bankIfsc: "",
     bankBranch: "",
+    location: "Erode",
+    state: "Tamil Nadu",
+    defaultVehicleAllowance: 0,
     tenthDetails: "",
     twelfthDetails: "",
     graduationDetails: "",
@@ -224,6 +227,9 @@ export default function LabourWorkforceMasterPage() {
       bankAccountNumber: "",
       bankIfsc: "",
       bankBranch: "",
+      location: "Erode",
+      state: "Tamil Nadu",
+      defaultVehicleAllowance: 0,
       tenthDetails: "",
       twelfthDetails: "",
       graduationDetails: "",
@@ -269,6 +275,9 @@ export default function LabourWorkforceMasterPage() {
       bankAccountNumber: w.bankAccountNumber || w.bankAccountNo || "",
       bankIfsc: w.bankIfsc || w.ifscCode || "",
       bankBranch: w.bankBranch || "",
+      location: w.location || "Erode",
+      state: w.state || "Tamil Nadu",
+      defaultVehicleAllowance: w.defaultVehicleAllowance ? Number(w.defaultVehicleAllowance) : 0,
       tenthDetails: w.tenthDetails || "",
       twelfthDetails: w.twelfthDetails || "",
       graduationDetails: w.graduationDetails || "",
@@ -1627,6 +1636,43 @@ export default function LabourWorkforceMasterPage() {
                           value={formData.dateOfJoining}
                           onChange={(e) => setFormData({ ...formData, dateOfJoining: e.target.value })}
                           className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Location / Branch</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Erode"
+                          value={formData.location}
+                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">State</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Tamil Nadu"
+                          value={formData.state}
+                          onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Default Vehicle Allowance (₹)
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={formData.defaultVehicleAllowance}
+                          onChange={(e) =>
+                            setFormData({ ...formData, defaultVehicleAllowance: Number(e.target.value) || 0 })
+                          }
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold outline-none focus:border-blue-500"
                         />
                       </div>
                     </div>

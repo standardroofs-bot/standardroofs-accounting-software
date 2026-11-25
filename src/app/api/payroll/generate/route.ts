@@ -21,7 +21,6 @@ function getCycleDateRange(month: string, halfPeriod: string) {
       defaultWorkingDays: lastDay - 15,
     };
   }
-  // Count non-Sunday days for FULL month
   let workingDays = 0;
   for (let d = 1; d <= lastDay; d++) {
     const dayOfWeek = new Date(year, mon - 1, d).getDay();
@@ -54,12 +53,20 @@ function getPreviousCycle(month: string, halfPeriod: string): { month: string; h
   };
 }
 
+function fmtJoining(d: Date | null | undefined): string | null {
+  if (!d) return null;
+  const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  return `${String(d.getUTCDate()).padStart(2, "0")}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const cycleType = body.cycleType || "MONTHLY_OFFICE";
     const month = body.month || "2026-11";
     const halfPeriod = body.halfPeriod || (cycleType === "MONTHLY_OFFICE" ? "FULL" : "FIRST_HALF");
+    const customWorkingDays = body.workingDays ? Number(body.workingDays) : null;
+    const defaultFullDaysIfNoAttendance = body.defaultFullDaysIfNoAttendance !== false;
 
     const empCategory =
       cycleType === "MONTHLY_OFFICE"
@@ -76,8 +83,8 @@ export async function POST(req: NextRequest) {
         : "HINDI_CREW";
 
     const { start, end, defaultWorkingDays } = getCycleDateRange(month, halfPeriod);
+    const effectiveDefaultWorkingDays = customWorkingDays || defaultWorkingDays;
 
-    // 1. Fetch active employees in this category
     const employees = await prisma.employeeOrLabour.findMany({
       where: {
         active: true,
@@ -87,7 +94,6 @@ export async function POST(req: NextRequest) {
       orderBy: { name: "asc" },
     });
 
-    // 2. Fetch AttendanceRecords in range
     const attendance = await prisma.attendanceRecord.findMany({
       where: {
         date: { gte: start, lte: end },
@@ -102,7 +108,6 @@ export async function POST(req: NextRequest) {
       attByEmp.set(rec.employeeId, list);
     }
 
-    // 3. Fetch prior cycle carryForwardBalance
     const prev = getPreviousCycle(month, halfPeriod);
     const prevRun = await prisma.payrollRun.findUnique({
       where: {
@@ -126,7 +131,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Check existing run to preserve manual overrides if DRAFT
     const existingRun = await prisma.payrollRun.findUnique({
       where: {
         cycleType_month_halfPeriod_companyFilter: {
@@ -141,7 +145,7 @@ export async function POST(req: NextRequest) {
 
     if (existingRun?.status === "PAID") {
       return NextResponse.json(
-        { success: false, error: "This payroll cycle is already PAID & locked." },
+        { success: false, error: "This payroll cycle is already PAID & locked. Unlock it first to re-sync." },
         { status: 400 }
       );
     }
@@ -166,20 +170,33 @@ export async function POST(req: NextRequest) {
       }
 
       const prevIt = existingByEmp.get(emp.id);
+      const totalWorkingDays = customWorkingDays || prevIt?.totalWorkingDays || effectiveDefaultWorkingDays;
+
+      // For future/unmarked cycles with 0 attendance records, allow full-days planning default
+      if (recs.length === 0 && defaultFullDaysIfNoAttendance && !prevIt) {
+        daysPresent = totalWorkingDays;
+      } else if (recs.length === 0 && prevIt) {
+        daysPresent = prevIt.daysPresent;
+      }
+
+      const leaveDays = Math.max(0, Math.round((totalWorkingDays - daysPresent) * 100) / 100);
+
       const baseRate =
         cycleType === "MONTHLY_OFFICE"
           ? Number(emp.monthlySalary || emp.baseWage || 0)
           : Number(emp.dailyWage || emp.baseWage || 0);
 
-      const totalWorkingDays = prevIt?.totalWorkingDays || defaultWorkingDays;
       const grossSalary =
         cycleType === "MONTHLY_OFFICE"
-          ? Math.round((baseRate / (totalWorkingDays || 26)) * daysPresent)
+          ? baseRate <= 2500
+            ? Math.round(baseRate * daysPresent)
+            : Math.round((baseRate / (totalWorkingDays || 26)) * daysPresent)
           : Math.round(baseRate * daysPresent);
 
-      const otRatePerHr = cycleType === "MONTHLY_OFFICE" ? Math.round(baseRate / (totalWorkingDays * 8)) : Math.round(baseRate / 8);
+      const otRatePerHr = cycleType === "MONTHLY_OFFICE" ? Math.round(baseRate / ((totalWorkingDays || 26) * 8)) : Math.round(baseRate / 8);
       const otAndIncentive = prevIt ? prevIt.otAndIncentive : Math.round(totalOtHours * otRatePerHr);
       const nightDutyAmount = prevIt?.nightDutyAmount || 0;
+      const vehicleAllowance = prevIt ? prevIt.vehicleAllowance : (emp.defaultVehicleAllowance || 0);
       const lastMonthBalance =
         prevIt?.lastMonthBalance ??
         (prevBalanceMap.get(emp.id) ?? prevBalanceMap.get(emp.name.toLowerCase().trim()) ?? 0);
@@ -187,7 +204,7 @@ export async function POST(req: NextRequest) {
       const expenseBalanceDeduction = prevIt?.expenseBalanceDeduction || 0;
 
       const netSalary = Math.round(
-        grossSalary + otAndIncentive + nightDutyAmount + lastMonthBalance - advanceDeduction - expenseBalanceDeduction
+        grossSalary + otAndIncentive + nightDutyAmount + vehicleAllowance + lastMonthBalance - advanceDeduction - expenseBalanceDeduction
       );
 
       const paidCash = prevIt?.paidCash || 0;
@@ -202,10 +219,12 @@ export async function POST(req: NextRequest) {
         company: emp.companyUnit === "INVI_CREATION" ? "INVI_CREATION" : "STANDARD_ROOFS",
         totalWorkingDays,
         daysPresent,
+        leaveDays,
         baseRate,
         grossSalary,
         otAndIncentive,
         nightDutyAmount,
+        vehicleAllowance,
         lastMonthBalance,
         advanceDeduction,
         expenseBalanceDeduction,
@@ -215,7 +234,15 @@ export async function POST(req: NextRequest) {
         paymentChannel: prevIt?.paymentChannel || "CASH",
         carryForwardBalance,
         isCleared: prevIt?.isCleared || false,
-        notes: prevIt?.notes || (recs.length > 0 ? `Synced from ${recs.length} attendance records` : null),
+        notes: prevIt?.notes || (recs.length > 0 ? `Synced from ${recs.length} attendance records` : "Planned / Default Working Days"),
+        designation: emp.designation || emp.role || null,
+        joiningDate: fmtJoining(emp.dateOfJoining),
+        location: emp.location || "ERODE",
+        state: emp.state || "TAMIL NADU",
+        mobileNo: emp.phone || null,
+        aadhaarNo: emp.aadhaarNumber || null,
+        bankName: emp.bankName || null,
+        accountNo: emp.bankAccountNo || emp.bankAccountNumber || null,
       };
     });
 
