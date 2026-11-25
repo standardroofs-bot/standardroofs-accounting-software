@@ -1,9 +1,9 @@
 // ==============================================================================
-// Standard Roofs Books (SR-Books) - Enterprise PWA Service Worker v3.1
+// Standard Roofs Books (SR-Books) - Enterprise PWA Service Worker v3.2
 // Pure native navigation with zero synthetic interception & zero chunk failures
 // ==============================================================================
 
-const CACHE_NAME = "sr-books-pwa-v3.1";
+const CACHE_NAME = "sr-books-pwa-v3.2";
 const STATIC_BRAND_ASSETS = [
   "/manifest.webmanifest",
   "/icons/icon.svg",

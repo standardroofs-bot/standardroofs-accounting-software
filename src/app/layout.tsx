@@ -93,10 +93,12 @@ export default function RootLayout({
                   }
                 });
 
-                // 3. Register Service Worker for PWA
+                // 3. Register Service Worker for PWA & purge stale legacy workers
                 if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
                   window.addEventListener('load', function() {
-                    navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                    navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                      reg.update();
+                    }).catch(function(err) {
                       console.log('[SW] Registration failed:', err);
                     });
                   });

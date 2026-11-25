@@ -866,7 +866,10 @@ export default function MyAttendancePage() {
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> P (Present 1.0)
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> P + <span className="px-1 py-0.2 rounded-full bg-amber-600 text-white text-[8px] font-black">-1hr M</span> / <span className="px-1 py-0.2 rounded-full bg-rose-500 text-white text-[8px] font-black">-1hr E</span> (1-Hr Perm)
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> P + <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-extrabold ring-1 ring-white shadow-xs">-1hr M / E</span> (1-Hr Perm)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-violet-600" /> +1hr / +2hr OT (Overtime)
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> H (Half-Day 0.5)
@@ -976,9 +979,7 @@ export default function MyAttendancePage() {
                           </span>
                           {is1H && (
                             <span
-                              className={`absolute -top-2.5 -right-2 px-1 py-0.2 rounded-full text-white text-[7.5px] font-black ring-1 ring-white dark:ring-slate-900 shadow-2xs z-10 ${
-                                d.permissionSlot === "EVENING" ? "bg-rose-500" : "bg-amber-600"
-                              }`}
+                              className="absolute -top-2.5 -right-2 px-1.5 py-0.5 rounded-full bg-rose-600 text-white font-extrabold text-[9px] leading-none ring-2 ring-white dark:ring-slate-900 shadow-sm z-10 whitespace-nowrap"
                             >
                               {d.permissionSlot === "EVENING" ? "-1hr E" : "-1hr M"}
                             </span>
@@ -986,7 +987,7 @@ export default function MyAttendancePage() {
                         </div>
 
                         {d.otHours > 0 && (
-                          <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 px-1.5 py-0.2 rounded-md border border-amber-200 dark:border-amber-800">
+                          <span className="text-[10px] font-extrabold text-white bg-violet-600 px-1.5 py-0.5 rounded-full ring-1 ring-white shadow-xs">
                             +{d.otHours}h
                           </span>
                         )}

@@ -29,7 +29,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [logoSrc, setLogoSrc] = useState("/logo.png");
+  const [logoSrc, setLogoSrc] = useState("/images/standard-roofs-logo.png");
   const [logoFailed, setLogoFailed] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -86,8 +86,8 @@ export default function LoginPage() {
                 alt="Standard Roofs"
                 className="h-10 w-auto max-w-[170px] object-contain transition-all"
                 onError={() => {
-                  if (logoSrc === "/logo.png") {
-                    setLogoSrc("/images/standard-roofs-logo.png");
+                  if (logoSrc === "/images/standard-roofs-logo.png") {
+                    setLogoSrc("/logo.png");
                   } else {
                     setLogoFailed(true);
                   }
@@ -206,12 +206,24 @@ export default function LoginPage() {
           {/* Mobile Header (visible on < lg) */}
           <div className="flex items-center gap-3 lg:hidden pb-2">
             <div className="h-12 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center shrink-0">
-              <img
-                src={logoSrc}
-                alt="Standard Roofs"
-                className="h-8 w-auto object-contain"
-                onError={() => setLogoFailed(true)}
-              />
+              {!logoFailed ? (
+                <img
+                  src={logoSrc}
+                  alt="Standard Roofs"
+                  className="h-8 w-auto object-contain"
+                  onError={() => {
+                    if (logoSrc === "/images/standard-roofs-logo.png") {
+                      setLogoSrc("/logo.png");
+                    } else {
+                      setLogoFailed(true);
+                    }
+                  }}
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-xs shadow-xs">
+                  SR
+                </div>
+              )}
             </div>
             <div>
               <div className="text-base font-extrabold text-slate-900 leading-tight">Standard Roofs</div>
