@@ -1845,6 +1845,64 @@ model RecycleBinItem {
   @@index([deletedAt])
 }
 
+// -------------------------------------------------------------
+// PHASE 1: STANDARD PAYROLL ENGINE (OFFICE, TAMIL & HINDI CREWS)
+// -------------------------------------------------------------
+
+model PayrollRun {
+  id              String        @id @default(cuid())
+  cycleType       String        // MONTHLY_OFFICE | BI_MONTHLY_TAMIL | BI_MONTHLY_HINDI
+  month           String        // e.g. "2026-11"
+  halfPeriod      String        // FULL | FIRST_HALF | SECOND_HALF
+  companyFilter   String        @default("ALL") // ALL | STANDARD_ROOFS | INVI_CREATION
+  status          String        @default("DRAFT") // DRAFT | APPROVED | PAID
+  totalGross      Float         @default(0)
+  totalDeductions Float         @default(0)
+  totalNet        Float         @default(0)
+  paidCash        Float         @default(0)
+  paidBank        Float         @default(0)
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  items           PayrollItem[]
+
+  @@unique([cycleType, month, halfPeriod, companyFilter])
+  @@index([month, cycleType])
+}
+
+model PayrollItem {
+  id                      String     @id @default(cuid())
+  payrollRunId            String
+  employeeId              String
+  employeeName            String
+  employeeCode            String
+  category                String     // OFFICE | TAMIL_LABOUR | HINDI_CREW
+  company                 String     @default("STANDARD_ROOFS") // STANDARD_ROOFS | INVI_CREATION
+  totalWorkingDays        Float      @default(25)
+  daysPresent             Float      @default(0)
+  baseRate                Float      @default(0)
+  grossSalary             Float      @default(0)
+  otAndIncentive          Float      @default(0)
+  nightDutyAmount         Float      @default(0)
+  lastMonthBalance        Float      @default(0)
+  advanceDeduction        Float      @default(0)
+  expenseBalanceDeduction Float      @default(0)
+  netSalary               Float      @default(0)
+  paidCash                Float      @default(0)
+  paidBankOrGpay          Float      @default(0)
+  paymentChannel          String     @default("CASH") // CASH | ICICI | OFFICE_GPAY | AGENT_ACCOUNT
+  carryForwardBalance     Float      @default(0)
+  isCleared               Boolean    @default(false)
+  notes                   String?
+
+  payrollRun              PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+
+  @@index([payrollRunId])
+  @@index([employeeId])
+}
+
 
 
 

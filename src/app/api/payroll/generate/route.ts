@@ -1,0 +1,282 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+function getCycleDateRange(month: string, halfPeriod: string) {
+  const [yStr, mStr] = month.split("-");
+  const year = Number(yStr);
+  const mon = Number(mStr);
+  const lastDay = new Date(year, mon, 0).getDate();
+
+  if (halfPeriod === "FIRST_HALF") {
+    return {
+      start: new Date(Date.UTC(year, mon - 1, 1)),
+      end: new Date(Date.UTC(year, mon - 1, 15)),
+      defaultWorkingDays: 15,
+    };
+  }
+  if (halfPeriod === "SECOND_HALF") {
+    return {
+      start: new Date(Date.UTC(year, mon - 1, 16)),
+      end: new Date(Date.UTC(year, mon - 1, lastDay)),
+      defaultWorkingDays: lastDay - 15,
+    };
+  }
+  // Count non-Sunday days for FULL month
+  let workingDays = 0;
+  for (let d = 1; d <= lastDay; d++) {
+    const dayOfWeek = new Date(year, mon - 1, d).getDay();
+    if (dayOfWeek !== 0) workingDays++;
+  }
+  return {
+    start: new Date(Date.UTC(year, mon - 1, 1)),
+    end: new Date(Date.UTC(year, mon - 1, lastDay)),
+    defaultWorkingDays: workingDays,
+  };
+}
+
+function getPreviousCycle(month: string, halfPeriod: string): { month: string; halfPeriod: string } {
+  const [yStr, mStr] = month.split("-");
+  let y = Number(yStr);
+  let m = Number(mStr);
+
+  if (halfPeriod === "SECOND_HALF") {
+    return { month, halfPeriod: "FIRST_HALF" };
+  }
+  m -= 1;
+  if (m < 1) {
+    m = 12;
+    y -= 1;
+  }
+  const prevMonth = `${y}-${String(m).padStart(2, "0")}`;
+  return {
+    month: prevMonth,
+    halfPeriod: halfPeriod === "FIRST_HALF" ? "SECOND_HALF" : "FULL",
+  };
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const cycleType = body.cycleType || "MONTHLY_OFFICE";
+    const month = body.month || "2026-11";
+    const halfPeriod = body.halfPeriod || (cycleType === "MONTHLY_OFFICE" ? "FULL" : "FIRST_HALF");
+
+    const empCategory =
+      cycleType === "MONTHLY_OFFICE"
+        ? "OFFICE_STAFF"
+        : cycleType === "BI_MONTHLY_TAMIL"
+        ? "TAMIL_LABOUR"
+        : "HINDI_LABOUR";
+
+    const itemCategory =
+      cycleType === "MONTHLY_OFFICE"
+        ? "OFFICE"
+        : cycleType === "BI_MONTHLY_TAMIL"
+        ? "TAMIL_LABOUR"
+        : "HINDI_CREW";
+
+    const { start, end, defaultWorkingDays } = getCycleDateRange(month, halfPeriod);
+
+    // 1. Fetch active employees in this category
+    const employees = await prisma.employeeOrLabour.findMany({
+      where: {
+        active: true,
+        status: "ACTIVE",
+        category: empCategory,
+      },
+      orderBy: { name: "asc" },
+    });
+
+    // 2. Fetch AttendanceRecords in range
+    const attendance = await prisma.attendanceRecord.findMany({
+      where: {
+        date: { gte: start, lte: end },
+        employeeId: { in: employees.map((e) => e.id) },
+      },
+    });
+
+    const attByEmp = new Map<string, typeof attendance>();
+    for (const rec of attendance) {
+      const list = attByEmp.get(rec.employeeId) || [];
+      list.push(rec);
+      attByEmp.set(rec.employeeId, list);
+    }
+
+    // 3. Fetch prior cycle carryForwardBalance
+    const prev = getPreviousCycle(month, halfPeriod);
+    const prevRun = await prisma.payrollRun.findUnique({
+      where: {
+        cycleType_month_halfPeriod_companyFilter: {
+          cycleType,
+          month: prev.month,
+          halfPeriod: prev.halfPeriod,
+          companyFilter: "ALL",
+        },
+      },
+      include: { items: true },
+    });
+
+    const prevBalanceMap = new Map<string, number>();
+    if (prevRun) {
+      for (const it of prevRun.items) {
+        if (it.carryForwardBalance !== 0) {
+          prevBalanceMap.set(it.employeeId, it.carryForwardBalance);
+          prevBalanceMap.set(it.employeeName.toLowerCase().trim(), it.carryForwardBalance);
+        }
+      }
+    }
+
+    // 4. Check existing run to preserve manual overrides if DRAFT
+    const existingRun = await prisma.payrollRun.findUnique({
+      where: {
+        cycleType_month_halfPeriod_companyFilter: {
+          cycleType,
+          month,
+          halfPeriod,
+          companyFilter: "ALL",
+        },
+      },
+      include: { items: true },
+    });
+
+    if (existingRun?.status === "PAID") {
+      return NextResponse.json(
+        { success: false, error: "This payroll cycle is already PAID & locked." },
+        { status: 400 }
+      );
+    }
+
+    const existingByEmp = new Map(existingRun?.items.map((it) => [it.employeeId, it]) || []);
+
+    const newItems = employees.map((emp) => {
+      const recs = attByEmp.get(emp.id) || [];
+      let daysPresent = 0;
+      let dailyAdvSum = 0;
+      let totalOtHours = 0;
+
+      for (const r of recs) {
+        const st = (r.status || "").toUpperCase();
+        if (st === "P" || st === "PL" || st === "1H" || st === "1H_MORNING" || st === "1H_EVENING") {
+          daysPresent += 1.0;
+        } else if (st === "H") {
+          daysPresent += 0.5;
+        }
+        dailyAdvSum += Number(r.dailyAdvance || 0);
+        totalOtHours += Number(r.otHours || 0);
+      }
+
+      const prevIt = existingByEmp.get(emp.id);
+      const baseRate =
+        cycleType === "MONTHLY_OFFICE"
+          ? Number(emp.monthlySalary || emp.baseWage || 0)
+          : Number(emp.dailyWage || emp.baseWage || 0);
+
+      const totalWorkingDays = prevIt?.totalWorkingDays || defaultWorkingDays;
+      const grossSalary =
+        cycleType === "MONTHLY_OFFICE"
+          ? Math.round((baseRate / (totalWorkingDays || 26)) * daysPresent)
+          : Math.round(baseRate * daysPresent);
+
+      const otRatePerHr = cycleType === "MONTHLY_OFFICE" ? Math.round(baseRate / (totalWorkingDays * 8)) : Math.round(baseRate / 8);
+      const otAndIncentive = prevIt ? prevIt.otAndIncentive : Math.round(totalOtHours * otRatePerHr);
+      const nightDutyAmount = prevIt?.nightDutyAmount || 0;
+      const lastMonthBalance =
+        prevIt?.lastMonthBalance ??
+        (prevBalanceMap.get(emp.id) ?? prevBalanceMap.get(emp.name.toLowerCase().trim()) ?? 0);
+      const advanceDeduction = prevIt ? prevIt.advanceDeduction : Math.round(dailyAdvSum);
+      const expenseBalanceDeduction = prevIt?.expenseBalanceDeduction || 0;
+
+      const netSalary = Math.round(
+        grossSalary + otAndIncentive + nightDutyAmount + lastMonthBalance - advanceDeduction - expenseBalanceDeduction
+      );
+
+      const paidCash = prevIt?.paidCash || 0;
+      const paidBankOrGpay = prevIt?.paidBankOrGpay || 0;
+      const carryForwardBalance = Math.round(netSalary - (paidCash + paidBankOrGpay));
+
+      return {
+        employeeId: emp.id,
+        employeeName: emp.name,
+        employeeCode: emp.employeeCode,
+        category: itemCategory,
+        company: emp.companyUnit === "INVI_CREATION" ? "INVI_CREATION" : "STANDARD_ROOFS",
+        totalWorkingDays,
+        daysPresent,
+        baseRate,
+        grossSalary,
+        otAndIncentive,
+        nightDutyAmount,
+        lastMonthBalance,
+        advanceDeduction,
+        expenseBalanceDeduction,
+        netSalary,
+        paidCash,
+        paidBankOrGpay,
+        paymentChannel: prevIt?.paymentChannel || "CASH",
+        carryForwardBalance,
+        isCleared: prevIt?.isCleared || false,
+        notes: prevIt?.notes || (recs.length > 0 ? `Synced from ${recs.length} attendance records` : null),
+      };
+    });
+
+    const totalGross = newItems.reduce((s, x) => s + x.grossSalary, 0);
+    const totalDeductions = newItems.reduce((s, x) => s + x.advanceDeduction + x.expenseBalanceDeduction, 0);
+    const totalNet = newItems.reduce((s, x) => s + x.netSalary, 0);
+    const paidCash = newItems.reduce((s, x) => s + x.paidCash, 0);
+    const paidBank = newItems.reduce((s, x) => s + x.paidBankOrGpay, 0);
+
+    const run = await prisma.payrollRun.upsert({
+      where: {
+        cycleType_month_halfPeriod_companyFilter: {
+          cycleType,
+          month,
+          halfPeriod,
+          companyFilter: "ALL",
+        },
+      },
+      update: {
+        totalGross,
+        totalDeductions,
+        totalNet,
+        paidCash,
+        paidBank,
+      },
+      create: {
+        cycleType,
+        month,
+        halfPeriod,
+        companyFilter: "ALL",
+        status: "DRAFT",
+        totalGross,
+        totalDeductions,
+        totalNet,
+        paidCash,
+        paidBank,
+      },
+    });
+
+    await prisma.payrollItem.deleteMany({ where: { payrollRunId: run.id } });
+    if (newItems.length > 0) {
+      await prisma.payrollItem.createMany({
+        data: newItems.map((it) => ({ ...it, payrollRunId: run.id })),
+      });
+    }
+
+    const updated = await prisma.payrollRun.findUnique({
+      where: { id: run.id },
+      include: { items: { orderBy: { employeeName: "asc" } } },
+    });
+
+    return NextResponse.json({
+      success: true,
+      run: updated,
+      syncedEmployees: newItems.length,
+    });
+  } catch (error: any) {
+    console.error("[POST /api/payroll/generate]", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to generate payroll" },
+      { status: 500 }
+    );
+  }
+}
