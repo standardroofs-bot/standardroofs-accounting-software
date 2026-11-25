@@ -299,6 +299,7 @@ export function Sidebar() {
     setIsCollapsed,
     currentWorkspace,
     setCurrentWorkspace,
+    themeConfig,
   } = useSidebar();
 
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -419,7 +420,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-gradient-to-b from-[#E3EBF9] via-[#E8EFFB] to-[#DDE6F7] text-slate-800 flex flex-col border-r border-indigo-200/90 shadow-[6px_0_28px_-12px_rgba(30,58,138,0.15)] backdrop-blur-md ${
+      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-gradient-to-b ${themeConfig.sidebarGradient} text-stone-800 flex flex-col border-r ${themeConfig.sidebarBorder} shadow-[6px_0_28px_-12px_rgba(120,53,15,0.12)] backdrop-blur-md ${
         isCollapsed ? "w-20" : "w-[272px]"
       } ${
         isMobileOpen
@@ -428,29 +429,29 @@ export function Sidebar() {
       }`}
     >
       {/* Brand Header */}
-      <div className="h-14 flex items-center justify-between px-3.5 border-b border-indigo-200/70 bg-white/75 shrink-0 backdrop-blur-sm">
+      <div className="h-14 flex items-center justify-between px-3.5 border-b border-stone-300/80 bg-[#FCFBF9]/90 shrink-0 backdrop-blur-sm">
         <Link
           href="/"
           onClick={() => setIsMobileOpen(false)}
           className="flex items-center gap-2.5 overflow-hidden hover:opacity-95 transition group cursor-pointer"
           title="Return to Home"
         >
-          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center p-1 shrink-0 shadow-2xs border border-slate-200 group-hover:border-indigo-400 transition">
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center p-1 shrink-0 shadow-2xs border border-stone-300 group-hover:border-amber-500 transition">
             <img
-              src="/images/standard-roofs-logo.png"
+              src="/logo.png"
               alt="Standard Roofs Logo"
               className="w-full h-full object-contain"
             />
           </div>
           {!isCollapsed && (
             <div className="flex flex-col truncate">
-              <span className="font-extrabold text-xs tracking-tight text-slate-900 leading-none group-hover:text-indigo-600 transition flex items-center gap-1.5">
+              <span className="font-extrabold text-xs tracking-tight text-stone-900 leading-none group-hover:text-amber-700 transition flex items-center gap-1.5">
                 SR-Books
-                <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-amber-100/80 text-amber-900 border border-amber-300/70">
                   v2.6
                 </span>
               </span>
-              <span className="text-[10px] text-slate-500 truncate mt-0.5 font-medium">
+              <span className="text-[10px] text-stone-500 truncate mt-0.5 font-medium">
                 Standard Roofs • Erode
               </span>
             </div>
@@ -461,14 +462,14 @@ export function Sidebar() {
         <div className="flex items-center">
           <button
             onClick={() => setIsMobileOpen(false)}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 lg:hidden transition cursor-pointer"
+            className="p-1.5 rounded-lg text-stone-500 hover:text-stone-900 hover:bg-stone-200/60 lg:hidden transition cursor-pointer"
             title="Close Menu"
           >
             <X size={18} />
           </button>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden lg:flex p-1.5 rounded-md hover:bg-slate-200/60 text-slate-500 hover:text-slate-900 transition cursor-pointer"
+            className="hidden lg:flex p-1.5 rounded-md hover:bg-stone-200/60 text-stone-500 hover:text-stone-900 transition cursor-pointer"
             title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
             {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
@@ -476,18 +477,18 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* 4-Workspace Switcher Bar (Tactile White Porcelain Selector with Custom Duotone Emblems) */}
+      {/* 4-Workspace Switcher Bar (Tactile Warm Porcelain Selector with Custom Duotone Emblems) */}
       {!isCollapsed ? (
-        <div className="p-2.5 border-b border-indigo-200/70 bg-indigo-50/40 relative">
+        <div className="p-2.5 border-b border-stone-300/70 bg-stone-100/50 relative">
           <button
             onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white border border-indigo-200/90 shadow-sm hover:border-indigo-400 hover:shadow-md transition text-left group cursor-pointer"
+            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-[#FCFBF9] border border-stone-300/90 shadow-sm hover:border-amber-500 hover:shadow-md transition text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div
                 className={`w-8 h-8 rounded-xl bg-gradient-to-br ${
                   currentWorkspace === "all"
-                    ? "from-blue-600 to-indigo-600"
+                    ? "from-stone-700 to-amber-700"
                     : activeWsConfig.color
                 } text-white flex items-center justify-center shrink-0 shadow-sm`}
               >
@@ -498,17 +499,17 @@ export function Sidebar() {
                 )}
               </div>
               <div className="truncate">
-                <span className="text-[9.5px] font-bold tracking-wider text-slate-400 uppercase block leading-none">
+                <span className="text-[9.5px] font-bold tracking-wider text-stone-400 uppercase block leading-none">
                   Active Workspace
                 </span>
-                <span className="text-[12.5px] font-bold text-slate-900 group-hover:text-indigo-600 transition truncate block mt-0.5">
+                <span className="text-[12.5px] font-bold text-stone-900 group-hover:text-amber-700 transition truncate block mt-0.5">
                   {currentWorkspace === "all" ? "All Modules" : activeWsConfig.title}
                 </span>
               </div>
             </div>
             <ChevronDown
               size={15}
-              className={`text-slate-400 group-hover:text-slate-700 transition-transform duration-200 shrink-0 ml-1 ${
+              className={`text-stone-400 group-hover:text-stone-700 transition-transform duration-200 shrink-0 ml-1 ${
                 showWorkspaceMenu ? "rotate-180" : ""
               }`}
             />
@@ -522,9 +523,9 @@ export function Sidebar() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: -6 }}
                 transition={{ type: "spring", stiffness: 420, damping: 28 }}
-                className="absolute left-2.5 right-2.5 top-full mt-1.5 bg-white/95 backdrop-blur-xl border border-indigo-200/90 rounded-2xl shadow-[0_20px_50px_-10px_rgba(30,58,138,0.25)] p-2 z-50 origin-top space-y-1.5"
+                className="absolute left-2.5 right-2.5 top-full mt-1.5 bg-[#FCFBF9]/95 backdrop-blur-xl border border-stone-300/90 rounded-2xl shadow-[0_20px_50px_-10px_rgba(120,53,15,0.2)] p-2 z-50 origin-top space-y-1.5"
               >
-                <div className="px-2 py-1 text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">
+                <div className="px-2 py-1 text-[9.5px] font-bold text-stone-400 uppercase tracking-wider">
                   Select Workspace
                 </div>
                 {accessibleWorkspaces.map((ws) => {
@@ -601,18 +602,18 @@ export function Sidebar() {
               {!isCollapsed ? (
                 <button
                   onClick={() => toggleSection(group.id)}
-                  className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] font-bold tracking-wider text-slate-400 hover:text-slate-700 uppercase transition group cursor-pointer"
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-[10.5px] font-bold tracking-wider text-stone-500 hover:text-stone-800 uppercase transition group cursor-pointer"
                 >
                   <span className="truncate">{group.title}</span>
                   <ChevronDown
                     size={14}
-                    className={`text-slate-400 group-hover:text-slate-600 transition-transform duration-200 ${
+                    className={`text-stone-400 group-hover:text-stone-600 transition-transform duration-200 ${
                       isOpen ? "" : "-rotate-90"
                     }`}
                   />
                 </button>
               ) : (
-                <div className="h-px bg-slate-200 my-2 mx-1" />
+                <div className="h-px bg-stone-300/80 my-2 mx-1" />
               )}
 
               {/* Items List (Gliding Active Pill via Framer Motion layoutId) */}
@@ -632,24 +633,24 @@ export function Sidebar() {
                         title={isCollapsed ? item.name : undefined}
                         className={`flex items-center gap-2.5 px-3 py-2 text-[13.5px] transition-colors group relative rounded-xl ${
                           isActive
-                            ? `${activeWsConfig.activeText} font-bold`
-                            : "text-slate-700 hover:text-slate-950 font-medium"
+                            ? `${themeConfig.activePillText} font-bold`
+                            : "text-stone-700 hover:text-stone-950 font-medium"
                         }`}
                       >
                         {isActive && (
                           <motion.span
                             layoutId="srActiveSidebarPill"
-                            className={`absolute inset-0 bg-white shadow-sm border border-indigo-200/90 ${activeWsConfig.activeBorder} rounded-r-xl rounded-l-xs z-0`}
+                            className={`absolute inset-0 bg-gradient-to-r ${themeConfig.activePillGradient} shadow-md shadow-emerald-900/20 rounded-xl z-0`}
                             transition={{ type: "spring", stiffness: 380, damping: 30 }}
                           />
                         )}
                         {!isActive && (
-                          <span className="absolute inset-0 rounded-xl hover:bg-white/60 transition-colors z-0" />
+                          <span className="absolute inset-0 rounded-xl hover:bg-stone-200/50 transition-colors z-0" />
                         )}
                         <Icon
                           size={17}
                           className={`relative z-10 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-                            isActive ? activeWsConfig.activeIconColor : "text-slate-400 group-hover:text-slate-700"
+                            isActive ? "text-white" : "text-stone-500 group-hover:text-stone-800"
                           }`}
                         />
                         {!isCollapsed && (
@@ -659,8 +660,8 @@ export function Sidebar() {
                               <span
                                 className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md shrink-0 ml-1.5 ${
                                   isActive
-                                    ? activeWsConfig.activeBadge
-                                    : "bg-slate-200/70 text-slate-600 border border-slate-300/60"
+                                    ? themeConfig.activeBadge
+                                    : "bg-stone-200/80 text-stone-700 border border-stone-300/80"
                                 }`}
                               >
                                 {item.badge}
@@ -680,20 +681,20 @@ export function Sidebar() {
 
       {/* Super Admin Status Footer */}
       {!isCollapsed && currentUser && (
-        <div className="p-3 border-t border-indigo-200/70 bg-white/75 text-xs flex items-center justify-between shrink-0 shadow-2xs backdrop-blur-sm">
+        <div className="p-3 border-t border-stone-300/80 bg-[#FCFBF9]/90 text-xs flex items-center justify-between shrink-0 shadow-2xs backdrop-blur-sm">
           <div className="truncate">
-            <div className="font-bold text-slate-900 truncate">
+            <div className="font-bold text-stone-900 truncate">
               {currentUser.email === "admin@standardroofs.in" || currentUser.role === "SUPER_ADMIN"
                 ? "Prabhakaran T"
                 : currentUser.name}
             </div>
-            <div className="text-[10px] text-slate-500 flex items-center gap-1 font-medium">
+            <div className="text-[10px] text-stone-500 flex items-center gap-1 font-medium">
               <span>{currentUser.role === "SUPER_ADMIN" ? "Super Admin" : currentUser.role?.replace(/_/g, " ")}</span>
               <span>•</span>
-              <span className="text-emerald-600 font-bold">Online</span>
+              <span className="text-emerald-700 font-bold">Online</span>
             </div>
           </div>
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 shadow-2xs shadow-emerald-500/50 animate-pulse" />
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0 shadow-2xs shadow-emerald-600/50 animate-pulse" />
         </div>
       )}
     </aside>

@@ -293,9 +293,9 @@ export function HomeVisualDashboard({
     <div className="max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-7 py-3 space-y-6 font-sans pb-16 select-none text-slate-800 dark:text-slate-100">
       
       {/* 1. COMMERCIAL ZOHO SAAS EXECUTIVE HEADER */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="porcelain-card rounded-2xl border border-stone-300/85 dark:border-slate-800 p-4 sm:p-5 shadow-[0_8px_28px_-8px_rgba(28,25,23,0.09)] flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-[#FCFBF9] dark:bg-slate-900">
         <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-500 text-white flex items-center justify-center font-black shadow-md shadow-blue-500/20 text-sm shrink-0 ring-2 ring-blue-500/10">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-amber-700 via-amber-600 to-orange-500 text-white flex items-center justify-center font-black shadow-md shadow-amber-600/20 text-sm shrink-0 ring-2 ring-amber-500/10">
             SR
           </div>
           <div>
@@ -303,12 +303,12 @@ export function HomeVisualDashboard({
               <h1 className="font-extrabold text-base md:text-lg tracking-tight text-slate-900 dark:text-slate-100">
                 Standard Roofs • Executive Financial Command
               </h1>
-              <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800/60">
+              <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 font-bold border border-emerald-300/70 dark:border-emerald-800/60">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 FY {fyName} Active
               </span>
-              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-800/60 hidden sm:inline-flex items-center gap-1">
-                <Landmark size={12} className="text-blue-600 dark:text-blue-400" />
+              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 font-semibold border border-amber-300/70 dark:border-amber-800/60 hidden sm:inline-flex items-center gap-1">
+                <Landmark size={12} className="text-amber-700 dark:text-amber-400" />
                 ICICI Live Sync
               </span>
             </div>
@@ -325,13 +325,13 @@ export function HomeVisualDashboard({
         {/* View Switcher & Primary Action Toolbar */}
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Visual vs Summary Table View Toggle */}
-          <div className="flex items-center p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center p-1 rounded-xl bg-stone-100 dark:bg-slate-800 border border-stone-300/80 dark:border-slate-700">
             <button
               type="button"
               onClick={() => setActiveView("visual")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeView === "visual"
-                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                  ? "bg-[#FCFBF9] dark:bg-slate-900 text-amber-800 dark:text-amber-400 shadow-xs border border-stone-200/80"
                   : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -343,7 +343,7 @@ export function HomeVisualDashboard({
               onClick={() => setActiveView("table")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeView === "table"
-                  ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                  ? "bg-[#FCFBF9] dark:bg-slate-900 text-amber-800 dark:text-amber-400 shadow-xs border border-stone-200/80"
                   : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -355,16 +355,16 @@ export function HomeVisualDashboard({
           <button
             type="button"
             onClick={handleExportSummaryExcel}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-stone-700 dark:text-slate-200 text-xs font-semibold border border-stone-300/80 dark:border-slate-700 transition cursor-pointer"
             title="Download Monthly Cash Flow Matrix (.xlsx)"
           >
-            <FileSpreadsheet size={14} className="text-emerald-600" />
+            <FileSpreadsheet size={14} className="text-emerald-700" />
             <span className="hidden sm:inline">Export Excel</span>
           </button>
 
           <Link
             href="/invoices/new"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition active:scale-95"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-600/20 transition active:scale-95"
           >
             <Receipt size={14} />
             <span>+ Tax Invoice #{nextInvoiceNo}</span>
@@ -372,7 +372,7 @@ export function HomeVisualDashboard({
 
           <Link
             href="/estimates"
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 rounded-xl text-xs font-bold shadow-xs transition active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs transition active:scale-95"
           >
             <Plus size={14} />
             <span>+ Quote</span>
@@ -383,12 +383,12 @@ export function HomeVisualDashboard({
       {/* 2. TOP 4 FINTECH KPI CARDS WITH SEGMENTED HEALTH BARS & SPARKLINES */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Total Receivables */}
-        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-white via-white to-blue-50/80 border border-slate-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md overflow-hidden relative">
-          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-blue-600 via-indigo-500 to-sky-400" />
+        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-[#FCFBF9] via-[#FAF7F2] to-[#F5EFE6] border border-stone-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md overflow-hidden relative">
+          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-amber-600 via-orange-500 to-amber-400" />
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                <span className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 flex items-center justify-center text-amber-700 dark:text-amber-400">
                   <TrendingUp size={13} />
                 </span>
                 Total Receivables (AR)
@@ -403,24 +403,24 @@ export function HomeVisualDashboard({
               </div>
               {/* Mini Sparkline */}
               <svg className="w-16 h-7 shrink-0 overflow-visible" viewBox="0 0 60 24">
-                <path d="M 0 18 Q 15 14 30 16 T 60 4" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" />
-                <circle cx="60" cy="4" r="3" fill="#2563eb" />
+                <path d="M 0 18 Q 15 14 30 16 T 60 4" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" />
+                <circle cx="60" cy="4" r="3" fill="#d97706" />
               </svg>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2 tabular-nums">
-              <span>Current: <strong className="text-blue-600 font-bold">{formatINR(effectiveCurrentAR)}</strong></span>
-              <span>Overdue: <strong className="text-amber-600 font-bold">{formatINR(effectiveOverdueAR)}</strong></span>
+              <span>Current: <strong className="text-amber-700 font-bold">{formatINR(effectiveCurrentAR)}</strong></span>
+              <span>Overdue: <strong className="text-orange-700 font-bold">{formatINR(effectiveOverdueAR)}</strong></span>
             </div>
           </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full mt-4 overflow-hidden flex">
-            <div className="bg-blue-600 h-full w-[35%]" title="Current (0-15d)" />
-            <div className="bg-amber-500 h-full w-[65%]" title="Overdue (16-30d)" />
+          <div className="w-full bg-stone-200 dark:bg-slate-800 h-2 rounded-full mt-4 overflow-hidden flex">
+            <div className="bg-amber-600 h-full w-[35%]" title="Current (0-15d)" />
+            <div className="bg-orange-500 h-full w-[65%]" title="Overdue (16-30d)" />
           </div>
         </div>
 
         {/* KPI 2: Cash & Bank Liquidity */}
-        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-white via-white to-emerald-50/70 border border-slate-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md overflow-hidden relative">
-          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-emerald-600 via-teal-500 to-green-400" />
+        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-[#FCFBF9] via-[#F4F9F6] to-[#EBF5EE] border border-stone-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md overflow-hidden relative">
+          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-emerald-600 via-teal-500 to-green-500" />
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -434,32 +434,32 @@ export function HomeVisualDashboard({
               </span>
             </div>
             <div className="flex items-baseline justify-between mt-3">
-              <div className="text-2xl lg:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums tracking-tight">
+              <div className="text-2xl lg:text-3xl font-extrabold text-emerald-700 dark:text-emerald-400 tabular-nums tracking-tight">
                 {formatINR(effectiveLiquidity)}
               </div>
               {/* Mini Sparkline */}
               <svg className="w-16 h-7 shrink-0 overflow-visible" viewBox="0 0 60 24">
-                <path d="M 0 16 Q 20 18 35 12 T 60 6" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
-                <circle cx="60" cy="6" r="3" fill="#10b981" />
+                <path d="M 0 16 Q 20 18 35 12 T 60 6" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" />
+                <circle cx="60" cy="6" r="3" fill="#059669" />
               </svg>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2 tabular-nums">
               <span>ICICI ...3161: <strong>{formatINR(iciciBalance)}</strong></span>
-              <span className="text-emerald-600 font-semibold">18.4 Mo Runway</span>
+              <span className="text-emerald-700 font-semibold">18.4 Mo Runway</span>
             </div>
           </div>
           <div className="w-full bg-emerald-100 dark:bg-emerald-950 h-2 rounded-full mt-4 overflow-hidden">
-            <div className="bg-emerald-500 h-full w-full" />
+            <div className="bg-emerald-600 h-full w-full" />
           </div>
         </div>
 
         {/* KPI 3: Total Payables (AP) */}
-        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-white via-white to-indigo-50/80 border border-slate-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md overflow-hidden relative">
-          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-400" />
+        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-[#FCFBF9] via-[#F8F6F4] to-[#F2EDE8] border border-stone-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md overflow-hidden relative">
+          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-stone-600 via-amber-700 to-stone-500" />
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                <span className="w-6 h-6 rounded-lg bg-stone-100 dark:bg-stone-900 border border-stone-300 dark:border-stone-700 flex items-center justify-center text-stone-700 dark:text-stone-300">
                   <Receipt size={13} />
                 </span>
                 Total Payables (AP)
@@ -474,27 +474,27 @@ export function HomeVisualDashboard({
               </div>
               {/* Mini Sparkline */}
               <svg className="w-16 h-7 shrink-0 overflow-visible" viewBox="0 0 60 24">
-                <path d="M 0 10 L 60 10" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" />
-                <circle cx="60" cy="10" r="3" fill="#94a3b8" />
+                <path d="M 0 10 L 60 10" fill="none" stroke="#78716c" strokeWidth="2.5" strokeLinecap="round" />
+                <circle cx="60" cy="10" r="3" fill="#78716c" />
               </svg>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2 tabular-nums">
               <span>Current: <strong>₹0.00</strong></span>
-              <span className="text-emerald-600 font-semibold">Zero Overdue</span>
+              <span className="text-emerald-700 font-semibold">Zero Overdue</span>
             </div>
           </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full mt-4 overflow-hidden">
-            <div className="bg-slate-400 h-full w-[10%]" />
+          <div className="w-full bg-stone-200 dark:bg-slate-800 h-2 rounded-full mt-4 overflow-hidden">
+            <div className="bg-stone-500 h-full w-[10%]" />
           </div>
         </div>
 
         {/* KPI 4: Net Operating Profit */}
-        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-white via-white to-teal-50/70 border border-slate-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md overflow-hidden relative">
-          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-teal-500 via-cyan-500 to-emerald-400" />
+        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-[#FCFBF9] via-[#F2F8F6] to-[#E6F3EE] border border-stone-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md overflow-hidden relative">
+          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-teal-700 via-emerald-600 to-amber-500" />
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-lg bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 flex items-center justify-center text-teal-600 dark:text-teal-400">
+                <span className="w-6 h-6 rounded-lg bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 flex items-center justify-center text-teal-700 dark:text-teal-400">
                   <DollarSign size={13} />
                 </span>
                 Net Operating Profit
@@ -504,22 +504,22 @@ export function HomeVisualDashboard({
               </span>
             </div>
             <div className="flex items-baseline justify-between mt-3">
-              <div className="text-2xl lg:text-3xl font-extrabold text-teal-600 dark:text-teal-400 tabular-nums tracking-tight">
+              <div className="text-2xl lg:text-3xl font-extrabold text-teal-700 dark:text-teal-400 tabular-nums tracking-tight">
                 {formatINR(effectiveNetSurplus)}
               </div>
               {/* Mini Sparkline */}
               <svg className="w-16 h-7 shrink-0 overflow-visible" viewBox="0 0 60 24">
-                <path d="M 0 18 Q 15 20 30 12 T 60 6" fill="none" stroke="#14b8a6" strokeWidth="2.5" strokeLinecap="round" />
-                <circle cx="60" cy="6" r="3" fill="#14b8a6" />
+                <path d="M 0 18 Q 15 20 30 12 T 60 6" fill="none" stroke="#0f766e" strokeWidth="2.5" strokeLinecap="round" />
+                <circle cx="60" cy="6" r="3" fill="#0f766e" />
               </svg>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2 tabular-nums">
               <span>Gross Turnover: <strong>{formatCompactINR(effectiveTurnover)}</strong></span>
-              <span className="text-teal-600 font-semibold">Margin: 89.2%</span>
+              <span className="text-teal-700 font-semibold">Margin: 89.2%</span>
             </div>
           </div>
           <div className="w-full bg-teal-100 dark:bg-teal-950 h-2 rounded-full mt-4 overflow-hidden">
-            <div className="bg-teal-500 h-full w-full" />
+            <div className="bg-teal-600 h-full w-full" />
           </div>
         </div>
       </div>
@@ -528,15 +528,16 @@ export function HomeVisualDashboard({
       {activeView === "visual" ? (
         <div className="space-y-6">
           {/* CHART 1: INTERACTIVE CASH FLOW & WORKING CAPITAL TRAJECTORY */}
-          <div className="porcelain-card rounded-2xl bg-gradient-to-br from-white via-[#FAFBFD] to-blue-50/50 border border-slate-300/85 dark:border-slate-800 p-5 sm:p-6 space-y-4 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+          <div className="porcelain-card rounded-2xl bg-gradient-to-br from-[#FCFBF9] via-[#FAF7F2] to-[#F5EFE6] border border-stone-300/85 dark:border-slate-800 p-5 sm:p-6 space-y-4 shadow-[0_8px_28px_-8px_rgba(28,25,23,0.09)] overflow-hidden relative">
+            <div className="h-1 -mx-6 -mt-6 mb-4 bg-gradient-to-r from-amber-600 via-emerald-600 to-teal-600" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-200/80 dark:border-slate-800 pb-4">
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <Landmark className="text-blue-600 dark:text-blue-400" size={18} />
+                    <Landmark className="text-amber-700 dark:text-amber-400" size={18} />
                     Cash Flow & Working Capital Trajectory (FY 2026-27)
                   </h2>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100/80 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300/60">
                     Cubic Spline
                   </span>
                 </div>
