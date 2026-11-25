@@ -221,27 +221,27 @@ export function ModuleHeaderWithAnalytics({
 
   return (
     <div className="space-y-4 font-sans">
-      {/* 1. TOP HEADER & ACTION BAR */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-slate-800">
-        <div className="flex items-center gap-3">
+      {/* 1. SIGNATURE EXECUTIVE HERO COMMAND BANNER */}
+      <div className="bg-gradient-to-br from-[#0F172A] via-[#1E1B4B] to-[#0F172A] text-white rounded-2xl p-5 sm:p-6 shadow-xl shadow-slate-900/10 border border-indigo-500/20 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-4 min-w-0">
           {Icon && (
-            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0 shadow-2xs">
+            <div className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 flex items-center justify-center shrink-0 shadow-inner">
               <Icon size={22} />
             </div>
           )}
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-[22px] font-extrabold text-white tracking-tight leading-tight">
                 {title}
               </h1>
               {badge && (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/25 text-indigo-100 border border-indigo-400/35 uppercase tracking-wide">
                   {badge}
                 </span>
               )}
             </div>
             {subtitle && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs sm:text-[13px] text-indigo-200/85 mt-1 leading-relaxed">
                 {subtitle}
               </p>
             )}
@@ -249,19 +249,19 @@ export function ModuleHeaderWithAnalytics({
         </div>
 
         {/* Top Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {/* Analytics Toggle */}
           <button
             type="button"
             onClick={toggleAnalytics}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition shadow-2xs ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition cursor-pointer ${
               showAnalytics
-                ? "bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-700 dark:text-blue-300"
-                : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50"
+                ? "bg-indigo-500/30 border-indigo-400/40 text-white"
+                : "bg-white/10 hover:bg-white/15 border-white/15 text-white"
             }`}
             title="Toggle Visual Analytics Strip"
           >
-            <BarChart3 size={14} className="text-blue-600 dark:text-blue-400" />
+            <BarChart3 size={14} className="text-indigo-200" />
             <span>{showAnalytics ? "Hide Analytics" : "Show Analytics"}</span>
             {showAnalytics ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
@@ -271,10 +271,10 @@ export function ModuleHeaderWithAnalytics({
             <button
               type="button"
               onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/15 border border-white/15 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
               title="Bulk Import Records from Excel / CSV"
             >
-              <Upload size={13} className="text-blue-600 dark:text-blue-400" />
+              <Upload size={13} className="text-indigo-200" />
               <span>Import Excel</span>
             </button>
           )}
@@ -284,10 +284,10 @@ export function ModuleHeaderWithAnalytics({
             <button
               type="button"
               onClick={onExportExcel}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/15 border border-white/15 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
               title="Download Filtered Records as Excel (.xlsx)"
             >
-              <FileSpreadsheet size={13} className="text-emerald-600 dark:text-emerald-400" />
+              <FileSpreadsheet size={13} className="text-emerald-300" />
               <span>Export (.xlsx)</span>
             </button>
           )}
@@ -297,10 +297,10 @@ export function ModuleHeaderWithAnalytics({
             <button
               type="button"
               onClick={onExportPDF}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold shadow-2xs transition"
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/15 border border-white/15 text-white rounded-xl text-xs font-semibold transition cursor-pointer"
               title="Generate Printable PDF Report (A4)"
             >
-              <Printer size={13} className="text-indigo-600 dark:text-indigo-400" />
+              <Printer size={13} className="text-indigo-200" />
               <span>Print / PDF</span>
             </button>
           )}
@@ -310,7 +310,7 @@ export function ModuleHeaderWithAnalytics({
             effectivePrimaryHref ? (
               <a
                 href={effectivePrimaryHref}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-xs transition active:scale-95"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-white font-semibold text-xs shadow-lg shadow-indigo-950/50 transition active:scale-95"
               >
                 <PrimaryActionIcon size={14} />
                 <span>{effectivePrimaryLabel}</span>
@@ -319,7 +319,7 @@ export function ModuleHeaderWithAnalytics({
               <button
                 type="button"
                 onClick={effectivePrimaryAction}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-xs transition active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-white font-semibold text-xs shadow-lg shadow-indigo-950/50 transition active:scale-95 cursor-pointer"
               >
                 <PrimaryActionIcon size={14} />
                 <span>{effectivePrimaryLabel}</span>

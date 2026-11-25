@@ -55,7 +55,7 @@
 }
 
 body {
-  background-color: #F8FAFC;
+  background-color: #F1F5F9;
   color: #0F172A;
   font-family: "Inter", var(--font-sans), "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -68,7 +68,7 @@ body {
 
 /* Disciplined Commercial Porcelain & Royal Indigo System */
 :root body {
-  background-color: #F8FAFC;
+  background-color: #F1F5F9;
   background-image: none;
 }
 

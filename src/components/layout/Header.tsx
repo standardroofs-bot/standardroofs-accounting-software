@@ -170,12 +170,15 @@ export function Header({ onQuickCreate }: HeaderProps) {
 
         {/* Global Search (Tablet and Desktop) */}
         <div className="hidden md:flex items-center relative ml-2">
-          <Search size={15} className="absolute left-3 text-slate-400" />
+          <Search size={15} className="absolute left-3 text-slate-500" />
           <input
             type="text"
-            placeholder="Search accounts, invoices, materials, fleet..."
-            className="pl-8 pr-4 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs w-48 lg:w-64 focus:outline-none focus:ring-1 focus:ring-slate-900 text-slate-800 dark:text-slate-200"
+            placeholder="Search accounts, invoices, materials..."
+            className="pl-8 pr-12 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs w-48 lg:w-64 focus:outline-none focus:ring-1 focus:ring-indigo-600 text-slate-900 dark:text-slate-200"
           />
+          <kbd className="hidden lg:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-bold text-slate-500 bg-white border border-slate-200 rounded absolute right-2">
+            ⌘K
+          </kbd>
         </div>
       </div>
 

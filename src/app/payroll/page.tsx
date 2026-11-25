@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
 import { BrandedPayslip, BrandedPayslipItem } from "@/components/payroll/BrandedPayslip";
+import { ModuleHeroBanner } from "@/components/ui/ModuleHeroBanner";
+import { TactileKpiCard, InitialsAvatar, ChannelBadge, BalanceBadge } from "@/components/ui/ErpPrimitives";
 
 interface PayrollItem extends BrandedPayslipItem {
   payrollRunId: string;
@@ -530,141 +532,109 @@ export default function StandardPayrollPage() {
   const allSelected = visibleItems.length > 0 && visibleItems.every((it) => selectedIds.includes(it.id));
 
   return (
-    <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-2 space-y-5 font-sans pb-16 text-slate-800">
-      {/* 1. PAGE HEADER */}
-      <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
-            <Coins size={20} />
-          </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg font-extrabold tracking-tight text-slate-900">
-                Standard Payroll & Official Payslips
-              </h1>
-              {run && (
-                <span
-                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                    run.status === "PAID"
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : "bg-amber-50 text-amber-700 border-amber-200"
-                  }`}
-                >
-                  {run.status}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Past, Current & Future Payroll Cycles • Attendance Sync • Cash Book Advance Pull • Batch Branded Payslips
-            </p>
-          </div>
-        </div>
+    <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-2 space-y-5 font-sans pb-16 text-slate-900">
+      <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" />
-
-          <button
-            type="button"
-            onClick={() => setShowNewCycleModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold transition cursor-pointer"
-          >
-            <CalendarPlus size={14} />
-            <span>+ New Cycle</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer"
-          >
-            <Plus size={14} className="text-[#4F46E5]" />
-            <span>+ Add Worker</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSyncFromAttendance()}
-            disabled={syncing}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={syncing ? "animate-spin text-[#4F46E5]" : "text-[#4F46E5]"} />
-            <span>{syncing ? "Syncing..." : "Sync Attendance"}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handlePullAdvances}
-            disabled={!run || pullingAdv}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
-          >
-            <Wallet size={14} className="text-[#D97706]" />
-            <span>{pullingAdv ? "Pulling..." : "Pull Advances"}</span>
-          </button>
-
-          {run && (
-            <Link
-              href={`/payroll/payslips?runId=${run.id}&cycleType=${run.cycleType}&month=${run.month}&halfPeriod=${run.halfPeriod}`}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition"
-            >
-              <Printer size={14} className="text-indigo-600" />
-              <span>All Payslips</span>
-            </Link>
-          )}
-
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
-          >
-            <Upload size={14} className="text-slate-600" />
-            <span>{importing ? "Importing..." : "Import"}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportExcel}
-            disabled={!run || visibleItems.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
-          >
-            <FileSpreadsheet size={14} className="text-emerald-600" />
-            <span>Export</span>
-          </button>
-
-          {run?.status === "PAID" ? (
+      {/* 1. EXECUTIVE HERO COMMAND BANNER */}
+      <ModuleHeroBanner
+        icon={<Coins size={22} />}
+        title="Standard Payroll & Official Payslips"
+        subtitle="Past, Current & Future Payroll Cycles • Live Attendance Sync • Cash Book Advance Pull • Batch Branded Payslips"
+        statusBadge={
+          run
+            ? {
+                label: run.status,
+                tone: run.status === "PAID" ? "emerald" : "amber",
+              }
+            : { label: "READY", tone: "indigo" }
+        }
+        primaryActions={
+          <>
             <button
               type="button"
-              onClick={handleReopenCycle}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold transition cursor-pointer"
+              onClick={() => setShowNewCycleModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/15 text-xs font-semibold transition cursor-pointer"
             >
-              <Unlock size={14} />
-              <span>Unlock & Edit</span>
+              <CalendarPlus size={14} className="text-indigo-200" />
+              <span>+ New Cycle</span>
             </button>
-          ) : (
-            <>
-              {run && (
-                <button
-                  type="button"
-                  onClick={handleDeleteDraftCycle}
-                  className="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition cursor-pointer"
-                  title="Delete Draft Payroll Cycle"
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
+
+            <button
+              type="button"
+              onClick={() => handleSyncFromAttendance()}
+              disabled={syncing}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/15 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={syncing ? "animate-spin text-indigo-200" : "text-indigo-200"} />
+              <span>{syncing ? "Syncing..." : "Sync Attendance"}</span>
+            </button>
+
+            {run?.status === "PAID" ? (
+              <button
+                type="button"
+                onClick={handleReopenCycle}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-lg transition cursor-pointer"
+              >
+                <Unlock size={14} />
+                <span>Unlock &amp; Edit</span>
+              </button>
+            ) : (
               <button
                 type="button"
                 onClick={handleApproveRun}
                 disabled={!run || approving}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold shadow-lg shadow-indigo-950/50 transition cursor-pointer disabled:opacity-50"
               >
                 <CheckCircle2 size={14} />
                 <span>{approving ? "Posting..." : "Approve & Post"}</span>
               </button>
-            </>
-          )}
-        </div>
-      </div>
+            )}
+          </>
+        }
+        moreActions={[
+          {
+            label: "+ Add Worker",
+            icon: <Plus size={14} className="text-[#4F46E5]" />,
+            onClick: () => setShowAddModal(true),
+          },
+          {
+            label: pullingAdv ? "Pulling Advances..." : "Pull Advances",
+            icon: <Wallet size={14} className="text-amber-600" />,
+            onClick: handlePullAdvances,
+            disabled: !run || pullingAdv,
+          },
+          ...(run
+            ? [
+                {
+                  label: "All Payslips (Batch)",
+                  icon: <Printer size={14} className="text-[#4F46E5]" />,
+                  href: `/payroll/payslips?runId=${run.id}&cycleType=${run.cycleType}&month=${run.month}&halfPeriod=${run.halfPeriod}`,
+                },
+              ]
+            : []),
+          {
+            label: importing ? "Importing..." : "Import Excel",
+            icon: <Upload size={14} className="text-slate-600" />,
+            onClick: () => fileInputRef.current?.click(),
+            disabled: importing,
+          },
+          {
+            label: "Export Excel (.xlsx)",
+            icon: <FileSpreadsheet size={14} className="text-emerald-600" />,
+            onClick: handleExportExcel,
+            disabled: !run || visibleItems.length === 0,
+          },
+          ...(run && run.status !== "PAID"
+            ? [
+                {
+                  label: "Delete Draft Cycle",
+                  icon: <Trash2 size={14} className="text-rose-600" />,
+                  onClick: handleDeleteDraftCycle,
+                },
+              ]
+            : []),
+        ]}
+      />
 
       {/* SUBTLE POSTED-TO-ACCOUNTS BANNER WHEN PAID */}
       {run?.status === "PAID" && (
@@ -679,14 +649,16 @@ export default function StandardPayrollPage() {
         </div>
       )}
 
-      {/* 2. 3 SEGMENT TABS + PERIOD & COMPANY CONTROLS */}
-      <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-3.5 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200/80">
+      {/* 2. 3 ELEVATED SEGMENTED TABS + PERIOD & COMPANY CONTROLS */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] p-3.5 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-slate-200/75 rounded-xl border border-slate-200">
           <button
             type="button"
             onClick={() => handleTabChange("MONTHLY_OFFICE")}
-            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-              cycleType === "MONTHLY_OFFICE" ? "bg-indigo-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+            className={`px-3.5 py-1.5 rounded-lg text-xs transition cursor-pointer ${
+              cycleType === "MONTHLY_OFFICE"
+                ? "bg-white text-indigo-700 font-semibold shadow-sm"
+                : "text-slate-600 hover:text-slate-900 font-medium"
             }`}
           >
             Office Staff (Monthly Salary)
@@ -694,8 +666,10 @@ export default function StandardPayrollPage() {
           <button
             type="button"
             onClick={() => handleTabChange("BI_MONTHLY_TAMIL")}
-            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-              cycleType === "BI_MONTHLY_TAMIL" ? "bg-indigo-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+            className={`px-3.5 py-1.5 rounded-lg text-xs transition cursor-pointer ${
+              cycleType === "BI_MONTHLY_TAMIL"
+                ? "bg-white text-indigo-700 font-semibold shadow-sm"
+                : "text-slate-600 hover:text-slate-900 font-medium"
             }`}
           >
             Tamil Labours (1–15 & 16–30 Wages)
@@ -703,8 +677,10 @@ export default function StandardPayrollPage() {
           <button
             type="button"
             onClick={() => handleTabChange("BI_MONTHLY_HINDI")}
-            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-              cycleType === "BI_MONTHLY_HINDI" ? "bg-indigo-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+            className={`px-3.5 py-1.5 rounded-lg text-xs transition cursor-pointer ${
+              cycleType === "BI_MONTHLY_HINDI"
+                ? "bg-white text-indigo-700 font-semibold shadow-sm"
+                : "text-slate-600 hover:text-slate-900 font-medium"
             }`}
           >
             Hindi Crew (1–15 & 16–30 Wages)
@@ -774,60 +750,48 @@ export default function StandardPayrollPage() {
         </div>
       </div>
 
-      {/* 3. 4 CLEAN EXECUTIVE KPI CARDS */}
+      {/* 3. 4 TACTILE EXECUTIVE KPI CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Gross Payroll</span>
+        <TactileKpiCard
+          label="Total Gross Payroll"
+          value={formatINR(displayGross)}
+          subtext="Earned base wages before deductions"
+          accent="indigo"
+          icon={<Users size={16} />}
+          badge={
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80">
-              {visibleItems.length} Personnel
+              {visibleItems.length} Staff
             </span>
-          </div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-2 tabular-nums">{formatINR(displayGross)}</div>
-          <p className="text-[11px] text-slate-500 mt-1">Earned base wages before deductions</p>
-        </div>
+          }
+          progressPercent={visibleItems.length > 0 ? 100 : 10}
+        />
 
-        <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Deductions</span>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200/80">
-              Advances + Exp
-            </span>
-          </div>
-          <div className="text-2xl font-extrabold text-rose-600 mt-2 tabular-nums">{formatINR(displayDeductions)}</div>
-          <p className="text-[11px] text-slate-500 mt-1">Mid-cycle cash advances & expense balances</p>
-        </div>
+        <TactileKpiCard
+          label="Total Deductions"
+          value={formatINR(displayDeductions)}
+          subtext="Mid-cycle cash advances & expense balances"
+          accent="rose"
+          icon={<Wallet size={16} />}
+          progressPercent={displayGross > 0 ? Math.min(100, (displayDeductions / displayGross) * 100) : 8}
+        />
 
-        <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Net Payable</span>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-              {formatMonthLabel(month)}
-            </span>
-          </div>
-          <div className="text-2xl font-extrabold text-indigo-700 mt-2 tabular-nums">{formatINR(displayNet)}</div>
-          <p className="text-[11px] text-slate-500 mt-1">Includes OT, Vehicle & Prior Balances</p>
-        </div>
+        <TactileKpiCard
+          label="Net Payable"
+          value={formatINR(displayNet)}
+          subtext={`${formatMonthLabel(month)} • Includes OT, Vehicle & Prev Bal`}
+          accent="emerald"
+          icon={<Coins size={16} />}
+          progressPercent={displayNet > 0 ? Math.min(100, ((displayCash + displayBank) / displayNet) * 100) : 0}
+        />
 
-        <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Disbursed & Balance</span>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-              Bal: {formatINR(displayCarryForward)}
-            </span>
-          </div>
-          <div className="flex items-baseline gap-3 mt-2 tabular-nums">
-            <div>
-              <div className="text-[10px] font-semibold text-slate-400 uppercase">Cash</div>
-              <div className="text-lg font-extrabold text-slate-900">{formatINR(displayCash)}</div>
-            </div>
-            <div className="text-slate-300">/</div>
-            <div>
-              <div className="text-[10px] font-semibold text-slate-400 uppercase">Bank / GPay</div>
-              <div className="text-lg font-extrabold text-emerald-700">{formatINR(displayBank)}</div>
-            </div>
-          </div>
-        </div>
+        <TactileKpiCard
+          label="Disbursed (Cash + Bank)"
+          value={formatINR(displayCash + displayBank)}
+          subtext={`Cash ${formatINR(displayCash)} • Bank ${formatINR(displayBank)} • Bal ${formatINR(displayCarryForward)}`}
+          accent="amber"
+          icon={<CheckCircle2 size={16} />}
+          progressPercent={displayNet > 0 ? Math.min(100, ((displayCash + displayBank) / displayNet) * 100) : 0}
+        />
       </div>
 
       {/* BULK ACTION BAR */}
@@ -1489,17 +1453,20 @@ function PayrollTableRow({
         />
       </td>
 
-      <td className="py-3.5 px-3">
+      <td className="py-4 px-3">
         <button
           type="button"
           onClick={onOpenDrawer}
-          className="text-left group cursor-pointer"
+          className="flex items-center gap-3 text-left group cursor-pointer"
         >
-          <div className="font-semibold text-slate-900 group-hover:text-[#4F46E5] transition whitespace-nowrap">
-            {item.employeeName}
-          </div>
-          <div className="text-[11px] text-slate-600 font-mono">
-            {item.employeeCode} • {item.designation || (item.company === "INVI_CREATION" ? "Invi" : "SR")}
+          <InitialsAvatar name={item.employeeName} />
+          <div className="min-w-0">
+            <div className="font-semibold text-slate-900 group-hover:text-[#4F46E5] transition whitespace-nowrap">
+              {item.employeeName}
+            </div>
+            <div className="text-[11px] text-slate-600 font-mono truncate">
+              {item.employeeCode} • {item.designation || (item.company === "INVI_CREATION" ? "Invi" : "SR")}
+            </div>
           </div>
         </button>
       </td>
@@ -1597,31 +1564,25 @@ function PayrollTableRow({
         />
       </td>
 
-      <td className="py-3.5 px-3">
-        <select
-          value={item.paymentChannel}
-          onChange={(e) => onPatch(item.id, { paymentChannel: e.target.value })}
-          className="px-2 py-1 rounded border border-slate-200 bg-white text-[11px] font-semibold text-slate-700 focus:outline-none focus:border-[#4F46E5] cursor-pointer"
-        >
-          <option value="CASH">Cash</option>
-          <option value="ICICI">ICICI</option>
-          <option value="OFFICE_GPAY">GPay</option>
-          <option value="AGENT_ACCOUNT">Agent</option>
-        </select>
+      <td className="py-4 px-3">
+        <div className="flex items-center gap-1.5">
+          <ChannelBadge channel={item.paymentChannel} />
+          <select
+            value={item.paymentChannel}
+            onChange={(e) => onPatch(item.id, { paymentChannel: e.target.value })}
+            aria-label="Payment Channel"
+            className="w-5 h-5 rounded border border-slate-200 bg-white text-[10px] text-slate-600 focus:outline-none cursor-pointer"
+          >
+            <option value="CASH">Cash</option>
+            <option value="ICICI">ICICI</option>
+            <option value="OFFICE_GPAY">GPay</option>
+            <option value="AGENT_ACCOUNT">Agent</option>
+          </select>
+        </div>
       </td>
 
-      <td className="py-3.5 px-3 text-right tabular-nums">
-        <span
-          className={`font-bold ${
-            item.carryForwardBalance > 0
-              ? "text-[#D97706]"
-              : item.carryForwardBalance < 0
-              ? "text-[#E11D48]"
-              : "text-[#059669]"
-          }`}
-        >
-          {formatINR(item.carryForwardBalance)}
-        </span>
+      <td className="py-4 px-3 text-right tabular-nums">
+        <BalanceBadge amount={item.carryForwardBalance} />
       </td>
 
       <td className="py-3.5 px-3">

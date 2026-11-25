@@ -24,6 +24,7 @@ import { validateGSTIN, getStateFromGSTIN } from "@/lib/gst";
 import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 import { ModuleHeaderWithAnalytics } from "@/components/common/ModuleHeaderWithAnalytics";
 import { ArchiveConfirmModal } from "@/components/common/ArchiveConfirmModal";
+import { InitialsAvatar, BalanceBadge } from "@/components/ui/ErpPrimitives";
 
 interface Vendor {
   id: string;
@@ -287,28 +288,29 @@ export default function VendorsPage() {
                         : "hover:bg-slate-50/60 dark:hover:bg-slate-800/40"
                     }`}
                   >
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
-                        {v.name}
-                        {v.companyName && (
-                          <span className="text-xs font-normal text-slate-500">
-                            ({v.companyName})
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-3 font-mono">
-                        <span>GSTIN: {v.gstNumber || "Unregistered"}</span>
-                        <span>{v.state} ({v.stateCode})</span>
-                        <span>{v.paymentTerms || "30 Days"}</span>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <InitialsAvatar name={v.name} />
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
+                          <span className="truncate">{v.name}</span>
+                          {v.companyName && (
+                            <span className="text-xs font-normal text-slate-600 truncate">
+                              ({v.companyName})
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5 flex items-center gap-3 font-mono">
+                          <span>GSTIN: {v.gstNumber || "Unregistered"}</span>
+                          <span>{v.state} ({v.stateCode})</span>
+                          <span>{v.paymentTerms || "30 Days"}</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 shrink-0">
                       <div className="text-right">
-                        <div className="font-mono font-black text-slate-900 dark:text-slate-100 text-sm">
-                          {formatINR(v.totalPayable)}
-                        </div>
-                        <div className="text-[10px] text-slate-400">
+                        <BalanceBadge amount={v.totalPayable} />
+                        <div className="text-[10px] text-slate-600 mt-1">
                           {v.billsCount} bill(s) • {v.ordersCount} PO(s)
                         </div>
                       </div>

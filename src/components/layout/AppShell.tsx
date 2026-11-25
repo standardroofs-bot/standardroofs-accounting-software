@@ -34,20 +34,20 @@ export interface SRThemeConfig {
 export const SR_THEMES: Record<SRThemeKey, SRThemeConfig> = {
   commercial_indigo: {
     id: "commercial_indigo",
-    name: "Porcelain & Royal Indigo",
+    name: "Obsidian-Navy & Royal Indigo",
     paletteLabel: "Commercial Indigo",
-    tagline: "Clean off-white canvas (#F8FAFC), crisp white sidebar (#FFFFFF), Royal Indigo accents",
+    tagline: "Crisp pearl canvas (#F1F5F9), Obsidian-Navy sidebar (#0B1120), Royal Indigo accents",
     swatchPrimary: "#4f46e5",
     swatchSecondary: "#6366f1",
-    canvasBg: "#F8FAFC",
-    sidebarGradient: "bg-white",
-    sidebarBorder: "border-[#E2E8F0]",
-    sidebarActiveBg: "bg-[#4F46E5]",
-    activePillGradient: "bg-[#4F46E5]",
+    canvasBg: "#F1F5F9",
+    sidebarGradient: "bg-[#0B1120]",
+    sidebarBorder: "border-slate-800/80",
+    sidebarActiveBg: "bg-gradient-to-r from-indigo-600 to-indigo-500",
+    activePillGradient: "bg-gradient-to-r from-indigo-600 to-indigo-500",
     activePillText: "text-white",
     activeBadge: "bg-indigo-50 text-indigo-700 border border-indigo-200/80",
     primaryBtn: "bg-[#4F46E5] hover:bg-[#4338CA] text-white font-semibold shadow-xs",
-    headerBorder: "border-[#E2E8F0]",
+    headerBorder: "border-slate-200/90",
   },
 };
 

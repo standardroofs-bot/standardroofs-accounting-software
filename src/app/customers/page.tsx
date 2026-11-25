@@ -32,6 +32,7 @@ import { exportToExcel, exportToPDF, downloadSampleExcel } from "@/lib/exportUti
 import { ExcelImportModal } from "@/components/common/ExcelImportModal";
 import { ModuleHeaderWithAnalytics } from "@/components/common/ModuleHeaderWithAnalytics";
 import { ArchiveConfirmModal } from "@/components/common/ArchiveConfirmModal";
+import { InitialsAvatar, BalanceBadge } from "@/components/ui/ErpPrimitives";
 import { Download, Upload, Loader2 } from "lucide-react";
 
 interface CustomerItem {
@@ -416,17 +417,26 @@ export default function CustomersPage() {
                 filteredCustomers.map((c) => {
                   const bal = Number(c.outstandingBalance || 0);
                   return (
-                    <tr key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900 dark:text-slate-100">{c.name}</div>
-                        {c.companyName && (
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 flex items-center gap-1">
-                            <Building size={11} className="text-slate-400" /> {c.companyName}
+                    <tr
+                      key={c.id}
+                      onClick={() => openEditModal(c)}
+                      className="hover:bg-indigo-50/40 dark:hover:bg-slate-800/40 transition cursor-pointer"
+                    >
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-3">
+                          <InitialsAvatar name={c.name} />
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-900 dark:text-slate-100">{c.name}</div>
+                            {c.companyName && (
+                              <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium mt-0.5 flex items-center gap-1">
+                                <Building size={11} className="text-slate-500" /> {c.companyName}
+                              </div>
+                            )}
+                            <p className="text-[10.5px] text-slate-600 truncate max-w-xs mt-0.5">
+                              {c.billingAddress}
+                            </p>
                           </div>
-                        )}
-                        <p className="text-[10px] text-slate-400 truncate max-w-xs mt-0.5">
-                          {c.billingAddress}
-                        </p>
+                        </div>
                       </td>
                       <td className="py-3 px-4">
                         {c.gstNumber ? (
@@ -459,12 +469,10 @@ export default function CustomersPage() {
                           {c.creditDays} Days Credit
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold">
-                        <span className={bal > 0 ? "text-rose-600 dark:text-rose-400 text-sm" : "text-emerald-600"}>
-                          {formatINR(bal)}
-                        </span>
+                      <td className="py-4 px-4 text-right font-mono font-bold">
+                        <BalanceBadge amount={bal} />
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-4 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1.5">
                           {!c.isArchived ? (
                             <>

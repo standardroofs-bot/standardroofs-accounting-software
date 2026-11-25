@@ -401,40 +401,40 @@ export default function CapitalPage() {
         }
       />
 
-      {/* Tabs Switcher */}
-      <div className="flex border-b border-border bg-card rounded-t-lg px-2 pt-2">
+      {/* Elevated Segmented Tabs Switcher */}
+      <div className="inline-flex flex-wrap items-center gap-1.5 p-1.5 bg-slate-200/75 rounded-xl border border-slate-200">
         <button
           onClick={() => setActiveTab("capital")}
-          className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs transition cursor-pointer ${
             activeTab === "capital"
-              ? "border-amber-500 text-amber-500 bg-amber-500/5"
-              : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "bg-white text-indigo-700 font-semibold shadow-sm"
+              : "text-slate-600 hover:text-slate-900 font-medium"
           }`}
         >
           <DollarSign className="h-4 w-4" />
-          Partner Capital & Drawings ({capitalTransactions.length})
+          Partner Capital &amp; Drawings ({capitalTransactions.length})
         </button>
         <button
           onClick={() => setActiveTab("loans")}
-          className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs transition cursor-pointer ${
             activeTab === "loans"
-              ? "border-amber-500 text-amber-500 bg-amber-500/5"
-              : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "bg-white text-indigo-700 font-semibold shadow-sm"
+              : "text-slate-600 hover:text-slate-900 font-medium"
           }`}
         >
           <CreditCard className="h-4 w-4" />
-          Business Loans & EMIs ({loans.length})
+          Business Loans &amp; EMIs ({loans.length})
         </button>
         <button
           onClick={() => setActiveTab("assets")}
-          className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs transition cursor-pointer ${
             activeTab === "assets"
-              ? "border-amber-500 text-amber-500 bg-amber-500/5"
-              : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "bg-white text-indigo-700 font-semibold shadow-sm"
+              : "text-slate-600 hover:text-slate-900 font-medium"
           }`}
         >
           <Wrench className="h-4 w-4" />
-          Fixed Assets & Machinery ({fixedAssets.length})
+          Fixed Assets &amp; Machinery ({fixedAssets.length})
         </button>
       </div>
 

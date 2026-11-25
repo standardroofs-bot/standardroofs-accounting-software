@@ -15,6 +15,8 @@ import {
   Filter,
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
+import { ModuleHeroBanner } from "@/components/ui/ModuleHeroBanner";
+import { ChannelBadge, StickySlideOverDrawer } from "@/components/ui/ErpPrimitives";
 
 interface CashEntry {
   id: string;
@@ -204,34 +206,26 @@ export default function CashBookPage() {
     exportToExcel(rows, `SR_CashBook_${selectedWallet}`, "CashBook");
   };
 
+  const WALLET_ACCENTS = [
+    "border-t-emerald-600",
+    "border-t-sky-600",
+    "border-t-violet-600",
+    "border-t-indigo-600",
+    "border-t-amber-500",
+    "border-t-rose-500",
+    "border-t-teal-600",
+    "border-t-fuchsia-600",
+  ];
+
   return (
-    <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-2 space-y-5 font-sans pb-16 text-slate-800">
-      {/* 1. HEADER */}
-      <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
-            <Wallet size={20} />
-          </div>
-          <div>
-            <h1 className="text-lg font-extrabold tracking-tight text-slate-900">
-              Standard Daily Cash Book & 8-Wallet Ledger
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Live balances across Office Cash, ICICI, Office Gpay, Ravi Gpay, Prabha Gpay, RBL, Periyasamy Gpay & Suji Cash
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleExport}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer"
-          >
-            <FileSpreadsheet size={14} className="text-emerald-600" />
-            <span>Export (.xlsx)</span>
-          </button>
-
+    <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-2 space-y-5 font-sans pb-16 text-slate-900">
+      {/* 1. EXECUTIVE HERO COMMAND BANNER */}
+      <ModuleHeroBanner
+        icon={<Wallet size={22} />}
+        title="Standard Daily Cash Book & 8-Wallet Ledger"
+        subtitle="Live balances across Office Cash, ICICI, Office Gpay, Ravi Gpay, Prabha Gpay, RBL, Periyasamy Gpay & Suji Cash"
+        statusBadge={{ label: "8 WALLETS LIVE", tone: "emerald" }}
+        primaryActions={
           <button
             type="button"
             onClick={() =>
@@ -246,33 +240,44 @@ export default function CashBookPage() {
                 counterpartyName: "",
               })
             }
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold shadow-lg shadow-indigo-950/50 transition cursor-pointer"
           >
             <Plus size={14} />
             <span>+ Add Entry</span>
           </button>
-        </div>
-      </div>
+        }
+        moreActions={[
+          {
+            label: "Export Excel (.xlsx)",
+            icon: <FileSpreadsheet size={14} className="text-emerald-600" />,
+            onClick: handleExport,
+          },
+        ]}
+      />
 
-      {/* 2. 8-WALLET LIVE BALANCE CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
-        {walletBalances.map((wb) => {
+      {/* 2. 8-WALLET LIVE BALANCE CARDS WITH COLORED TOP ACCENT BARS */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        {walletBalances.map((wb, idx) => {
           const isSelected = selectedWallet === wb.walletName;
+          const topBar = WALLET_ACCENTS[idx % WALLET_ACCENTS.length];
           return (
             <button
               key={wb.walletName}
               type="button"
               onClick={() => setSelectedWallet(isSelected ? "ALL" : wb.walletName)}
-              className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+              className={`p-3.5 rounded-2xl border border-t-[3.5px] ${topBar} text-left transition-all cursor-pointer ${
                 isSelected
-                  ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                  : "bg-white hover:bg-slate-50 border-slate-200/90 text-slate-900 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+                  ? "bg-white ring-2 ring-[#4F46E5] border-[#4F46E5] shadow-lg shadow-indigo-500/15"
+                  : "bg-white hover:bg-slate-50/80 border-slate-200/90 shadow-[0_2px_10px_rgba(15,23,42,0.04)]"
               }`}
             >
-              <div className={`text-[10px] font-bold uppercase tracking-wider truncate ${isSelected ? "text-indigo-100" : "text-slate-600"}`}>
-                {wb.walletName}
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider truncate text-slate-600">
+                  {wb.walletName}
+                </span>
+                <Wallet size={12} className={isSelected ? "text-[#4F46E5]" : "text-slate-500"} />
               </div>
-              <div className={`text-sm font-extrabold mt-1 tabular-nums ${isSelected ? "text-white" : wb.balance < 0 ? "text-rose-600" : "text-slate-900"}`}>
+              <div className={`text-sm font-extrabold mt-1.5 tabular-nums ${wb.balance < 0 ? "text-[#E11D48]" : "text-[#0F172A]"}`}>
                 {formatINR(wb.balance)}
               </div>
             </button>
@@ -356,32 +361,46 @@ export default function CashBookPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredEntries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                  <tr
+                    key={entry.id}
+                    onClick={() =>
+                      setEntryModal({
+                        mode: "EDIT",
+                        id: entry.id,
+                        date: new Date(entry.date).toISOString().slice(0, 10),
+                        type: entry.type,
+                        amount: String(entry.amount),
+                        purpose: entry.purpose,
+                        category: entry.category,
+                        walletName: entry.walletName,
+                        counterpartyName: entry.counterpartyName || "",
+                      })
+                    }
+                    className="hover:bg-indigo-50/40 transition cursor-pointer"
+                  >
+                    <td className="py-4 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
                       {new Date(entry.date).toISOString().slice(0, 10)}
-                      <div className="text-[9.5px] text-slate-600">{entry.voucherNumber}</div>
+                      <div className="text-[10px] text-slate-600">{entry.voucherNumber}</div>
                     </td>
-                    <td className="py-2.5 px-3 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/80 text-[10.5px] font-bold">
-                        {entry.walletName}
-                      </span>
+                    <td className="py-4 px-3 whitespace-nowrap">
+                      <ChannelBadge channel={entry.walletName} />
                     </td>
-                    <td className="py-2.5 px-3 whitespace-nowrap font-semibold text-slate-700">
+                    <td className="py-4 px-3 whitespace-nowrap font-semibold text-slate-900">
                       {entry.category}
                     </td>
-                    <td className="py-2.5 px-3">
-                      <div className="font-medium text-slate-900">{entry.purpose}</div>
+                    <td className="py-4 px-3">
+                      <div className="font-semibold text-slate-900">{entry.purpose}</div>
                       {entry.counterpartyName && (
-                        <div className="text-[10px] text-slate-600">{entry.counterpartyName}</div>
+                        <div className="text-[11px] text-slate-600">{entry.counterpartyName}</div>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-bold text-emerald-700 tabular-nums">
+                    <td className="py-4 px-3 text-right font-bold text-[#059669] tabular-nums">
                       {entry.type === "CASH_INFLOW" ? formatINR(entry.amount) : "—"}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-bold text-rose-600 tabular-nums">
+                    <td className="py-4 px-3 text-right font-bold text-[#E11D48] tabular-nums">
                       {entry.type === "CASH_OUTFLOW" ? formatINR(entry.amount) : "—"}
                     </td>
-                    <td className="py-2.5 px-3 text-center">
+                    <td className="py-4 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-center gap-1">
                         <button
                           type="button"
@@ -421,111 +440,131 @@ export default function CashBookPage() {
         )}
       </div>
 
-      {/* ADD / EDIT MODAL */}
+      {/* STICKY-FOOTER ADD / EDIT SLIDE-OVER DRAWER */}
       {entryModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <form onSubmit={handleSaveEntry} className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div className="font-bold text-sm text-slate-900">
-                {entryModal.mode === "ADD" ? "New 8-Wallet Cash Book Entry" : "Edit Cash Book Entry"}
+        <StickySlideOverDrawer
+          title={entryModal.mode === "ADD" ? "New 8-Wallet Cash Book Entry" : "Edit Cash Book Entry"}
+          subtitle="Wallet balances recalculate automatically upon save"
+          onClose={() => setEntryModal(null)}
+          footer={
+            <>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEntryModal(null)}
+                  className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                {entryModal.mode === "EDIT" && entryModal.id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const found = entries.find((x) => x.id === entryModal.id);
+                      setEntryModal(null);
+                      if (found) setConfirmDelete(found);
+                    }}
+                    className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white hover:bg-rose-50 text-[#E11D48] border border-rose-300 text-xs font-semibold cursor-pointer"
+                  >
+                    <Trash2 size={13} />
+                    <span>Delete</span>
+                  </button>
+                )}
               </div>
-              <button type="button" onClick={() => setEntryModal(null)} className="text-slate-500 cursor-pointer">
-                <X size={16} />
+              <button
+                type="submit"
+                form="cashbook-entry-form"
+                className="px-4 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold cursor-pointer"
+              >
+                Save Changes
               </button>
-            </div>
-            <div className="p-5 space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Date</label>
-                  <input
-                    type="date"
-                    value={entryModal.date}
-                    onChange={(e) => setEntryModal({ ...entryModal, date: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Flow Type</label>
-                  <select
-                    value={entryModal.type}
-                    onChange={(e) => setEntryModal({ ...entryModal, type: e.target.value as any })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
-                  >
-                    <option value="CASH_OUTFLOW">Outflow (Paid / Expense)</option>
-                    <option value="CASH_INFLOW">Inflow (Received)</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Wallet *</label>
-                  <select
-                    value={entryModal.walletName}
-                    onChange={(e) => setEntryModal({ ...entryModal, walletName: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
-                  >
-                    {WALLETS.map((w) => (
-                      <option key={w} value={w}>{w}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Category *</label>
-                  <select
-                    value={entryModal.category}
-                    onChange={(e) => setEntryModal({ ...entryModal, category: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
-                  >
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+            </>
+          }
+        >
+          <form id="cashbook-entry-form" onSubmit={handleSaveEntry} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Amount (₹) *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Date</label>
                 <input
-                  required
-                  type="number"
-                  step="0.01"
-                  value={entryModal.amount}
-                  onChange={(e) => setEntryModal({ ...entryModal, amount: e.target.value })}
-                  placeholder="0.00"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 font-bold"
+                  type="date"
+                  value={entryModal.date}
+                  onChange={(e) => setEntryModal({ ...entryModal, date: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900"
                 />
               </div>
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Description / Purpose *</label>
-                <input
-                  required
-                  type="text"
-                  value={entryModal.purpose}
-                  onChange={(e) => setEntryModal({ ...entryModal, purpose: e.target.value })}
-                  placeholder="Site material, customer receipt, contractor payment..."
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Counterparty / Site</label>
-                <input
-                  type="text"
-                  value={entryModal.counterpartyName}
-                  onChange={(e) => setEntryModal({ ...entryModal, counterpartyName: e.target.value })}
-                  placeholder="Optional customer/vendor/team name"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                />
+                <label className="block font-semibold text-slate-700 mb-1">Flow Type</label>
+                <select
+                  value={entryModal.type}
+                  onChange={(e) => setEntryModal({ ...entryModal, type: e.target.value as any })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 font-semibold"
+                >
+                  <option value="CASH_OUTFLOW">Outflow (Paid / Expense)</option>
+                  <option value="CASH_INFLOW">Inflow (Received)</option>
+                </select>
               </div>
             </div>
-            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
-              <button type="button" onClick={() => setEntryModal(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold cursor-pointer">
-                Cancel
-              </button>
-              <button type="submit" className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer">
-                Save Entry
-              </button>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Wallet *</label>
+                <select
+                  value={entryModal.walletName}
+                  onChange={(e) => setEntryModal({ ...entryModal, walletName: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 font-semibold"
+                >
+                  {WALLETS.map((w) => (
+                    <option key={w} value={w}>{w}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Category *</label>
+                <select
+                  value={entryModal.category}
+                  onChange={(e) => setEntryModal({ ...entryModal, category: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 font-semibold"
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Amount (₹) *</label>
+              <input
+                required
+                type="number"
+                step="0.01"
+                value={entryModal.amount}
+                onChange={(e) => setEntryModal({ ...entryModal, amount: e.target.value })}
+                placeholder="0.00"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 font-bold text-slate-900 tabular-nums"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Description / Purpose *</label>
+              <input
+                required
+                type="text"
+                value={entryModal.purpose}
+                onChange={(e) => setEntryModal({ ...entryModal, purpose: e.target.value })}
+                placeholder="Site material, customer receipt, contractor payment..."
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Counterparty / Site</label>
+              <input
+                type="text"
+                value={entryModal.counterpartyName}
+                onChange={(e) => setEntryModal({ ...entryModal, counterpartyName: e.target.value })}
+                placeholder="Optional customer/vendor/team name"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900"
+              />
             </div>
           </form>
-        </div>
+        </StickySlideOverDrawer>
       )}
 
       {/* DELETE CONFIRM MODAL */}

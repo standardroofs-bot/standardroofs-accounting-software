@@ -17,6 +17,14 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
+import { ModuleHeroBanner } from "@/components/ui/ModuleHeroBanner";
+import {
+  TactileKpiCard,
+  InitialsAvatar,
+  ChannelBadge,
+  BalanceBadge,
+  StickySlideOverDrawer,
+} from "@/components/ui/ErpPrimitives";
 
 interface SubContractorEntry {
   id: string;
@@ -312,88 +320,117 @@ export default function StandardSubContractorsPage() {
   const totalPaid = entries.reduce((s, e) => s + (e.givenAmount || 0), 0);
 
   return (
-    <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-2 space-y-5 font-sans pb-16 text-slate-800">
-      {/* 1. HEADER */}
-      <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
-            <HardHat size={20} />
-          </div>
-          <div>
-            <h1 className="text-lg font-extrabold tracking-tight text-slate-900">
-              Standard Sub-Contractors & Running Ledger
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Sq.Ft roofing billing, tool & consumable deductions, and running contractor balances across all teams
-            </p>
-          </div>
-        </div>
+    <div className="max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 py-2 space-y-5 font-sans pb-16 text-slate-900">
+      {/* 1. EXECUTIVE HERO COMMAND BANNER */}
+      <ModuleHeroBanner
+        icon={<HardHat size={22} />}
+        title="Standard Sub-Contractors & Running Ledger"
+        subtitle="Sq.Ft roofing billing, tool & consumable deductions, and running contractor balances across all teams"
+        statusBadge={
+          activeTeam
+            ? {
+                label: activeTeam.currentBalance > 0 ? "PAYABLE" : "SETTLED",
+                tone: activeTeam.currentBalance > 0 ? "amber" : "emerald",
+              }
+            : { label: `${teams.length} TEAMS`, tone: "indigo" }
+        }
+        primaryActions={
+          <>
+            <button
+              type="button"
+              onClick={() =>
+                setTeamModal({
+                  mode: "ADD",
+                  name: "",
+                  teamLead: "",
+                  phone: "",
+                  tradeCategory: "Roofing & Fabrication",
+                  openingBalance: "0",
+                  notes: "",
+                })
+              }
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/15 text-xs font-semibold transition cursor-pointer"
+            >
+              <Plus size={14} className="text-indigo-200" />
+              <span>+ Add Team</span>
+            </button>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() =>
-              setTeamModal({
-                mode: "ADD",
-                name: "",
-                teamLead: "",
-                phone: "",
-                tradeCategory: "Roofing & Fabrication",
-                openingBalance: "0",
-                notes: "",
-              })
-            }
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
-          >
-            <Plus size={14} />
-            <span>+ Add Team</span>
-          </button>
+            {activeTeam && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => openQuickEntry("WORK_BILL")}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold shadow-lg shadow-indigo-950/50 transition cursor-pointer"
+                >
+                  <Plus size={14} />
+                  <span>+ Sq.Ft Work Bill</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openQuickEntry("PAYMENT")}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-lg transition cursor-pointer"
+                >
+                  <Wallet size={14} />
+                  <span>+ Record Payment</span>
+                </button>
+              </>
+            )}
+          </>
+        }
+        moreActions={
+          activeTeam
+            ? [
+                {
+                  label: "+ Tool/Material Deduction",
+                  icon: <Wrench size={14} className="text-rose-600" />,
+                  onClick: () => openQuickEntry("MATERIAL_DEDUCTION"),
+                },
+                {
+                  label: "Edit Active Team",
+                  icon: <Edit3 size={14} className="text-[#4F46E5]" />,
+                  onClick: () =>
+                    setTeamModal({
+                      mode: "EDIT",
+                      id: activeTeam.id,
+                      name: activeTeam.name,
+                      teamLead: activeTeam.teamLead || "",
+                      phone: activeTeam.phone || "",
+                      tradeCategory: activeTeam.tradeCategory,
+                      openingBalance: String(activeTeam.openingBalance),
+                      notes: activeTeam.notes || "",
+                    }),
+                },
+                {
+                  label: "Export Statement (.xlsx)",
+                  icon: <FileSpreadsheet size={14} className="text-emerald-600" />,
+                  onClick: handleExportTeamStatement,
+                },
+                {
+                  label: "Print Team Statement",
+                  icon: <Printer size={14} className="text-slate-600" />,
+                  onClick: () => window.print(),
+                },
+                {
+                  label: "Delete Active Team",
+                  icon: <Trash2 size={14} className="text-rose-600" />,
+                  onClick: handleDeleteTeam,
+                },
+              ]
+            : []
+        }
+      />
 
-          {activeTeam && (
-            <>
-              <button
-                type="button"
-                onClick={() =>
-                  setTeamModal({
-                    mode: "EDIT",
-                    id: activeTeam.id,
-                    name: activeTeam.name,
-                    teamLead: activeTeam.teamLead || "",
-                    phone: activeTeam.phone || "",
-                    tradeCategory: activeTeam.tradeCategory,
-                    openingBalance: String(activeTeam.openingBalance),
-                    notes: activeTeam.notes || "",
-                  })
-                }
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer"
-              >
-                <Edit3 size={13} />
-                <span>Edit Team</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteTeam}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition cursor-pointer"
-              >
-                <Trash2 size={13} />
-                <span>Delete Team</span>
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* 2. TEAM DIRECTORY PILLS */}
-      <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-3">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600 px-1 mb-2">
+      {/* 2. ELEVATED SEGMENTED TEAM DIRECTORY */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] p-3.5">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600 px-1 mb-2">
           Contracting Teams ({teams.length})
         </div>
         {loading ? (
-          <div className="text-xs text-slate-500 p-2">Loading teams...</div>
+          <div className="text-xs text-slate-600 p-2">Loading teams...</div>
         ) : teams.length === 0 ? (
-          <div className="text-xs text-slate-500 p-2">No sub-contractor teams found. Click &ldquo;+ Add Team&rdquo; to create one.</div>
+          <div className="text-xs text-slate-600 p-2">No sub-contractor teams found. Click &ldquo;+ Add Team&rdquo; to create one.</div>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-200/75 rounded-xl border border-slate-200">
             {teams.map((t) => {
               const isSelected = activeTeam?.id === t.id;
               return (
@@ -401,18 +438,16 @@ export default function StandardSubContractorsPage() {
                   key={t.id}
                   type="button"
                   onClick={() => setSelectedTeamId(t.id)}
-                  className={`px-3 py-2 rounded-lg border text-xs font-semibold transition flex items-center gap-2 cursor-pointer ${
+                  className={`px-3 py-2 rounded-lg text-xs transition flex items-center gap-2 cursor-pointer ${
                     isSelected
-                      ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
-                      : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                      ? "bg-white text-indigo-700 font-semibold shadow-sm"
+                      : "text-slate-600 hover:text-slate-900 font-medium"
                   }`}
                 >
                   <span>{t.name}</span>
                   <span
-                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                      isSelected
-                        ? "bg-white/20 text-white"
-                        : t.currentBalance > 0
+                    className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${
+                      t.currentBalance > 0
                         ? "bg-amber-100 text-amber-800"
                         : "bg-emerald-100 text-emerald-800"
                     }`}
@@ -426,62 +461,54 @@ export default function StandardSubContractorsPage() {
         )}
       </div>
 
-      {/* 3. 4 KPI CARDS FOR ACTIVE TEAM */}
+      {/* 3. 4 TACTILE KPI CARDS FOR ACTIVE TEAM */}
       {activeTeam && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Opening + Work Billed
-              </div>
-              <div className="text-2xl font-extrabold text-slate-900 mt-2 tabular-nums">
-                {formatINR(activeTeam.openingBalance + totalWorkBilled)}
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Opening: {formatINR(activeTeam.openingBalance)}
-              </p>
-            </div>
+            <TactileKpiCard
+              label="Opening + Work Billed"
+              value={formatINR(activeTeam.openingBalance + totalWorkBilled)}
+              subtext={`Opening: ${formatINR(activeTeam.openingBalance)}`}
+              accent="indigo"
+              icon={<HardHat size={16} />}
+              progressPercent={100}
+            />
 
-            <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Tool & Material Deductions
-              </div>
-              <div className="text-2xl font-extrabold text-rose-600 mt-2 tabular-nums">
-                -{formatINR(totalDeductions)}
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1">Welding rods, cutting wheels, food, etc.</p>
-            </div>
+            <TactileKpiCard
+              label="Tool & Material Deductions"
+              value={`-${formatINR(totalDeductions)}`}
+              subtext="Welding rods, cutting wheels, food, etc."
+              accent="rose"
+              icon={<Wrench size={16} />}
+              progressPercent={
+                activeTeam.openingBalance + totalWorkBilled > 0
+                  ? (totalDeductions / (activeTeam.openingBalance + totalWorkBilled)) * 100
+                  : 10
+              }
+            />
 
-            <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Total Payments Given
-              </div>
-              <div className="text-2xl font-extrabold text-emerald-700 mt-2 tabular-nums">
-                {formatINR(totalPaid)}
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1">{entries.length} total ledger entries</p>
-            </div>
+            <TactileKpiCard
+              label="Total Payments Given"
+              value={formatINR(totalPaid)}
+              subtext={`${entries.length} total ledger entries`}
+              accent="emerald"
+              icon={<Wallet size={16} />}
+              progressPercent={
+                activeTeam.openingBalance + totalWorkBilled > 0
+                  ? (totalPaid / (activeTeam.openingBalance + totalWorkBilled)) * 100
+                  : 0
+              }
+            />
 
-            <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Live Net Balance
-                </span>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    activeTeam.currentBalance > 0
-                      ? "bg-amber-50 text-amber-700 border-amber-200"
-                      : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  }`}
-                >
-                  {activeTeam.currentBalance > 0 ? "Payable" : "Advance / Settled"}
-                </span>
-              </div>
-              <div className="text-2xl font-extrabold text-indigo-700 mt-2 tabular-nums">
-                {formatINR(activeTeam.currentBalance)}
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1">{activeTeam.tradeCategory}</p>
-            </div>
+            <TactileKpiCard
+              label="Live Net Balance"
+              value={formatINR(activeTeam.currentBalance)}
+              subtext={activeTeam.tradeCategory}
+              accent="amber"
+              icon={<Building2 size={16} />}
+              badge={<BalanceBadge amount={activeTeam.currentBalance} />}
+              progressPercent={activeTeam.currentBalance > 0 ? 75 : 100}
+            />
           </div>
 
           {/* 4. QUICK-ENTRY ACTION BAR & FILTERS */}
@@ -588,17 +615,48 @@ export default function StandardSubContractorsPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredEntries.map((entry) => (
-                      <tr key={entry.id} className="hover:bg-slate-50/80 transition">
-                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                      <tr
+                        key={entry.id}
+                        onClick={() =>
+                          setEntryModal({
+                            mode: "EDIT",
+                            entryId: entry.id,
+                            entryDate: new Date(entry.entryDate).toISOString().slice(0, 10),
+                            siteName: entry.siteName || "",
+                            particulars: entry.particulars,
+                            entryType: entry.entryType,
+                            sqft: String(entry.sqft),
+                            ratePerSqft: String(entry.ratePerSqft),
+                            otherAllowance: String(entry.otherAllowance),
+                            materialReduction: String(entry.materialReduction),
+                            givenAmount: String(entry.givenAmount),
+                            walletUsed: entry.walletUsed || "Office Cash",
+                            postToCashBook: false,
+                            notes: entry.notes || "",
+                          })
+                        }
+                        className="hover:bg-indigo-50/40 transition cursor-pointer"
+                      >
+                        <td className="py-4 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
                           {new Date(entry.entryDate).toISOString().slice(0, 10)}
                         </td>
-                        <td className="py-2.5 px-3">
-                          <div className="font-semibold text-slate-900">{entry.particulars}</div>
-                          {entry.siteName && (
-                            <div className="text-[10px] text-slate-600 flex items-center gap-1 mt-0.5">
-                              <Building2 size={10} /> {entry.siteName}
+                        <td className="py-4 px-3">
+                          <div className="flex items-center gap-2.5">
+                            <InitialsAvatar name={entry.siteName || entry.particulars} />
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-900">{entry.particulars}</div>
+                              {(entry.siteName || entry.walletUsed) && (
+                                <div className="text-[11px] text-slate-600 flex items-center gap-1.5 mt-0.5">
+                                  {entry.siteName && (
+                                    <span className="flex items-center gap-1 font-medium">
+                                      <Building2 size={10} /> {entry.siteName}
+                                    </span>
+                                  )}
+                                  {entry.walletUsed && <ChannelBadge channel={entry.walletUsed} />}
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </td>
                         <td className="py-2.5 px-2">
                           <span
@@ -633,7 +691,7 @@ export default function StandardSubContractorsPage() {
                         <td className="py-2.5 px-3 text-right font-extrabold text-indigo-700 tabular-nums">
                           {formatINR(entry.runningBalance)}
                         </td>
-                        <td className="py-2.5 px-3 text-center">
+                        <td className="py-4 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
@@ -655,18 +713,18 @@ export default function StandardSubContractorsPage() {
                                   notes: entry.notes || "",
                                 })
                               }
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 cursor-pointer"
+                              className="p-1.5 rounded-lg text-slate-600 hover:text-[#4F46E5] hover:bg-indigo-50 cursor-pointer"
                               title="Edit Entry"
                             >
-                              <Edit3 size={13} />
+                              <Edit3 size={14} />
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDeleteEntry(entry)}
-                              className="p-1.5 rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                              className="p-1.5 rounded-lg text-slate-600 hover:text-[#E11D48] hover:bg-rose-50 cursor-pointer"
                               title="Delete Entry"
                             >
-                              <Trash2 size={13} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </td>
@@ -680,233 +738,258 @@ export default function StandardSubContractorsPage() {
         </>
       )}
 
-      {/* TEAM MODAL */}
+      {/* TEAM SLIDE-OVER DRAWER */}
       {teamModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <form onSubmit={handleSaveTeam} className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div className="font-bold text-sm text-slate-900">
-                {teamModal.mode === "ADD" ? "Add Sub-Contractor Team" : "Edit Sub-Contractor Team"}
-              </div>
-              <button type="button" onClick={() => setTeamModal(null)} className="text-slate-500 cursor-pointer">
-                <X size={16} />
+        <StickySlideOverDrawer
+          title={teamModal.mode === "ADD" ? "Add Sub-Contractor Team" : "Edit Sub-Contractor Team"}
+          subtitle="Contractor master profile & opening balance"
+          onClose={() => setTeamModal(null)}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setTeamModal(null)}
+                className="px-3.5 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer"
+              >
+                Cancel
               </button>
+              <button
+                type="submit"
+                form="contractor-team-form"
+                className="px-4 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold cursor-pointer"
+              >
+                Save Changes
+              </button>
+            </>
+          }
+        >
+          <form id="contractor-team-form" onSubmit={handleSaveTeam} className="space-y-3">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Team Name *</label>
+              <input
+                required
+                type="text"
+                value={teamModal.name}
+                onChange={(e) => setTeamModal({ ...teamModal, name: e.target.value })}
+                placeholder="e.g. Sakthi Team"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold"
+              />
             </div>
-            <div className="p-5 space-y-3 text-xs">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Team Name *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Team Lead</label>
+                <input
+                  type="text"
+                  value={teamModal.teamLead}
+                  onChange={(e) => setTeamModal({ ...teamModal, teamLead: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Phone</label>
+                <input
+                  type="text"
+                  value={teamModal.phone}
+                  onChange={(e) => setTeamModal({ ...teamModal, phone: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Trade Category</label>
+                <input
+                  type="text"
+                  value={teamModal.tradeCategory}
+                  onChange={(e) => setTeamModal({ ...teamModal, tradeCategory: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Opening Balance (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={teamModal.openingBalance}
+                  onChange={(e) => setTeamModal({ ...teamModal, openingBalance: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-bold tabular-nums"
+                />
+              </div>
+            </div>
+          </form>
+        </StickySlideOverDrawer>
+      )}
+
+      {/* LEDGER ENTRY SLIDE-OVER DRAWER */}
+      {entryModal && (
+        <StickySlideOverDrawer
+          title={entryModal.mode === "ADD" ? "Add Contractor Ledger Entry" : "Edit Ledger Entry"}
+          subtitle={activeTeam ? `${activeTeam.name} • Running balance recalculates automatically` : undefined}
+          maxWidthClass="max-w-lg"
+          onClose={() => setEntryModal(null)}
+          footer={
+            <>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEntryModal(null)}
+                  className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                {entryModal.mode === "EDIT" && entryModal.entryId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = activeTeam?.entries.find((x) => x.id === entryModal.entryId);
+                      setEntryModal(null);
+                      if (target) handleDeleteEntry(target);
+                    }}
+                    className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white hover:bg-rose-50 text-[#E11D48] border border-rose-300 text-xs font-semibold cursor-pointer"
+                  >
+                    <Trash2 size={13} />
+                    <span>Delete</span>
+                  </button>
+                )}
+              </div>
+              <button
+                type="submit"
+                form="contractor-entry-form"
+                className="px-4 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold cursor-pointer"
+              >
+                Save Changes
+              </button>
+            </>
+          }
+        >
+          <form id="contractor-entry-form" onSubmit={handleSaveEntry} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Entry Date</label>
+                <input
+                  type="date"
+                  value={entryModal.entryDate}
+                  onChange={(e) => setEntryModal({ ...entryModal, entryDate: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Entry Type</label>
+                <select
+                  value={entryModal.entryType}
+                  onChange={(e) => setEntryModal({ ...entryModal, entryType: e.target.value as any })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 font-semibold"
+                >
+                  <option value="WORK_BILL">Sq.Ft Work Bill</option>
+                  <option value="EXTRA_LABOUR">Extra Labour / Food</option>
+                  <option value="MATERIAL_DEDUCTION">Tool / Material Deduction</option>
+                  <option value="PAYMENT">Payment Given</option>
+                  <option value="ADJUSTMENT">Adjustment</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Particulars *</label>
                 <input
                   required
                   type="text"
-                  value={teamModal.name}
-                  onChange={(e) => setTeamModal({ ...teamModal, name: e.target.value })}
-                  placeholder="e.g. Sakthi Team"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                  value={entryModal.particulars}
+                  onChange={(e) => setEntryModal({ ...entryModal, particulars: e.target.value })}
+                  placeholder="Site work / welding rod / payment..."
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Team Lead</label>
-                  <input
-                    type="text"
-                    value={teamModal.teamLead}
-                    onChange={(e) => setTeamModal({ ...teamModal, teamLead: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Phone</label>
-                  <input
-                    type="text"
-                    value={teamModal.phone}
-                    onChange={(e) => setTeamModal({ ...teamModal, phone: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Trade Category</label>
-                  <input
-                    type="text"
-                    value={teamModal.tradeCategory}
-                    onChange={(e) => setTeamModal({ ...teamModal, tradeCategory: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Opening Balance (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={teamModal.openingBalance}
-                    onChange={(e) => setTeamModal({ ...teamModal, openingBalance: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Site Name</label>
+                <input
+                  type="text"
+                  value={entryModal.siteName}
+                  onChange={(e) => setEntryModal({ ...entryModal, siteName: e.target.value })}
+                  placeholder="e.g. SSM School / Chennai"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900"
+                />
               </div>
             </div>
-            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
-              <button type="button" onClick={() => setTeamModal(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold cursor-pointer">
-                Cancel
-              </button>
-              <button type="submit" className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer">
-                Save Team
-              </button>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Sq.Ft</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={entryModal.sqft}
+                  onChange={(e) => setEntryModal({ ...entryModal, sqft: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 tabular-nums"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Rate / Sq.Ft (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={entryModal.ratePerSqft}
+                  onChange={(e) => setEntryModal({ ...entryModal, ratePerSqft: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 tabular-nums"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Other Allowance</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={entryModal.otherAllowance}
+                  onChange={(e) => setEntryModal({ ...entryModal, otherAllowance: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 tabular-nums"
+                />
+              </div>
             </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Tool Deduction (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={entryModal.materialReduction}
+                  onChange={(e) => setEntryModal({ ...entryModal, materialReduction: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 tabular-nums"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Payment Given (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={entryModal.givenAmount}
+                  onChange={(e) => setEntryModal({ ...entryModal, givenAmount: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 tabular-nums"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Wallet Used</label>
+                <select
+                  value={entryModal.walletUsed}
+                  onChange={(e) => setEntryModal({ ...entryModal, walletUsed: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900"
+                >
+                  {WALLETS.map((w) => (
+                    <option key={w} value={w}>{w}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {entryModal.mode === "ADD" && entryModal.entryType === "PAYMENT" && (
+              <label className="flex items-center gap-2 text-xs text-slate-700 font-medium pt-1">
+                <input
+                  type="checkbox"
+                  checked={entryModal.postToCashBook}
+                  onChange={(e) => setEntryModal({ ...entryModal, postToCashBook: e.target.checked })}
+                  className="rounded border-slate-300 text-indigo-600"
+                />
+                <span>Also record outflow in Standard Daily Cash Book ({entryModal.walletUsed})</span>
+              </label>
+            )}
           </form>
-        </div>
-      )}
-
-      {/* ENTRY MODAL */}
-      {entryModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <form onSubmit={handleSaveEntry} className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div className="font-bold text-sm text-slate-900">
-                {entryModal.mode === "ADD" ? "Add Contractor Ledger Entry" : "Edit Ledger Entry"}
-              </div>
-              <button type="button" onClick={() => setEntryModal(null)} className="text-slate-500 cursor-pointer">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-5 space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Entry Date</label>
-                  <input
-                    type="date"
-                    value={entryModal.entryDate}
-                    onChange={(e) => setEntryModal({ ...entryModal, entryDate: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Entry Type</label>
-                  <select
-                    value={entryModal.entryType}
-                    onChange={(e) => setEntryModal({ ...entryModal, entryType: e.target.value as any })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
-                  >
-                    <option value="WORK_BILL">Sq.Ft Work Bill</option>
-                    <option value="EXTRA_LABOUR">Extra Labour / Food</option>
-                    <option value="MATERIAL_DEDUCTION">Tool / Material Deduction</option>
-                    <option value="PAYMENT">Payment Given</option>
-                    <option value="ADJUSTMENT">Adjustment</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Particulars *</label>
-                  <input
-                    required
-                    type="text"
-                    value={entryModal.particulars}
-                    onChange={(e) => setEntryModal({ ...entryModal, particulars: e.target.value })}
-                    placeholder="Site work / welding rod / payment..."
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Site Name</label>
-                  <input
-                    type="text"
-                    value={entryModal.siteName}
-                    onChange={(e) => setEntryModal({ ...entryModal, siteName: e.target.value })}
-                    placeholder="e.g. SSM School / Chennai"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Sq.Ft</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={entryModal.sqft}
-                    onChange={(e) => setEntryModal({ ...entryModal, sqft: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Rate / Sq.Ft (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={entryModal.ratePerSqft}
-                    onChange={(e) => setEntryModal({ ...entryModal, ratePerSqft: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Other Allowance</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={entryModal.otherAllowance}
-                    onChange={(e) => setEntryModal({ ...entryModal, otherAllowance: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Tool Deduction (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={entryModal.materialReduction}
-                    onChange={(e) => setEntryModal({ ...entryModal, materialReduction: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Payment Given (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={entryModal.givenAmount}
-                    onChange={(e) => setEntryModal({ ...entryModal, givenAmount: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Wallet Used</label>
-                  <select
-                    value={entryModal.walletUsed}
-                    onChange={(e) => setEntryModal({ ...entryModal, walletUsed: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white"
-                  >
-                    {WALLETS.map((w) => (
-                      <option key={w} value={w}>{w}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              {entryModal.mode === "ADD" && entryModal.entryType === "PAYMENT" && (
-                <label className="flex items-center gap-2 text-xs text-slate-700 font-medium pt-1">
-                  <input
-                    type="checkbox"
-                    checked={entryModal.postToCashBook}
-                    onChange={(e) => setEntryModal({ ...entryModal, postToCashBook: e.target.checked })}
-                    className="rounded border-slate-300 text-indigo-600"
-                  />
-                  <span>Also record outflow in Standard Daily Cash Book ({entryModal.walletUsed})</span>
-                </label>
-              )}
-            </div>
-            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
-              <button type="button" onClick={() => setEntryModal(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold cursor-pointer">
-                Cancel
-              </button>
-              <button type="submit" className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer">
-                Save & Recalculate
-              </button>
-            </div>
-          </form>
-        </div>
+        </StickySlideOverDrawer>
       )}
 
       {/* CONFIRM DELETE DIALOG */}
