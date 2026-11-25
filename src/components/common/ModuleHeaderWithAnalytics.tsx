@@ -310,7 +310,7 @@ export function ModuleHeaderWithAnalytics({
             effectivePrimaryHref ? (
               <a
                 href={effectivePrimaryHref}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition active:scale-95"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-xs transition active:scale-95"
               >
                 <PrimaryActionIcon size={14} />
                 <span>{effectivePrimaryLabel}</span>
@@ -319,7 +319,7 @@ export function ModuleHeaderWithAnalytics({
               <button
                 type="button"
                 onClick={effectivePrimaryAction}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-xs transition active:scale-95 cursor-pointer"
               >
                 <PrimaryActionIcon size={14} />
                 <span>{effectivePrimaryLabel}</span>

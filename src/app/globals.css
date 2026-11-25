@@ -55,7 +55,7 @@
 }
 
 body {
-  background-color: #E5ECF6;
+  background-color: #F3F5F8;
   color: #334155;
   font-family: var(--font-sans), "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -63,40 +63,13 @@ body {
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
-  background-image: 
-    radial-gradient(at 15% 5%, rgba(20, 184, 166, 0.09) 0px, transparent 50%),
-    radial-gradient(at 85% 10%, rgba(99, 102, 241, 0.09) 0px, transparent 50%);
-  background-attachment: fixed;
-  transition: background-color 0.3s ease, background-image 0.3s ease;
+  background-image: none;
 }
 
-/* 4 Curated Light Luxury Flagship Themes */
-:root, [data-theme="mint_teal"] body {
-  background-color: #E5ECF6;
-  background-image: 
-    radial-gradient(at 15% 5%, rgba(20, 184, 166, 0.09) 0px, transparent 50%),
-    radial-gradient(at 85% 10%, rgba(99, 102, 241, 0.09) 0px, transparent 50%);
-}
-
-[data-theme="cool_indigo"] body {
-  background-color: #F0F4FA;
-  background-image: 
-    radial-gradient(at 50% -10%, rgba(37, 99, 235, 0.08) 0px, transparent 60%),
-    radial-gradient(at 100% 100%, rgba(224, 231, 255, 0.4) 0px, transparent 50%);
-}
-
-[data-theme="mint_forest"] body {
-  background-color: #F0F7F4;
-  background-image: 
-    radial-gradient(at 50% -10%, rgba(5, 150, 105, 0.08) 0px, transparent 60%),
-    radial-gradient(at 100% 100%, rgba(209, 250, 229, 0.4) 0px, transparent 50%);
-}
-
-[data-theme="lavender_plum"] body {
-  background-color: #F4F0FA;
-  background-image: 
-    radial-gradient(at 50% -10%, rgba(124, 58, 237, 0.08) 0px, transparent 60%),
-    radial-gradient(at 100% 100%, rgba(243, 232, 255, 0.4) 0px, transparent 50%);
+/* Disciplined Commercial Alabaster-Pearl & Royal Indigo System */
+:root body {
+  background-color: #F3F5F8;
+  background-image: none;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -122,18 +95,17 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-mono), "JetBrains Mono", monospace;
 }
 
-/* Clean Pure-Porcelain Cards (Linear / Stripe Elevation) */
+/* Clean Commercial Porcelain Cards (Mercury / Stripe / Linear Elevation) */
 .porcelain-card {
   background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 1rem;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 6px 16px -4px rgba(15, 23, 42, 0.05);
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 12px -2px rgba(16, 24, 40, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .porcelain-card:hover {
-  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 10px 24px -6px rgba(15, 23, 42, 0.08);
-  transform: translateY(-1.5px);
+  box-shadow: 0 2px 4px rgba(16, 24, 40, 0.05), 0 8px 16px -4px rgba(16, 24, 40, 0.06);
   border-color: #CBD5E1;
 }
 

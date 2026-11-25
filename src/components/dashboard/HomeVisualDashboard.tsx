@@ -293,9 +293,9 @@ export function HomeVisualDashboard({
     <div className="max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-7 py-3 space-y-6 font-sans pb-16 select-none text-slate-800 dark:text-slate-100">
       
       {/* 1. COMMERCIAL ZOHO SAAS EXECUTIVE HEADER */}
-      <div className="porcelain-card rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04),0_6px_16px_-4px_rgba(15,23,42,0.05)] flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900">
+      <div className="porcelain-card rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900">
         <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500 via-emerald-500 to-indigo-600 text-white flex items-center justify-center font-black shadow-md shadow-teal-600/20 text-sm shrink-0 ring-2 ring-teal-500/20">
+          <div className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-xs text-sm shrink-0 ring-2 ring-indigo-500/20">
             SR
           </div>
           <div>
@@ -331,7 +331,7 @@ export function HomeVisualDashboard({
               onClick={() => setActiveView("visual")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeView === "visual"
-                  ? "bg-white dark:bg-slate-900 text-teal-800 dark:text-teal-400 shadow-xs border border-teal-200/80"
+                  ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs border border-indigo-200/80"
                   : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -343,7 +343,7 @@ export function HomeVisualDashboard({
               onClick={() => setActiveView("table")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeView === "table"
-                  ? "bg-white dark:bg-slate-900 text-teal-800 dark:text-teal-400 shadow-xs border border-teal-200/80"
+                  ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs border border-indigo-200/80"
                   : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -364,7 +364,7 @@ export function HomeVisualDashboard({
 
           <Link
             href="/invoices/new"
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition active:scale-95"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-xs transition active:scale-95"
           >
             <Receipt size={14} />
             <span>+ Tax Invoice #{nextInvoiceNo}</span>
@@ -383,8 +383,7 @@ export function HomeVisualDashboard({
       {/* 2. TOP 4 FINTECH KPI CARDS WITH SEGMENTED HEALTH BARS & SPARKLINES */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Total Receivables */}
-        <div className="porcelain-card p-5 rounded-2xl bg-white border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.04),0_6px_16px_-4px_rgba(15,23,42,0.05)] hover:shadow-md overflow-hidden relative">
-          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500" />
+        <div className="porcelain-card p-5 rounded-xl bg-white border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] hover:shadow-md overflow-hidden relative">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -419,8 +418,7 @@ export function HomeVisualDashboard({
         </div>
 
         {/* KPI 2: Cash & Bank Liquidity */}
-        <div className="porcelain-card p-5 rounded-2xl bg-white border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.04),0_6px_16px_-4px_rgba(15,23,42,0.05)] hover:shadow-md overflow-hidden relative">
-          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-emerald-600 via-teal-500 to-green-500" />
+        <div className="porcelain-card p-5 rounded-xl bg-white border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] hover:shadow-md overflow-hidden relative">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -454,8 +452,7 @@ export function HomeVisualDashboard({
         </div>
 
         {/* KPI 3: Total Payables (AP) */}
-        <div className="porcelain-card p-5 rounded-2xl bg-white border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.04),0_6px_16px_-4px_rgba(15,23,42,0.05)] hover:shadow-md overflow-hidden relative">
-          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-indigo-500 via-sky-500 to-teal-500" />
+        <div className="porcelain-card p-5 rounded-xl bg-white border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] hover:shadow-md overflow-hidden relative">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -489,8 +486,7 @@ export function HomeVisualDashboard({
         </div>
 
         {/* KPI 4: Net Operating Profit */}
-        <div className="porcelain-card p-5 rounded-2xl bg-white border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.04),0_6px_16px_-4px_rgba(15,23,42,0.05)] hover:shadow-md overflow-hidden relative">
-          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-500" />
+        <div className="porcelain-card p-5 rounded-xl bg-white border border-slate-200/90 dark:border-slate-800 transition-all flex flex-col justify-between shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] hover:shadow-md overflow-hidden relative">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -528,8 +524,7 @@ export function HomeVisualDashboard({
       {activeView === "visual" ? (
         <div className="space-y-6">
           {/* CHART 1: INTERACTIVE CASH FLOW & WORKING CAPITAL TRAJECTORY */}
-          <div className="porcelain-card rounded-2xl bg-white border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 space-y-4 shadow-[0_1px_3px_rgba(15,23,42,0.04),0_6px_16px_-4px_rgba(15,23,42,0.05)] overflow-hidden relative">
-            <div className="h-1 -mx-6 -mt-6 mb-4 bg-gradient-to-r from-teal-600 via-sky-600 to-indigo-600" />
+          <div className="porcelain-card rounded-xl bg-white border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 space-y-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] overflow-hidden relative">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800 pb-4">
               <div>
                 <div className="flex items-center gap-2">

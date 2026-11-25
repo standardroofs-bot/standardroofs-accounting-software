@@ -25,12 +25,9 @@ import {
   CheckCircle2,
   LogOut,
   Menu,
-  Palette,
-  Check,
-  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
-import { useSidebar, useTheme, SR_THEMES, SRThemeKey } from "./AppShell";
+import { useSidebar } from "./AppShell";
 
 interface HeaderProps {
   onQuickCreate?: (type: "inflow" | "outflow" | "transfer" | "journal") => void;
@@ -38,11 +35,9 @@ interface HeaderProps {
 
 export function Header({ onQuickCreate }: HeaderProps) {
   const { toggleMobileSidebar } = useSidebar();
-  const { currentTheme, setCurrentTheme, themeConfig } = useTheme();
   const [isDark, setIsDark] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [selectedFY, setSelectedFY] = useState("2026-27");
   const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -130,7 +125,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
       .toUpperCase() || "PT";
 
   return (
-    <header className="h-14 bg-white/95 backdrop-blur-xl border-b border-teal-200/80 shadow-xs flex items-center justify-between px-3 sm:px-5 lg:px-6 sticky top-0 z-30 transition-colors whitespace-nowrap select-none">
+    <header className="h-14 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs flex items-center justify-between px-3 sm:px-5 lg:px-6 sticky top-0 z-30 transition-colors whitespace-nowrap select-none">
       {/* Left: Hamburger (mobile) + Organization context + Search */}
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         {/* Mobile Hamburger Drawer Button */}
@@ -190,7 +185,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
         <div className="relative">
           <button
             onClick={() => setShowQuickMenu(!showQuickMenu)}
-            className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition active:scale-95 cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition active:scale-95 cursor-pointer"
             title="Create New Transaction"
           >
             <Plus size={15} />
@@ -340,80 +335,6 @@ export function Header({ onQuickCreate }: HeaderProps) {
           )}
         </div>
 
-        {/* 1-Click Curated Live Palette Theme Switcher */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              setShowThemeMenu(!showThemeMenu);
-              setShowQuickMenu(false);
-              setShowNotifications(false);
-            }}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-teal-800 dark:text-slate-200 border border-teal-200/90 dark:border-slate-700 text-xs font-semibold transition cursor-pointer shadow-2xs"
-            title="Switch Theme Preset (Persisted)"
-          >
-            <Palette size={14} className="text-slate-700 dark:text-slate-300 shrink-0" />
-            <span className="hidden md:inline font-semibold text-[11.5px]">{themeConfig.paletteLabel}</span>
-            <div className="flex items-center -space-x-1 shrink-0">
-              <span className="w-2.5 h-2.5 rounded-full border border-white dark:border-slate-800 shadow-2xs" style={{ backgroundColor: themeConfig.swatchPrimary }} />
-              <span className="w-2.5 h-2.5 rounded-full border border-white dark:border-slate-800 shadow-2xs" style={{ backgroundColor: themeConfig.swatchSecondary }} />
-            </div>
-            <ChevronDown size={11} className="text-slate-400" />
-          </button>
-
-          {showThemeMenu && (
-            <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 text-xs animate-in fade-in zoom-in-95">
-              <div className="px-3 py-1.5 font-bold text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800 mb-1 flex items-center justify-between">
-                <span>Theme Presets</span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-bold">1-Click Live</span>
-              </div>
-
-              <div className="space-y-1">
-                {(Object.keys(SR_THEMES) as SRThemeKey[]).map((themeKey) => {
-                  const t = SR_THEMES[themeKey];
-                  const isSelected = currentTheme === themeKey;
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => {
-                        setCurrentTheme(t.id);
-                        setShowThemeMenu(false);
-                      }}
-                      className={`w-full flex items-center justify-between p-2.5 rounded-xl transition text-left cursor-pointer group ${
-                        isSelected
-                          ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50 border border-slate-300 dark:border-slate-700 shadow-xs"
-                          : "hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 border border-transparent"
-                      }`}
-                    >
-                      <div className="flex items-start gap-2.5 min-w-0">
-                        <div className="flex items-center -space-x-1.5 mt-0.5 shrink-0">
-                          <span className="w-3.5 h-3.5 rounded-full border border-white shadow-xs" style={{ backgroundColor: t.swatchPrimary }} />
-                          <span className="w-3.5 h-3.5 rounded-full border border-white shadow-xs" style={{ backgroundColor: t.swatchSecondary }} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-bold text-xs tracking-tight flex items-center gap-1.5">
-                            {t.name}
-                            {isSelected && (
-                              <span className="text-[9px] px-1 rounded bg-teal-600 text-white font-bold leading-tight">Active</span>
-                            )}
-                          </div>
-                          <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug line-clamp-1">
-                            {t.tagline}
-                          </div>
-                        </div>
-                      </div>
-                      {isSelected ? (
-                        <Check size={14} className="text-slate-900 dark:text-slate-100 shrink-0 ml-1.5" />
-                      ) : (
-                        <div className="w-3.5 shrink-0" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Dark/Light mode toggle */}
         <button
           onClick={toggleDarkMode}
@@ -426,7 +347,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
         {/* User Badge & Logout */}
         <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-3 border-l border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 via-emerald-500 to-indigo-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm ring-2 ring-teal-500/20">
+            <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs ring-2 ring-indigo-500/15">
               {initials}
             </div>
             <div className="hidden sm:flex flex-col text-left truncate max-w-[140px]">
