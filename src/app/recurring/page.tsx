@@ -37,6 +37,7 @@ export default function RecurringPage() {
   const [showModal, setShowModal] = useState(false);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  
 
   const [form, setForm] = useState({
     templateName: "",

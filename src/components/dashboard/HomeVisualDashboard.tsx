@@ -383,7 +383,8 @@ export function HomeVisualDashboard({
       {/* 2. TOP 4 FINTECH KPI CARDS WITH SEGMENTED HEALTH BARS & SPARKLINES */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Total Receivables */}
-        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-white via-white to-blue-50/80 border border-slate-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md">
+        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-white via-white to-blue-50/80 border border-slate-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md overflow-hidden relative">
+          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-blue-600 via-indigo-500 to-sky-400" />
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -418,7 +419,8 @@ export function HomeVisualDashboard({
         </div>
 
         {/* KPI 2: Cash & Bank Liquidity */}
-        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-white via-white to-emerald-50/70 border border-slate-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md">
+        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-white via-white to-emerald-50/70 border border-slate-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md overflow-hidden relative">
+          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-emerald-600 via-teal-500 to-green-400" />
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -452,7 +454,8 @@ export function HomeVisualDashboard({
         </div>
 
         {/* KPI 3: Total Payables (AP) */}
-        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-white via-white to-indigo-50/80 border border-slate-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md">
+        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-white via-white to-indigo-50/80 border border-slate-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md overflow-hidden relative">
+          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-400" />
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -486,7 +489,8 @@ export function HomeVisualDashboard({
         </div>
 
         {/* KPI 4: Net Operating Profit */}
-        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-white via-white to-teal-50/70 border border-slate-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md">
+        <div className="porcelain-card p-5 rounded-2xl bg-gradient-to-br from-white via-white to-teal-50/70 border border-slate-300/85 dark:border-slate-800 transition-all flex flex-col justify-between shadow-xs hover:shadow-md overflow-hidden relative">
+          <div className="h-1 -mx-5 -mt-5 mb-4 bg-gradient-to-r from-teal-500 via-cyan-500 to-emerald-400" />
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">

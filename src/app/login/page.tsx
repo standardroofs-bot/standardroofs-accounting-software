@@ -29,7 +29,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [logoSrc, setLogoSrc] = useState("/images/standard-roofs-logo.png");
+  const [logoSrc, setLogoSrc] = useState("/logo.png");
   const [logoFailed, setLogoFailed] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -86,8 +86,8 @@ export default function LoginPage() {
                 alt="Standard Roofs"
                 className="h-10 w-auto max-w-[170px] object-contain transition-all"
                 onError={() => {
-                  if (logoSrc === "/images/standard-roofs-logo.png") {
-                    setLogoSrc("/logo.png");
+                  if (logoSrc === "/logo.png") {
+                    setLogoSrc("/images/standard-roofs-logo.png");
                   } else {
                     setLogoFailed(true);
                   }

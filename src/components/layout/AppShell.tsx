@@ -129,7 +129,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       }}
     >
       <SessionGuard />
-      <div className="min-h-screen bg-[#DCE4F2] dark:bg-slate-950 flex transition-colors text-slate-900 dark:text-slate-100 antialiased">
+      <div className="min-h-screen bg-[#DCE5F4] dark:bg-slate-950 flex transition-colors text-slate-900 dark:text-slate-100 antialiased">
         {/* Mobile Backdrop Overlay */}
         {isMobileOpen && (
           <div

@@ -40,7 +40,102 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSidebar } from "./AppShell";
+
+// ==============================================================================
+// BESPOKE MULTI-LAYERED DUOTONE SVG CREST EMBLEMS FOR THE 4 WORKSPACES
+// ==============================================================================
+
+// 1. Standard Finance & GST Crest (Emerald-Sapphire Ledger & Rupee Crest)
+function FinanceGstIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="finGstGradA" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#38bdf8" />
+          <stop offset="1" stopColor="#2563eb" />
+        </linearGradient>
+        <linearGradient id="finGstGradB" x1="8" y1="6" x2="16" y2="18" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#10b981" />
+          <stop offset="1" stopColor="#059669" />
+        </linearGradient>
+      </defs>
+      <rect x="3" y="3" width="18" height="18" rx="4" fill="url(#finGstGradA)" fillOpacity="0.25" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M7 8h10M7 12h6M7 16h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="16" cy="14" r="3.5" fill="url(#finGstGradB)" stroke="white" strokeWidth="1.2" />
+      <path d="M14.8 13h2.4M14.8 14.2h2M15.4 13v2.2" stroke="white" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// 2. Standard Sites & Fleet Crest (Amber-Orange Roof Truss & Crane Crest)
+function SitesFleetIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="siteGradA" x1="2" y1="4" x2="22" y2="20" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fbbf24" />
+          <stop offset="1" stopColor="#ea580c" />
+        </linearGradient>
+      </defs>
+      <path d="M2 13L12 4l10 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 10.5v8.5a1 1 0 001 1h12a1 1 0 001-1v-8.5" fill="url(#siteGradA)" fillOpacity="0.3" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M12 4v16M8 10l8 10M16 10L8 20" stroke="currentColor" strokeWidth="1.2" strokeOpacity="0.7" strokeLinecap="round" />
+      <circle cx="12" cy="13" r="2.2" fill="white" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+// 3. Standard People (HR & Payroll) Crest (Violet-Teal Workforce & ID Crest)
+function PeoplePayrollIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="hrGradA" x1="2" y1="3" x2="22" y2="21" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#10b981" />
+          <stop offset="1" stopColor="#0d9488" />
+        </linearGradient>
+        <linearGradient id="hrGradB" x1="10" y1="10" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#6366f1" />
+          <stop offset="1" stopColor="#4f46e5" />
+        </linearGradient>
+      </defs>
+      <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="9" cy="7" r="4" fill="url(#hrGradA)" fillOpacity="0.3" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="14" y="11" width="8" height="10" rx="2" fill="url(#hrGradB)" stroke="white" strokeWidth="1.2" />
+      <circle cx="18" cy="14" r="1.5" fill="white" />
+      <path d="M16 18h4" stroke="white" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// 4. Standard Admin & Security Crest (Crimson-Violet Shield & Key Crest)
+function AdminSecurityIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="secGradA" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#ec4899" />
+          <stop offset="1" stopColor="#8b5cf6" />
+        </linearGradient>
+      </defs>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="url(#secGradA)" fillOpacity="0.3" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <circle cx="12" cy="10" r="2.5" fill="white" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M12 12.5V16M10.5 15h3" stroke="white" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// 5. All Workspaces Multi-Cube Crest
+function AllWorkspacesIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2L2 7l10 5 10-5-10-5z" fill="#3b82f6" fillOpacity="0.3" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M2 12l10 5 10-5M2 17l10 5 10-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 interface NavItem {
   name: string;
@@ -62,6 +157,10 @@ export interface WorkspaceConfig {
   shortLabel: string;
   icon: any;
   color: string;
+  activeBorder: string;
+  activeText: string;
+  activeIconColor: string;
+  activeBadge: string;
   groups: NavGroup[];
 }
 
@@ -70,8 +169,12 @@ const WORKSPACES: WorkspaceConfig[] = [
     id: "accounting_gst",
     title: "Standard Finance & GST",
     shortLabel: "Finance",
-    icon: Landmark,
-    color: "from-blue-600 to-indigo-600",
+    icon: FinanceGstIcon,
+    color: "from-blue-600 via-indigo-600 to-blue-700",
+    activeBorder: "border-l-indigo-600",
+    activeText: "text-indigo-700",
+    activeIconColor: "text-indigo-600",
+    activeBadge: "bg-indigo-600/15 text-indigo-700 border border-indigo-600/25",
     groups: [
       {
         id: "sales_core",
@@ -115,8 +218,12 @@ const WORKSPACES: WorkspaceConfig[] = [
     id: "site_fleet",
     title: "Standard Sites & Fleet",
     shortLabel: "Sites & Fleet",
-    icon: HardHat,
-    color: "from-amber-600 to-orange-600",
+    icon: SitesFleetIcon,
+    color: "from-amber-500 via-orange-600 to-amber-700",
+    activeBorder: "border-l-amber-600",
+    activeText: "text-amber-800",
+    activeIconColor: "text-amber-600",
+    activeBadge: "bg-amber-600/15 text-amber-800 border border-amber-600/25",
     groups: [
       {
         id: "site_operations",
@@ -136,8 +243,12 @@ const WORKSPACES: WorkspaceConfig[] = [
     id: "hr_payroll",
     title: "Standard People (HR & Payroll)",
     shortLabel: "People & HR",
-    icon: Users2,
-    color: "from-emerald-600 to-teal-600",
+    icon: PeoplePayrollIcon,
+    color: "from-emerald-600 via-teal-600 to-emerald-700",
+    activeBorder: "border-l-emerald-600",
+    activeText: "text-emerald-800",
+    activeIconColor: "text-emerald-600",
+    activeBadge: "bg-emerald-600/15 text-emerald-800 border border-emerald-600/25",
     groups: [
       {
         id: "workforce",
@@ -155,8 +266,12 @@ const WORKSPACES: WorkspaceConfig[] = [
     id: "admin_control",
     title: "Standard Admin & Security",
     shortLabel: "Governance",
-    icon: ShieldCheck,
-    color: "from-purple-600 to-indigo-700",
+    icon: AdminSecurityIcon,
+    color: "from-purple-600 via-violet-600 to-indigo-700",
+    activeBorder: "border-l-purple-600",
+    activeText: "text-purple-800",
+    activeIconColor: "text-purple-600",
+    activeBadge: "bg-purple-600/15 text-purple-800 border border-purple-600/25",
     groups: [
       {
         id: "governance",
@@ -304,7 +419,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-gradient-to-b from-[#E5ECFA] via-[#EAEFFA] to-[#DFE7F7] text-slate-800 flex flex-col border-r border-indigo-200/80 shadow-[4px_0_24px_-12px_rgba(30,58,138,0.12)] backdrop-blur-md ${
+      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-gradient-to-b from-[#E3EBF9] via-[#E8EFFB] to-[#DDE6F7] text-slate-800 flex flex-col border-r border-indigo-200/90 shadow-[6px_0_28px_-12px_rgba(30,58,138,0.15)] backdrop-blur-md ${
         isCollapsed ? "w-20" : "w-[272px]"
       } ${
         isMobileOpen
@@ -361,7 +476,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* 4-Workspace Switcher Bar (Tactile White Porcelain Selector) */}
+      {/* 4-Workspace Switcher Bar (Tactile White Porcelain Selector with Custom Duotone Emblems) */}
       {!isCollapsed ? (
         <div className="p-2.5 border-b border-indigo-200/70 bg-indigo-50/40 relative">
           <button
@@ -377,9 +492,9 @@ export function Sidebar() {
                 } text-white flex items-center justify-center shrink-0 shadow-sm`}
               >
                 {currentWorkspace === "all" ? (
-                  <Layers size={15} />
+                  <AllWorkspacesIcon className="w-4.5 h-4.5 text-white" />
                 ) : (
-                  <activeWsConfig.icon size={15} />
+                  <activeWsConfig.icon className="w-4.5 h-4.5 text-white" />
                 )}
               </div>
               <div className="truncate">
@@ -399,63 +514,75 @@ export function Sidebar() {
             />
           </button>
 
-          {/* Workspace Dropdown Menu */}
-          {showWorkspaceMenu && (
-            <div className="absolute left-2.5 right-2.5 top-full mt-1 bg-white border border-indigo-200/90 rounded-xl shadow-2xl p-1.5 z-50 transition-all duration-200 ease-out origin-top animate-in fade-in zoom-in-95 space-y-1">
-              <div className="px-2 py-1 text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">
-                Select Workspace
-              </div>
-              {accessibleWorkspaces.map((ws) => {
-                const WsIcon = ws.icon;
-                const isSelected = currentWorkspace === ws.id;
-                return (
-                  <button
-                    key={ws.id}
-                    onClick={() => handleSwitchWorkspace(ws.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                      isSelected
-                        ? "bg-indigo-600/10 text-indigo-700 font-bold border-l-[3px] border-indigo-600 shadow-2xs"
-                        : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 truncate">
-                      <WsIcon size={15} className={isSelected ? "text-indigo-600" : "text-slate-400"} />
-                      <span className="truncate">{ws.title}</span>
-                    </div>
-                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />}
-                  </button>
-                );
-              })}
-
-              {!isHr && (
-                <div className="border-t border-slate-100 my-1 pt-1">
-                  <button
-                    onClick={() => handleSwitchWorkspace("all")}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition cursor-pointer ${
-                      currentWorkspace === "all"
-                        ? "bg-indigo-600/10 text-indigo-700 font-bold border-l-[3px] border-indigo-600"
-                        : "text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Layers size={15} className={currentWorkspace === "all" ? "text-indigo-600" : "text-slate-400"} />
-                      <span>View All Workspaces</span>
-                    </div>
-                  </button>
+          {/* Workspace Dropdown Menu with Spring Physics & Custom Duotone Emblems */}
+          <AnimatePresence>
+            {showWorkspaceMenu && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: -6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -6 }}
+                transition={{ type: "spring", stiffness: 420, damping: 28 }}
+                className="absolute left-2.5 right-2.5 top-full mt-1.5 bg-white/95 backdrop-blur-xl border border-indigo-200/90 rounded-2xl shadow-[0_20px_50px_-10px_rgba(30,58,138,0.25)] p-2 z-50 origin-top space-y-1.5"
+              >
+                <div className="px-2 py-1 text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">
+                  Select Workspace
                 </div>
-              )}
-            </div>
-          )}
+                {accessibleWorkspaces.map((ws) => {
+                  const WsIcon = ws.icon;
+                  const isSelected = currentWorkspace === ws.id;
+                  return (
+                    <button
+                      key={ws.id}
+                      onClick={() => handleSwitchWorkspace(ws.id)}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        isSelected
+                          ? `bg-indigo-600/10 ${ws.activeText} font-bold border-l-[3px] ${ws.activeBorder} shadow-2xs`
+                          : "text-slate-700 hover:bg-slate-100/80 hover:text-slate-900"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 truncate">
+                        <div className={`w-6 h-6 rounded-lg bg-gradient-to-br ${ws.color} text-white flex items-center justify-center shrink-0 shadow-2xs`}>
+                          <WsIcon className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        <span className="truncate">{ws.title}</span>
+                      </div>
+                      {isSelected && <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0 shadow-xs" />}
+                    </button>
+                  );
+                })}
+
+                {!isHr && (
+                  <div className="border-t border-slate-100 my-1 pt-1">
+                    <button
+                      onClick={() => handleSwitchWorkspace("all")}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition cursor-pointer ${
+                        currentWorkspace === "all"
+                          ? "bg-indigo-600/10 text-indigo-700 font-bold border-l-[3px] border-indigo-600"
+                          : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                          <AllWorkspacesIcon className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        <span>View All Workspaces</span>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       ) : (
         /* Collapsed Workspace Icon Button */
-        <div className="p-2 border-b border-slate-200/90 flex justify-center">
+        <div className="p-2 border-b border-indigo-200/70 flex justify-center">
           <button
             onClick={() => setIsCollapsed(false)}
-            className="w-9 h-9 rounded-xl bg-white hover:bg-slate-100 text-indigo-600 flex items-center justify-center transition cursor-pointer border border-slate-200 shadow-2xs"
+            className={`w-9 h-9 rounded-xl bg-gradient-to-br ${activeWsConfig.color} text-white flex items-center justify-center transition cursor-pointer shadow-sm hover:scale-105`}
             title={`Active: ${activeWsConfig.title} (Click to expand)`}
           >
-            <activeWsConfig.icon size={16} />
+            <activeWsConfig.icon className="w-5 h-5 text-white" />
           </button>
         </div>
       )}
@@ -488,9 +615,9 @@ export function Sidebar() {
                 <div className="h-px bg-slate-200 my-2 mx-1" />
               )}
 
-              {/* Items List (Zero Truncation) */}
+              {/* Items List (Gliding Active Pill via Framer Motion layoutId) */}
               {(isCollapsed || isOpen) && (
-                <div className="space-y-0.5">
+                <div className="space-y-0.5 relative">
                   {visibleItems.map((item) => {
                     const isActive =
                       item.href === "/"
@@ -503,26 +630,36 @@ export function Sidebar() {
                         href={item.href}
                         onClick={() => setIsMobileOpen(false)}
                         title={isCollapsed ? item.name : undefined}
-                        className={`flex items-center gap-2.5 px-3 py-2 text-[13.5px] transition-all duration-200 group relative ${
+                        className={`flex items-center gap-2.5 px-3 py-2 text-[13.5px] transition-colors group relative rounded-xl ${
                           isActive
-                            ? "bg-white text-indigo-700 font-bold shadow-sm border border-indigo-200/90 border-l-[4px] border-l-indigo-600 rounded-r-xl rounded-l-xs"
-                            : "text-slate-700 hover:bg-white/70 hover:text-indigo-950 font-medium rounded-xl hover:translate-x-1 hover:shadow-2xs"
+                            ? `${activeWsConfig.activeText} font-bold`
+                            : "text-slate-700 hover:text-slate-950 font-medium"
                         }`}
                       >
+                        {isActive && (
+                          <motion.span
+                            layoutId="srActiveSidebarPill"
+                            className={`absolute inset-0 bg-white shadow-sm border border-indigo-200/90 ${activeWsConfig.activeBorder} rounded-r-xl rounded-l-xs z-0`}
+                            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                          />
+                        )}
+                        {!isActive && (
+                          <span className="absolute inset-0 rounded-xl hover:bg-white/60 transition-colors z-0" />
+                        )}
                         <Icon
                           size={17}
-                          className={`shrink-0 transition-colors ${
-                            isActive ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-700"
+                          className={`relative z-10 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+                            isActive ? activeWsConfig.activeIconColor : "text-slate-400 group-hover:text-slate-700"
                           }`}
                         />
                         {!isCollapsed && (
-                          <div className="flex items-center justify-between flex-1 min-w-0">
+                          <div className="relative z-10 flex items-center justify-between flex-1 min-w-0">
                             <span className="whitespace-nowrap tracking-tight">{item.name}</span>
                             {item.badge && (
                               <span
                                 className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md shrink-0 ml-1.5 ${
                                   isActive
-                                    ? "bg-indigo-600/15 text-indigo-700 border border-indigo-600/25"
+                                    ? activeWsConfig.activeBadge
                                     : "bg-slate-200/70 text-slate-600 border border-slate-300/60"
                                 }`}
                               >
