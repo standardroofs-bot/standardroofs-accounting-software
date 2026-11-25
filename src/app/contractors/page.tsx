@@ -385,7 +385,7 @@ export default function StandardSubContractorsPage() {
 
       {/* 2. TEAM DIRECTORY PILLS */}
       <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-3">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-1 mb-2">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600 px-1 mb-2">
           Contracting Teams ({teams.length})
         </div>
         {loading ? (
@@ -550,7 +550,7 @@ export default function StandardSubContractorsPage() {
                 ))}
               </div>
               <div className="relative">
-                <Search size={13} className="absolute left-2.5 top-2 text-slate-400" />
+                <Search size={13} className="absolute left-2.5 top-2 text-slate-600" />
                 <input
                   type="text"
                   value={searchQuery}
@@ -566,7 +566,7 @@ export default function StandardSubContractorsPage() {
           <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] overflow-hidden">
             {filteredEntries.length === 0 ? (
               <div className="p-10 text-center text-xs text-slate-500">
-                <AlertCircle size={26} className="mx-auto text-slate-400 mb-2" />
+                <AlertCircle size={26} className="mx-auto text-slate-600 mb-2" />
                 No ledger entries match the current filter.
               </div>
             ) : (
@@ -595,7 +595,7 @@ export default function StandardSubContractorsPage() {
                         <td className="py-2.5 px-3">
                           <div className="font-semibold text-slate-900">{entry.particulars}</div>
                           {entry.siteName && (
-                            <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <div className="text-[10px] text-slate-600 flex items-center gap-1 mt-0.5">
                               <Building2 size={10} /> {entry.siteName}
                             </div>
                           )}
@@ -663,7 +663,7 @@ export default function StandardSubContractorsPage() {
                             <button
                               type="button"
                               onClick={() => handleDeleteEntry(entry)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                              className="p-1.5 rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
                               title="Delete Entry"
                             >
                               <Trash2 size={13} />

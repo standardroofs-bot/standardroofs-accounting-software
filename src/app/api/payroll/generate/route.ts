@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { computeAttendanceBreakdownMap, syncLinkedCashBookForPaidRun } from "@/lib/payrollAttendanceSync";
 
 function getCycleDateRange(month: string, halfPeriod: string) {
   const [yStr, mStr] = month.split("-");
@@ -142,13 +143,6 @@ export async function POST(req: NextRequest) {
       },
       include: { items: true },
     });
-
-    if (existingRun?.status === "PAID") {
-      return NextResponse.json(
-        { success: false, error: "This payroll cycle is already PAID & locked. Unlock it first to re-sync." },
-        { status: 400 }
-      );
-    }
 
     const existingByEmp = new Map(existingRun?.items.map((it) => [it.employeeId, it]) || []);
 
@@ -294,9 +288,33 @@ export async function POST(req: NextRequest) {
       include: { items: { orderBy: { employeeName: "asc" } } },
     });
 
+    if (updated?.status === "PAID") {
+      await syncLinkedCashBookForPaidRun(updated.id);
+    }
+
+    const empIds = updated ? Array.from(new Set(updated.items.map((it) => it.employeeId).filter(Boolean))) : [];
+    const attMap = updated ? await computeAttendanceBreakdownMap(empIds, updated.month, updated.halfPeriod) : new Map();
+
     return NextResponse.json({
       success: true,
-      run: updated,
+      run: updated
+        ? {
+            ...updated,
+            items: updated.items.map((it) => ({
+              ...it,
+              attendanceSummary: attMap.get(it.employeeId) || {
+                presentCount: 0,
+                halfDayCount: 0,
+                paidLeaveCount: 0,
+                absentCount: 0,
+                otHours: 0,
+                payableDays: 0,
+                dailyAdvanceSum: 0,
+                totalRecords: 0,
+              },
+            })),
+          }
+        : updated,
       syncedEmployees: newItems.length,
     });
   } catch (error: any) {

@@ -269,7 +269,7 @@ export default function CashBookPage() {
                   : "bg-white hover:bg-slate-50 border-slate-200/90 text-slate-900 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
               }`}
             >
-              <div className={`text-[10px] font-bold uppercase tracking-wider truncate ${isSelected ? "text-indigo-100" : "text-slate-400"}`}>
+              <div className={`text-[10px] font-bold uppercase tracking-wider truncate ${isSelected ? "text-indigo-100" : "text-slate-600"}`}>
                 {wb.walletName}
               </div>
               <div className={`text-sm font-extrabold mt-1 tabular-nums ${isSelected ? "text-white" : wb.balance < 0 ? "text-rose-600" : "text-slate-900"}`}>
@@ -284,7 +284,7 @@ export default function CashBookPage() {
       <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-3.5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4 text-xs">
           <div>
-            <span className="text-slate-400 font-semibold">Net Liquidity: </span>
+            <span className="text-slate-600 font-semibold">Net Liquidity: </span>
             <span className="font-extrabold text-indigo-700 tabular-nums">{formatINR(currentBalance)}</span>
           </div>
           <div className="flex items-center gap-1 text-emerald-700 font-bold tabular-nums">
@@ -297,7 +297,7 @@ export default function CashBookPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
-            <Filter size={12} className="text-slate-400" />
+            <Filter size={12} className="text-slate-600" />
             <select
               value={selectedWallet}
               onChange={(e) => setSelectedWallet(e.target.value)}
@@ -322,7 +322,7 @@ export default function CashBookPage() {
           </select>
 
           <div className="relative">
-            <Search size={13} className="absolute left-2.5 top-2 text-slate-400" />
+            <Search size={13} className="absolute left-2.5 top-2 text-slate-600" />
             <input
               type="text"
               value={searchQuery}
@@ -359,7 +359,7 @@ export default function CashBookPage() {
                   <tr key={entry.id} className="hover:bg-slate-50/80 transition">
                     <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
                       {new Date(entry.date).toISOString().slice(0, 10)}
-                      <div className="text-[9.5px] text-slate-400">{entry.voucherNumber}</div>
+                      <div className="text-[9.5px] text-slate-600">{entry.voucherNumber}</div>
                     </td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/80 text-[10.5px] font-bold">
@@ -372,7 +372,7 @@ export default function CashBookPage() {
                     <td className="py-2.5 px-3">
                       <div className="font-medium text-slate-900">{entry.purpose}</div>
                       {entry.counterpartyName && (
-                        <div className="text-[10px] text-slate-400">{entry.counterpartyName}</div>
+                        <div className="text-[10px] text-slate-600">{entry.counterpartyName}</div>
                       )}
                     </td>
                     <td className="py-2.5 px-3 text-right font-bold text-emerald-700 tabular-nums">
@@ -406,7 +406,7 @@ export default function CashBookPage() {
                         <button
                           type="button"
                           onClick={() => setConfirmDelete(entry)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                          className="p-1.5 rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
                           title="Delete Entry"
                         >
                           <Trash2 size={13} />

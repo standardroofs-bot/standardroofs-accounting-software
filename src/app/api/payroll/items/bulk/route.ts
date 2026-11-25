@@ -18,12 +18,6 @@ export async function POST(req: NextRequest) {
     if (!run) {
       return NextResponse.json({ success: false, error: "Payroll run not found" }, { status: 404 });
     }
-    if (run.status === "PAID") {
-      return NextResponse.json(
-        { success: false, error: "Cycle is PAID & locked. Reopen cycle first." },
-        { status: 400 }
-      );
-    }
 
     if (action === "MARK_CLEARED") {
       const items = await prisma.payrollItem.findMany({ where: { id: { in: itemIds } } });

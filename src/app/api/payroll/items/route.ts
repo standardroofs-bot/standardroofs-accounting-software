@@ -53,13 +53,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (run?.status === "PAID") {
-      return NextResponse.json(
-        { success: false, error: "Cannot add rows to a PAID cycle. Reopen the cycle first." },
-        { status: 400 }
-      );
-    }
-
     if (!run) {
       run = await prisma.payrollRun.create({
         data: {

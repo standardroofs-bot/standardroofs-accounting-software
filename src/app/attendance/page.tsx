@@ -1106,6 +1106,13 @@ export default function AttendancePage() {
         onPrintPDF={() => setShowUniversalExportModal(true)}
         extraControls={
           <div className="flex items-center gap-2 whitespace-nowrap">
+            <Link
+              href={`/payroll?month=${selectedMonth}&tab=${activeTab}`}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white font-semibold text-xs rounded-xl shadow-xs transition cursor-pointer shrink-0"
+              title="Open Standard Payroll for this month"
+            >
+              <span>View &amp; Run Payroll →</span>
+            </Link>
             <button
               type="button"
               onClick={() => setShowLeaveDrawer(true)}

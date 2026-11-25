@@ -20,6 +20,7 @@ import {
   Trash2,
   Wallet,
   CalendarPlus,
+  Pencil,
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
 import { BrandedPayslip, BrandedPayslipItem } from "@/components/payroll/BrandedPayslip";
@@ -28,6 +29,16 @@ interface PayrollItem extends BrandedPayslipItem {
   payrollRunId: string;
   employeeId: string;
   isCleared: boolean;
+  attendanceSummary?: {
+    presentCount: number;
+    halfDayCount: number;
+    paidLeaveCount: number;
+    absentCount: number;
+    otHours: number;
+    payableDays: number;
+    dailyAdvanceSum: number;
+    totalRecords: number;
+  };
 }
 
 interface PayrollRun {
@@ -159,6 +170,26 @@ export default function StandardPayrollPage() {
   }, [cycleType, month, halfPeriod, companyFilter]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const qMonth = sp.get("month");
+    const qTab = sp.get("tab");
+    if (qMonth && /^\d{4}-\d{2}$/.test(qMonth)) {
+      setMonth(qMonth);
+    }
+    if (qTab === "tamil") {
+      setCycleType("BI_MONTHLY_TAMIL");
+      setHalfPeriod("FIRST_HALF");
+    } else if (qTab === "hindi") {
+      setCycleType("BI_MONTHLY_HINDI");
+      setHalfPeriod("FIRST_HALF");
+    } else if (qTab === "office") {
+      setCycleType("MONTHLY_OFFICE");
+      setHalfPeriod("FULL");
+    }
+  }, []);
+
+  useEffect(() => {
     loadPayroll();
   }, [loadPayroll]);
 
@@ -211,7 +242,7 @@ export default function StandardPayrollPage() {
         setHalfPeriod(targetHalf);
         setRun(data.run);
         setShowNewCycleModal(false);
-        showToast(`Opened ${formatMonthLabel(targetMonth)} (${data.syncedEmployees} personnel synced)`);
+        showToast(`Synced live attendance for ${data.syncedEmployees} personnel`);
       } else {
         showToast(data.error || "Sync failed", "error");
       }
@@ -541,34 +572,32 @@ export default function StandardPayrollPage() {
             <span>+ New Cycle</span>
           </button>
 
-          {(!run || run.status !== "PAID") && (
-            <button
-              type="button"
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer"
-            >
-              <Plus size={14} className="text-indigo-600" />
-              <span>+ Add Worker</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer"
+          >
+            <Plus size={14} className="text-[#4F46E5]" />
+            <span>+ Add Worker</span>
+          </button>
 
           <button
             type="button"
             onClick={() => handleSyncFromAttendance()}
-            disabled={syncing || run?.status === "PAID"}
+            disabled={syncing}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
           >
-            <RefreshCw size={14} className={syncing ? "animate-spin text-indigo-600" : "text-indigo-600"} />
+            <RefreshCw size={14} className={syncing ? "animate-spin text-[#4F46E5]" : "text-[#4F46E5]"} />
             <span>{syncing ? "Syncing..." : "Sync Attendance"}</span>
           </button>
 
           <button
             type="button"
             onClick={handlePullAdvances}
-            disabled={!run || pullingAdv || run.status === "PAID"}
+            disabled={!run || pullingAdv}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
           >
-            <Wallet size={14} className="text-amber-600" />
+            <Wallet size={14} className="text-[#D97706]" />
             <span>{pullingAdv ? "Pulling..." : "Pull Advances"}</span>
           </button>
 
@@ -636,6 +665,19 @@ export default function StandardPayrollPage() {
           )}
         </div>
       </div>
+
+      {/* SUBTLE POSTED-TO-ACCOUNTS BANNER WHEN PAID */}
+      {run?.status === "PAID" && (
+        <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-2 text-xs text-emerald-900">
+          <div className="flex items-center gap-2 font-medium">
+            <CheckCircle2 size={15} className="text-[#059669] shrink-0" />
+            <span>
+              <strong>Cycle posted to accounts</strong> — any edits will automatically update the linked Cash Book entry.
+            </span>
+          </div>
+          <span className="text-[11px] font-semibold text-[#059669]">All fields editable</span>
+        </div>
+      )}
 
       {/* 2. 3 SEGMENT TABS + PERIOD & COMPANY CONTROLS */}
       <div className="bg-white border border-slate-200/90 rounded-xl shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_12px_-2px_rgba(16,24,40,0.04)] p-3.5 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
@@ -789,7 +831,7 @@ export default function StandardPayrollPage() {
       </div>
 
       {/* BULK ACTION BAR */}
-      {selectedIds.length > 0 && run?.status !== "PAID" && (
+      {selectedIds.length > 0 && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
           <span className="font-bold text-indigo-900">{selectedIds.length} row(s) selected</span>
           <div className="flex flex-wrap items-center gap-2">
@@ -864,30 +906,29 @@ export default function StandardPayrollPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left border-collapse">
-              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-bold">
+              <thead className="bg-slate-50/90 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-600 font-bold">
                 <tr>
-                  <th className="py-3 px-3 w-8">
+                  <th className="py-3.5 px-4 w-8">
                     <input
                       type="checkbox"
                       checked={allSelected}
                       onChange={() => setSelectedIds(allSelected ? [] : visibleItems.map((it) => it.id))}
-                      disabled={run?.status === "PAID"}
-                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      className="rounded border-slate-300 text-[#4F46E5] focus:ring-[#4F46E5] cursor-pointer"
                     />
                   </th>
-                  <th className="py-3 px-2">Employee</th>
-                  <th className="py-3 px-2 text-right">Days</th>
-                  <th className="py-3 px-2 text-right">Rate (₹)</th>
-                  <th className="py-3 px-2 text-right">Gross (₹)</th>
-                  <th className="py-3 px-2 text-right">+ OT / Veh / Prev</th>
-                  <th className="py-3 px-2 text-right">- Adv / Exp</th>
-                  <th className="py-3 px-2 text-right text-indigo-700">Net Salary</th>
-                  <th className="py-3 px-2 text-right">Paid Cash</th>
-                  <th className="py-3 px-2 text-right">Bank / GPay</th>
-                  <th className="py-3 px-2">Channel</th>
-                  <th className="py-3 px-2 text-right">Balance</th>
-                  <th className="py-3 px-2">Notes</th>
-                  <th className="py-3 px-3 text-center">Actions</th>
+                  <th className="py-3.5 px-3">Employee</th>
+                  <th className="py-3.5 px-3 text-right">Days</th>
+                  <th className="py-3.5 px-3 text-right">Rate (₹)</th>
+                  <th className="py-3.5 px-3 text-right">Gross (₹)</th>
+                  <th className="py-3.5 px-3 text-right">+ OT / Veh / Prev</th>
+                  <th className="py-3.5 px-3 text-right">- Adv / Exp</th>
+                  <th className="py-3.5 px-3 text-right text-[#4F46E5]">Net Salary</th>
+                  <th className="py-3.5 px-3 text-right">Paid Cash</th>
+                  <th className="py-3.5 px-3 text-right">Bank / GPay</th>
+                  <th className="py-3.5 px-3">Channel</th>
+                  <th className="py-3.5 px-3 text-right">Balance</th>
+                  <th className="py-3.5 px-3">Notes</th>
+                  <th className="py-3.5 px-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -895,7 +936,6 @@ export default function StandardPayrollPage() {
                   <PayrollTableRow
                     key={item.id}
                     item={item}
-                    locked={run?.status === "PAID"}
                     selected={selectedIds.includes(item.id)}
                     onToggleSelect={() =>
                       setSelectedIds((prev) =>
@@ -998,7 +1038,6 @@ export default function StandardPayrollPage() {
       {drawerItem && (
         <PayrollDetailDrawer
           item={drawerItem}
-          locked={run?.status === "PAID"}
           onClose={() => setDrawerItem(null)}
           onSave={async (patch) => {
             await handleInlinePatch(drawerItem.id, patch);
@@ -1178,19 +1217,18 @@ export default function StandardPayrollPage() {
 
 function PayrollDetailDrawer({
   item,
-  locked,
   onClose,
   onSave,
   onViewPayslip,
   onDelete,
 }: {
   item: PayrollItem;
-  locked: boolean;
   onClose: () => void;
   onSave: (patch: Partial<PayrollItem>) => Promise<void>;
   onViewPayslip: () => void;
   onDelete: () => void;
 }) {
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     totalWorkingDays: item.totalWorkingDays,
     daysPresent: item.daysPresent,
@@ -1226,83 +1264,94 @@ function PayrollDetailDrawer({
   const balance = Math.round((net - (form.paidCash + form.paidBankOrGpay)) * 100) / 100;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex justify-end">
-      <div className="bg-white w-full max-w-md h-full shadow-2xl border-l border-slate-200 flex flex-col">
-        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+    <div className="fixed inset-0 z-50 bg-slate-900/20 flex justify-end" onClick={onClose}>
+      <div
+        className="bg-white w-full max-w-md h-full shadow-2xl border-l border-slate-200 flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="shrink-0 px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div>
-            <div className="text-sm font-extrabold text-slate-900">{item.employeeName}</div>
-            <div className="text-[11px] text-slate-500 font-mono">
+            <div className="text-sm font-bold text-slate-900">{item.employeeName}</div>
+            <div className="text-[11px] text-slate-600 font-mono">
               {item.employeeCode} • {item.designation || item.category}
             </div>
           </div>
-          <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 cursor-pointer">
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-200 cursor-pointer">
             <X size={16} />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
           {/* Attendance Summary */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 grid grid-cols-3 gap-2 text-center">
-            <div>
-              <div className="text-[10px] text-slate-400 font-bold uppercase">Working</div>
-              <div className="text-sm font-extrabold text-slate-800">{form.totalWorkingDays} Days</div>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <div className="text-[10px] text-slate-600 font-bold uppercase">Working</div>
+                <div className="text-sm font-extrabold text-slate-900 tabular-nums">{form.totalWorkingDays} Days</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-600 font-bold uppercase">Present</div>
+                <div className="text-sm font-extrabold text-[#059669] tabular-nums">{form.daysPresent} Days</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-600 font-bold uppercase">Leave</div>
+                <div className="text-sm font-extrabold text-[#E11D48] tabular-nums">{leaveDays} Days</div>
+              </div>
             </div>
-            <div>
-              <div className="text-[10px] text-slate-400 font-bold uppercase">Present</div>
-              <div className="text-sm font-extrabold text-emerald-700">{form.daysPresent} Days</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-slate-400 font-bold uppercase">Leave</div>
-              <div className="text-sm font-extrabold text-rose-600">{leaveDays} Days</div>
-            </div>
+            {item.attendanceSummary && item.attendanceSummary.totalRecords > 0 && (
+              <div className="pt-2 border-t border-slate-200/80 text-center text-[11px] font-semibold text-[#4F46E5]">
+                Synced from Attendance: {item.attendanceSummary.presentCount}P · {item.attendanceSummary.paidLeaveCount}PL · {item.attendanceSummary.halfDayCount}H
+                {item.attendanceSummary.otHours > 0 ? ` · ${item.attendanceSummary.otHours}h OT` : ""}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Working Days</label>
-              <input type="number" disabled={locked} value={form.totalWorkingDays} onChange={(e) => setForm({ ...form, totalWorkingDays: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+              <input type="number" value={form.totalWorkingDays} onChange={(e) => setForm({ ...form, totalWorkingDays: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Days Present</label>
-              <input type="number" step="0.5" disabled={locked} value={form.daysPresent} onChange={(e) => setForm({ ...form, daysPresent: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+              <input type="number" step="0.5" value={form.daysPresent} onChange={(e) => setForm({ ...form, daysPresent: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Base Rate (₹)</label>
-              <input type="number" disabled={locked} value={form.baseRate} onChange={(e) => setForm({ ...form, baseRate: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+              <input type="number" value={form.baseRate} onChange={(e) => setForm({ ...form, baseRate: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">OT / Incentive (₹)</label>
-              <input type="number" disabled={locked} value={form.otAndIncentive} onChange={(e) => setForm({ ...form, otAndIncentive: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+              <input type="number" value={form.otAndIncentive} onChange={(e) => setForm({ ...form, otAndIncentive: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Vehicle Allowance (₹)</label>
-              <input type="number" disabled={locked} value={form.vehicleAllowance} onChange={(e) => setForm({ ...form, vehicleAllowance: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+              <input type="number" value={form.vehicleAllowance} onChange={(e) => setForm({ ...form, vehicleAllowance: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Last Month Bal (₹)</label>
-              <input type="number" disabled={locked} value={form.lastMonthBalance} onChange={(e) => setForm({ ...form, lastMonthBalance: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+              <input type="number" value={form.lastMonthBalance} onChange={(e) => setForm({ ...form, lastMonthBalance: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
             <div>
-              <label className="block font-semibold text-rose-700 mb-1">Advance Ded (₹)</label>
-              <input type="number" disabled={locked} value={form.advanceDeduction} onChange={(e) => setForm({ ...form, advanceDeduction: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+              <label className="block font-semibold text-[#E11D48] mb-1">Advance Ded (₹)</label>
+              <input type="number" value={form.advanceDeduction} onChange={(e) => setForm({ ...form, advanceDeduction: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
             <div>
-              <label className="block font-semibold text-rose-700 mb-1">Expense Bal Ded (₹)</label>
-              <input type="number" disabled={locked} value={form.expenseBalanceDeduction} onChange={(e) => setForm({ ...form, expenseBalanceDeduction: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+              <label className="block font-semibold text-[#E11D48] mb-1">Expense Bal Ded (₹)</label>
+              <input type="number" value={form.expenseBalanceDeduction} onChange={(e) => setForm({ ...form, expenseBalanceDeduction: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Paid Cash (₹)</label>
-              <input type="number" disabled={locked} value={form.paidCash} onChange={(e) => setForm({ ...form, paidCash: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+              <input type="number" value={form.paidCash} onChange={(e) => setForm({ ...form, paidCash: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Paid Bank / GPay (₹)</label>
-              <input type="number" disabled={locked} value={form.paidBankOrGpay} onChange={(e) => setForm({ ...form, paidBankOrGpay: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+              <input type="number" value={form.paidBankOrGpay} onChange={(e) => setForm({ ...form, paidBankOrGpay: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
           </div>
 
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Payment Channel</label>
-            <select disabled={locked} value={form.paymentChannel} onChange={(e) => setForm({ ...form, paymentChannel: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white">
+            <select value={form.paymentChannel} onChange={(e) => setForm({ ...form, paymentChannel: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 font-semibold focus:outline-none focus:border-[#4F46E5]">
               <option value="CASH">Cash</option>
               <option value="ICICI">ICICI</option>
               <option value="OFFICE_GPAY">Office GPay</option>
@@ -1312,23 +1361,23 @@ function PayrollDetailDrawer({
 
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Notes</label>
-            <input type="text" disabled={locked} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+            <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 focus:outline-none focus:border-[#4F46E5]" />
           </div>
 
           {/* Live Summary */}
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5 flex items-center justify-between">
             <div>
-              <div className="text-[10px] font-bold uppercase text-indigo-700">Live Net Salary</div>
-              <div className="text-xl font-extrabold text-indigo-900 tabular-nums">{formatINR(net)}</div>
+              <div className="text-[10px] font-bold uppercase text-[#4F46E5]">Live Net Salary</div>
+              <div className="text-xl font-extrabold text-slate-900 tabular-nums">{formatINR(net)}</div>
             </div>
             <div className="text-right">
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                   balance > 0
-                    ? "bg-amber-100 text-amber-800"
+                    ? "bg-amber-100 text-[#D97706]"
                     : balance < 0
-                    ? "bg-rose-100 text-rose-800"
-                    : "bg-emerald-100 text-emerald-800"
+                    ? "bg-rose-100 text-[#E11D48]"
+                    : "bg-emerald-100 text-[#059669]"
                 }`}
               >
                 {balance > 0 ? "Pending Balance" : balance < 0 ? "Advance to Recover" : "Cleared"}
@@ -1338,30 +1387,42 @@ function PayrollDetailDrawer({
           </div>
         </div>
 
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
+        <div className="sticky bottom-0 bg-white border-t border-slate-200 p-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <button type="button" onClick={onViewPayslip} className="flex items-center gap-1 px-3 py-2 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-indigo-700 cursor-pointer">
-              <Printer size={13} />
-              <span>Official Payslip</span>
-            </button>
-            {!locked && (
-              <button type="button" onClick={onDelete} className="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer" title="Delete Row">
-                <Trash2 size={14} />
-              </button>
-            )}
-          </div>
-          {!locked && (
             <button
               type="button"
-              onClick={async () => {
+              onClick={onViewPayslip}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
+            >
+              <Printer size={13} className="text-[#4F46E5]" />
+              <span>Official Payslip</span>
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="flex items-center gap-1 px-2.5 py-2 rounded-lg bg-white hover:bg-rose-50 text-[#E11D48] border border-rose-300 text-xs font-semibold cursor-pointer"
+              title="Delete Row"
+            >
+              <Trash2 size={13} />
+              <span>Delete</span>
+            </button>
+          </div>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
                 await onSave(form);
                 onClose();
-              }}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer"
-            >
-              Save Changes
-            </button>
-          )}
+              } finally {
+                setSaving(false);
+              }
+            }}
+            className="px-4 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
         </div>
       </div>
     </div>
@@ -1370,7 +1431,6 @@ function PayrollDetailDrawer({
 
 function PayrollTableRow({
   item,
-  locked,
   selected,
   onToggleSelect,
   onOpenDrawer,
@@ -1379,7 +1439,6 @@ function PayrollTableRow({
   onPrint,
 }: {
   item: PayrollItem;
-  locked: boolean;
   selected: boolean;
   onToggleSelect: () => void;
   onOpenDrawer: () => void;
@@ -1420,64 +1479,67 @@ function PayrollTableRow({
   };
 
   return (
-    <tr className={`hover:bg-slate-50/80 transition ${selected ? "bg-indigo-50/40" : ""}`}>
-      <td className="py-2.5 px-3">
+    <tr className={`hover:bg-indigo-50/40 transition ${selected ? "bg-indigo-50/50" : ""}`}>
+      <td className="py-3.5 px-4">
         <input
           type="checkbox"
           checked={selected}
           onChange={onToggleSelect}
-          disabled={locked}
-          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+          className="rounded border-slate-300 text-[#4F46E5] focus:ring-[#4F46E5] cursor-pointer"
         />
       </td>
 
-      <td className="py-2.5 px-2">
+      <td className="py-3.5 px-3">
         <button
           type="button"
           onClick={onOpenDrawer}
           className="text-left group cursor-pointer"
         >
-          <div className="font-bold text-slate-900 group-hover:text-indigo-600 transition whitespace-nowrap">
+          <div className="font-semibold text-slate-900 group-hover:text-[#4F46E5] transition whitespace-nowrap">
             {item.employeeName}
           </div>
-          <div className="text-[10px] text-slate-400 font-mono">
+          <div className="text-[11px] text-slate-600 font-mono">
             {item.employeeCode} • {item.designation || (item.company === "INVI_CREATION" ? "Invi" : "SR")}
           </div>
         </button>
       </td>
 
-      <td className="py-2.5 px-2 text-right tabular-nums">
-        <input
-          type="number"
-          step="0.5"
-          disabled={locked}
-          value={daysPresent}
-          onChange={(e) => setDaysPresent(e.target.value)}
-          onKeyDown={handleEnterBlur}
-          onBlur={() => commitNum("daysPresent", daysPresent, item.daysPresent)}
-          className="w-14 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent font-semibold tabular-nums"
-        />
-        <span className="text-[10px] text-slate-400 ml-0.5">/{item.totalWorkingDays}</span>
+      <td className="py-3.5 px-3 text-right tabular-nums">
+        <div className="flex items-center justify-end gap-0.5">
+          <input
+            type="number"
+            step="0.5"
+            value={daysPresent}
+            onChange={(e) => setDaysPresent(e.target.value)}
+            onKeyDown={handleEnterBlur}
+            onBlur={() => commitNum("daysPresent", daysPresent, item.daysPresent)}
+            className="w-14 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent font-semibold text-slate-900 tabular-nums"
+          />
+          <span className="text-[11px] text-slate-600">/{item.totalWorkingDays}</span>
+        </div>
+        {item.attendanceSummary && item.attendanceSummary.totalRecords > 0 && (
+          <div className="text-[10px] font-semibold text-[#4F46E5] whitespace-nowrap mt-0.5">
+            Synced: {item.attendanceSummary.presentCount}P · {item.attendanceSummary.paidLeaveCount}PL · {item.attendanceSummary.halfDayCount}H
+          </div>
+        )}
       </td>
 
-      <td className="py-2.5 px-2 text-right tabular-nums">
+      <td className="py-3.5 px-3 text-right tabular-nums">
         <input
           type="number"
-          disabled={locked}
           value={baseRate}
           onChange={(e) => setBaseRate(e.target.value)}
           onKeyDown={handleEnterBlur}
           onBlur={() => commitNum("baseRate", baseRate, item.baseRate)}
-          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent tabular-nums"
+          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-slate-900 font-medium tabular-nums"
         />
       </td>
 
-      <td className="py-2.5 px-2 text-right font-semibold text-slate-800 tabular-nums">{formatINR(item.grossSalary)}</td>
+      <td className="py-3.5 px-3 text-right font-semibold text-slate-900 tabular-nums">{formatINR(item.grossSalary)}</td>
 
-      <td className="py-2.5 px-2 text-right tabular-nums">
+      <td className="py-3.5 px-3 text-right tabular-nums">
         <input
           type="number"
-          disabled={locked}
           value={otPlus}
           onChange={(e) => setOtPlus(e.target.value)}
           onKeyDown={handleEnterBlur}
@@ -1489,14 +1551,13 @@ function PayrollTableRow({
               onPatch(item.id, { otAndIncentive: val, nightDutyAmount: 0, vehicleAllowance: 0, lastMonthBalance: 0 });
             }
           }}
-          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent text-emerald-700 font-semibold tabular-nums"
+          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-[#059669] font-semibold tabular-nums"
         />
       </td>
 
-      <td className="py-2.5 px-2 text-right tabular-nums">
+      <td className="py-3.5 px-3 text-right tabular-nums">
         <input
           type="number"
-          disabled={locked}
           value={advDed}
           onChange={(e) => setAdvDed(e.target.value)}
           onKeyDown={handleEnterBlur}
@@ -1508,42 +1569,39 @@ function PayrollTableRow({
               onPatch(item.id, { advanceDeduction: val, expenseBalanceDeduction: 0 });
             }
           }}
-          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent text-rose-600 font-semibold tabular-nums"
+          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-[#E11D48] font-semibold tabular-nums"
         />
       </td>
 
-      <td className="py-2.5 px-2 text-right font-extrabold text-indigo-700 tabular-nums">{formatINR(item.netSalary)}</td>
+      <td className="py-3.5 px-3 text-right font-bold text-slate-900 tabular-nums">{formatINR(item.netSalary)}</td>
 
-      <td className="py-2.5 px-2 text-right tabular-nums">
+      <td className="py-3.5 px-3 text-right tabular-nums">
         <input
           type="number"
-          disabled={locked}
           value={paidCash}
           onChange={(e) => setPaidCash(e.target.value)}
           onKeyDown={handleEnterBlur}
           onBlur={() => commitNum("paidCash", paidCash, item.paidCash)}
-          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent tabular-nums"
+          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-slate-900 font-medium tabular-nums"
         />
       </td>
 
-      <td className="py-2.5 px-2 text-right tabular-nums">
+      <td className="py-3.5 px-3 text-right tabular-nums">
         <input
           type="number"
-          disabled={locked}
           value={paidBank}
           onChange={(e) => setPaidBank(e.target.value)}
           onKeyDown={handleEnterBlur}
           onBlur={() => commitNum("paidBankOrGpay", paidBank, item.paidBankOrGpay)}
-          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent tabular-nums"
+          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-slate-900 font-medium tabular-nums"
         />
       </td>
 
-      <td className="py-2.5 px-2">
+      <td className="py-3.5 px-3">
         <select
-          disabled={locked}
           value={item.paymentChannel}
           onChange={(e) => onPatch(item.id, { paymentChannel: e.target.value })}
-          className="px-1.5 py-1 rounded border border-slate-200 bg-white text-[11px] font-semibold text-slate-700 focus:outline-none cursor-pointer"
+          className="px-2 py-1 rounded border border-slate-200 bg-white text-[11px] font-semibold text-slate-700 focus:outline-none focus:border-[#4F46E5] cursor-pointer"
         >
           <option value="CASH">Cash</option>
           <option value="ICICI">ICICI</option>
@@ -1552,24 +1610,23 @@ function PayrollTableRow({
         </select>
       </td>
 
-      <td className="py-2.5 px-2 text-right tabular-nums">
+      <td className="py-3.5 px-3 text-right tabular-nums">
         <span
           className={`font-bold ${
             item.carryForwardBalance > 0
-              ? "text-amber-700"
+              ? "text-[#D97706]"
               : item.carryForwardBalance < 0
-              ? "text-rose-600"
-              : "text-emerald-700"
+              ? "text-[#E11D48]"
+              : "text-[#059669]"
           }`}
         >
           {formatINR(item.carryForwardBalance)}
         </span>
       </td>
 
-      <td className="py-2.5 px-2">
+      <td className="py-3.5 px-3">
         <input
           type="text"
-          disabled={locked}
           value={notes}
           placeholder="Add note..."
           onChange={(e) => setNotes(e.target.value)}
@@ -1577,30 +1634,36 @@ function PayrollTableRow({
           onBlur={() => {
             if (notes !== (item.notes || "")) onPatch(item.id, { notes });
           }}
-          className="w-28 px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent text-[11px] text-slate-600 truncate"
+          className="w-28 px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-[11px] text-slate-600 truncate"
         />
       </td>
 
-      <td className="py-2.5 px-3 text-center">
+      <td className="py-3.5 px-4 text-center">
         <div className="flex items-center justify-center gap-1">
           <button
             type="button"
+            onClick={onOpenDrawer}
+            className="p-1.5 rounded-lg text-slate-600 hover:text-[#4F46E5] hover:bg-indigo-50 transition cursor-pointer"
+            title="Edit in Drawer"
+          >
+            <Pencil size={14} />
+          </button>
+          <button
+            type="button"
             onClick={onPrint}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-600 hover:text-[#4F46E5] hover:bg-indigo-50 transition cursor-pointer"
             title="View & Print Official Payslip"
           >
             <Printer size={14} />
           </button>
-          {!locked && (
-            <button
-              type="button"
-              onClick={onDelete}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-              title="Delete Row"
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onDelete}
+            className="p-1.5 rounded-lg text-slate-600 hover:text-[#E11D48] hover:bg-rose-50 transition cursor-pointer"
+            title="Delete Row"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
       </td>
     </tr>

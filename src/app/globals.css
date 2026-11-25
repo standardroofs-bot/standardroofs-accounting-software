@@ -55,9 +55,9 @@
 }
 
 body {
-  background-color: #F3F5F8;
-  color: #334155;
-  font-family: var(--font-sans), "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  background-color: #F8FAFC;
+  color: #0F172A;
+  font-family: "Inter", var(--font-sans), "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   font-variant-numeric: tabular-nums;
   margin: 0;
@@ -66,9 +66,9 @@ body {
   background-image: none;
 }
 
-/* Disciplined Commercial Alabaster-Pearl & Royal Indigo System */
+/* Disciplined Commercial Porcelain & Royal Indigo System */
 :root body {
-  background-color: #F3F5F8;
+  background-color: #F8FAFC;
   background-image: none;
 }
 

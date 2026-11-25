@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { computeAttendanceBreakdownMap } from "@/lib/payrollAttendanceSync";
 
 export async function GET(req: NextRequest) {
   try {
@@ -59,11 +60,28 @@ export async function GET(req: NextRequest) {
         ? run.items
         : run.items.filter((it) => it.company === companyFilter);
 
+    const empIds = Array.from(new Set(filteredItems.map((it) => it.employeeId).filter(Boolean)));
+    const attMap = await computeAttendanceBreakdownMap(empIds, run.month, run.halfPeriod);
+
+    const enrichedItems = filteredItems.map((it) => ({
+      ...it,
+      attendanceSummary: attMap.get(it.employeeId) || {
+        presentCount: 0,
+        halfDayCount: 0,
+        paidLeaveCount: 0,
+        absentCount: 0,
+        otHours: 0,
+        payableDays: 0,
+        dailyAdvanceSum: 0,
+        totalRecords: 0,
+      },
+    }));
+
     return NextResponse.json({
       success: true,
       run: {
         ...run,
-        items: filteredItems,
+        items: enrichedItems,
       },
       availableRuns,
     });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { recalculatePayrollRunTotals } from "@/lib/payrollTotals";
+import { syncLinkedCashBookForPaidRun } from "@/lib/payrollAttendanceSync";
 
 export async function PATCH(
   req: NextRequest,
@@ -17,13 +18,6 @@ export async function PATCH(
 
     if (!existing) {
       return NextResponse.json({ success: false, error: "Payroll item not found" }, { status: 404 });
-    }
-
-    if (existing.payrollRun.status === "PAID") {
-      return NextResponse.json(
-        { success: false, error: "Cycle is PAID & locked. Reopen cycle to edit." },
-        { status: 400 }
-      );
     }
 
     const employeeName = body.employeeName !== undefined ? String(body.employeeName).trim() : existing.employeeName;
@@ -111,6 +105,9 @@ export async function PATCH(
     });
 
     const updatedRun = await recalculatePayrollRunTotals(existing.payrollRunId, prisma as any);
+    if (existing.payrollRun.status === "PAID") {
+      await syncLinkedCashBookForPaidRun(existing.payrollRunId);
+    }
 
     return NextResponse.json({
       success: true,
@@ -141,15 +138,11 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: "Payroll item not found" }, { status: 404 });
     }
 
-    if (existing.payrollRun.status === "PAID") {
-      return NextResponse.json(
-        { success: false, error: "Cycle is PAID & locked. Reopen cycle to delete rows." },
-        { status: 400 }
-      );
-    }
-
     await prisma.payrollItem.delete({ where: { id } });
     const updatedRun = await recalculatePayrollRunTotals(existing.payrollRunId, prisma as any);
+    if (existing.payrollRun.status === "PAID") {
+      await syncLinkedCashBookForPaidRun(existing.payrollRunId);
+    }
 
     return NextResponse.json({
       success: true,

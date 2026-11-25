@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncOpenDraftPayrollRunsForMonth } from "@/lib/payrollAttendanceSync";
 
 export const dynamic = "force-dynamic";
 
@@ -277,6 +278,10 @@ export async function POST(request: Request) {
         },
       });
 
+      if (rDate) {
+        await syncOpenDraftPayrollRunsForMonth(String(rDate).substring(0, 7));
+      }
+
       return NextResponse.json({ success: true, updated });
     }
 
@@ -376,6 +381,8 @@ export async function POST(request: Request) {
         curr.setUTCDate(curr.getUTCDate() + 1);
       }
 
+      await syncOpenDraftPayrollRunsForMonth(start.toISOString().substring(0, 7));
+
       return NextResponse.json({ success: true, message: "Leave approved and attendance matrix updated." });
     }
 
@@ -448,6 +455,10 @@ export async function POST(request: Request) {
         });
         results.push(res);
       }
+      const affectedMonths = Array.from(new Set(records.map((r: any) => String(r.date || "").substring(0, 7)).filter(Boolean)));
+      for (const m of affectedMonths) {
+        await syncOpenDraftPayrollRunsForMonth(m);
+      }
       return NextResponse.json({ success: true, count: results.length });
     }
 
@@ -488,6 +499,7 @@ export async function POST(request: Request) {
       );
 
       await Promise.all(promises);
+      await syncOpenDraftPayrollRunsForMonth(String(date).substring(0, 7));
       return NextResponse.json({ success: true, count: employees.length });
     }
 
@@ -538,6 +550,8 @@ export async function POST(request: Request) {
         await Promise.all(promises);
         markedCount += activeEmployees.length;
       }
+
+      await syncOpenDraftPayrollRunsForMonth(month);
 
       return NextResponse.json({
         success: true,
