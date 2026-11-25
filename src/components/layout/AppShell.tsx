@@ -129,7 +129,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       }}
     >
       <SessionGuard />
-      <div className="min-h-screen bg-[#E2E8F2] dark:bg-slate-950 flex transition-colors text-slate-900 dark:text-slate-100 antialiased">
+      <div className="min-h-screen bg-[#DCE4F2] dark:bg-slate-950 flex transition-colors text-slate-900 dark:text-slate-100 antialiased">
         {/* Mobile Backdrop Overlay */}
         {isMobileOpen && (
           <div
@@ -149,7 +149,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           } ml-0 w-full min-w-0`}
         >
           <Header />
-          <main className="flex-1 p-3 sm:p-5 lg:p-6 overflow-x-hidden min-w-0">
+          <main key={pathname} className="flex-1 p-3 sm:p-5 lg:p-6 overflow-x-hidden min-w-0 animate-page-enter">
             {children}
           </main>
         </div>

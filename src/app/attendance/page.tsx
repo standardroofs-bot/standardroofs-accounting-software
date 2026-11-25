@@ -2346,7 +2346,7 @@ export default function AttendancePage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Click any cell to edit status: <strong className="text-emerald-600">P (1.0)</strong>, <strong className="text-amber-600">P + -1hr M (1.0)</strong>, <strong className="text-rose-600">P + -1hr E (1.0)</strong>, <strong className="text-amber-500">H (0.5)</strong>, <strong className="text-teal-600">PL (1.0)</strong>, <strong className="text-slate-600">UP (0.0)</strong>, <strong className="text-rose-600">A (0.0)</strong>, <strong className="text-slate-500">L (Sunday Off)</strong>, <strong className="text-amber-600">OT (+1hr/+2hr)</strong>
+                  Click any cell to edit status: <strong className="text-emerald-600">P (1.0)</strong>, <strong className="text-rose-600">P + -1hM / -1hE (1.0)</strong>, <strong className="text-amber-500">H (0.5)</strong>, <strong className="text-teal-600">PL (1.0)</strong>, <strong className="text-slate-600">UP (0.0)</strong>, <strong className="text-rose-600">A (0.0)</strong>, <strong className="text-slate-500">L (Sunday Off)</strong>, <strong className="text-violet-600">OT (+1h/+2h)</strong>
                 </p>
               </div>
 
@@ -2355,11 +2355,11 @@ export default function AttendancePage() {
                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold" title="Full Day Present (1.0)">
                   <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P <span className="text-[9px] font-medium text-slate-400">1.0</span>
                 </span>
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold" title="1-Hr Morning Permission (1.0 Present)">
-                  <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P + <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-extrabold shadow-sm ring-1 ring-white">-1hr M</span> <span className="text-[9px] font-medium text-slate-400">1.0</span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold" title="1-Hour Morning Permission (1.0 Present)">
+                  <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P + <span className="h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white bg-rose-600 text-white inline-flex items-center justify-center">-1hM</span> <span className="text-[9px] font-medium text-slate-400">1.0</span>
                 </span>
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold" title="1-Hr Evening Permission (1.0 Present)">
-                  <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P + <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-extrabold shadow-sm ring-1 ring-white">-1hr E</span> <span className="text-[9px] font-medium text-slate-400">1.0</span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold" title="1-Hour Evening Permission (1.0 Present)">
+                  <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P + <span className="h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white bg-rose-600 text-white inline-flex items-center justify-center">-1hE</span> <span className="text-[9px] font-medium text-slate-400">1.0</span>
                 </span>
                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold" title="Half-Day (0.5)">
                   <span className="w-2 h-2 rounded-xs bg-amber-400" /> H <span className="text-[9px] font-medium text-slate-400">0.5</span>
@@ -2377,7 +2377,7 @@ export default function AttendancePage() {
                   <span className="w-2 h-2 rounded-xs bg-slate-300 dark:bg-slate-600" /> L <span className="text-[9px] font-medium text-slate-400">Off</span>
                 </span>
                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 font-bold" title="After 9:00 PM Overtime Hours">
-                  <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P + <span className="px-1.5 py-0.5 rounded-full bg-violet-600 text-white text-[9px] font-extrabold shadow-sm ring-1 ring-white">+1hr/+2hr OT</span>
+                  <span className="w-2 h-2 rounded-xs bg-emerald-500" /> P + <span className="h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white bg-violet-600 text-white inline-flex items-center justify-center">+1h/+2h</span>
                 </span>
               </div>
 
@@ -2755,27 +2755,27 @@ export default function AttendancePage() {
                             >
                               {status === "1H" ? "P" : status || "—"}
 
-                              {/* 1-Hour Permission Corner Pill (-1hr M / -1hr E) -> Bold Rose-Crimson */}
+                              {/* 1-Hour Permission Corner Pill (-1hM / -1hE) -> Bold Rose-Crimson Micro-Tag */}
                               {status === "1H" && (
                                 <span
-                                  className={`absolute -top-2.5 ${
-                                    att?.otHours && att.otHours > 0 ? "-left-1.5" : "left-1/2 -translate-x-1/2"
-                                  } px-1.5 py-0.5 rounded-full bg-rose-600 text-white font-extrabold text-[9.5px] leading-none ring-2 ring-white dark:ring-slate-900 shadow-sm z-10 whitespace-nowrap`}
-                                  title={`1-Hour Permission: ${isEve ? "Evening (-1hr E)" : "Morning (-1hr M)"}`}
+                                  className={`absolute -top-1.5 ${
+                                    att?.otHours && att.otHours > 0 ? "-left-1" : "left-1/2 -translate-x-1/2"
+                                  } h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white dark:ring-slate-900 bg-rose-600 text-white z-10 whitespace-nowrap flex items-center justify-center`}
+                                  title={`1-Hour Permission: ${isEve ? "Evening (-1hE)" : "Morning (-1hM)"}`}
                                 >
-                                  {isEve ? "-1hr E" : "-1hr M"}
+                                  {isEve ? "-1hE" : "-1hM"}
                                 </span>
                               )}
 
-                              {/* Overtime Corner Pill (+1hr / +2hr) -> Vibrant Royal Violet */}
+                              {/* Overtime Corner Pill (+1h / +2h) -> Vibrant Royal Violet Micro-Tag */}
                               {att?.otHours && att.otHours > 0 ? (
                                 <span
-                                  className={`absolute -top-2.5 ${
-                                    status === "1H" ? "-right-1.5" : "left-1/2 -translate-x-1/2"
-                                  } px-1.5 py-0.5 rounded-full bg-violet-600 text-white font-extrabold text-[9.5px] leading-none ring-2 ring-white dark:ring-slate-900 shadow-sm z-10 whitespace-nowrap`}
-                                  title={`After 9PM OT: +${att.otHours}hr ${att.otTimeRange ? `(${att.otTimeRange})` : ""} - ${att.otReason || ""}`}
+                                  className={`absolute -top-1.5 ${
+                                    status === "1H" ? "-right-1" : "left-1/2 -translate-x-1/2"
+                                  } h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white dark:ring-slate-900 bg-violet-600 text-white z-10 whitespace-nowrap flex items-center justify-center`}
+                                  title={`After 9PM OT: +${att.otHours}h ${att.otTimeRange ? `(${att.otTimeRange})` : ""} - ${att.otReason || ""}`}
                                 >
-                                  +{att.otHours}hr
+                                  +{att.otHours}h
                                 </span>
                               ) : null}
                             </span>

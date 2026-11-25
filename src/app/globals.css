@@ -55,7 +55,7 @@
 }
 
 body {
-  background-color: #e2e8f2;
+  background-color: #dce4f2;
   color: #334155;
   font-family: var(--font-sans), "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -64,16 +64,16 @@ body {
   padding: 0;
   -webkit-font-smoothing: antialiased;
   background-image: 
-    radial-gradient(at 15% 0%, rgba(59, 130, 246, 0.12) 0px, transparent 55%),
-    radial-gradient(at 85% 5%, rgba(99, 102, 241, 0.10) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 60%);
+    radial-gradient(at 15% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 55%),
+    radial-gradient(at 85% 5%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.08) 0px, transparent 60%);
   background-attachment: fixed;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: "Outfit", var(--font-sans), sans-serif;
   color: #0f172a;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.015em;
 }
 
 .dark body {
@@ -93,18 +93,19 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-mono), "JetBrains Mono", monospace;
 }
 
-/* Elevated Porcelain Glass Cards & Interactive Surfaces */
+/* Elevated Pastel-Tinted Porcelain Glass Cards & Interactive Surfaces */
 .porcelain-card {
-  background: #ffffff;
-  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: linear-gradient(135deg, #ffffff 60%, rgba(240, 245, 255, 0.85) 100%);
+  border: 1px solid rgba(203, 213, 225, 0.85);
   border-radius: 1rem;
-  box-shadow: 0 6px 24px -6px rgba(15, 23, 42, 0.08), 0 2px 6px -2px rgba(15, 23, 42, 0.04);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px -4px rgba(15, 23, 42, 0.07), 0 2px 6px -2px rgba(15, 23, 42, 0.04);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .porcelain-card:hover {
-  box-shadow: 0 16px 36px -8px rgba(37, 99, 235, 0.16);
+  box-shadow: 0 16px 36px -8px rgba(37, 99, 235, 0.14);
   transform: translateY(-2px);
+  border-color: rgba(148, 163, 184, 0.9);
 }
 
 .dark .porcelain-card {
@@ -113,7 +114,22 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 6px 24px -6px rgba(0, 0, 0, 0.4);
 }
 
-/* Keyframe Micro-animations */
+/* Keyframe Micro-animations & Smooth Page Entrance */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: pageEnter 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;

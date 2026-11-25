@@ -866,10 +866,10 @@ export default function MyAttendancePage() {
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> P (Present 1.0)
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> P + <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-extrabold ring-1 ring-white shadow-xs">-1hr M / E</span> (1-Hr Perm)
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> P + <span className="h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white bg-rose-600 text-white inline-flex items-center justify-center">-1hM / -1hE</span> (1-Hr Perm)
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-violet-600" /> +1hr / +2hr OT (Overtime)
+                <span className="w-2.5 h-2.5 rounded-full bg-violet-600" /> <span className="h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white bg-violet-600 text-white inline-flex items-center justify-center">+1h / +2h</span> OT (Overtime)
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> H (Half-Day 0.5)
@@ -979,15 +979,15 @@ export default function MyAttendancePage() {
                           </span>
                           {is1H && (
                             <span
-                              className="absolute -top-2.5 -right-2 px-1.5 py-0.5 rounded-full bg-rose-600 text-white font-extrabold text-[9px] leading-none ring-2 ring-white dark:ring-slate-900 shadow-sm z-10 whitespace-nowrap"
+                              className="absolute -top-1.5 -right-1 h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white dark:ring-slate-900 bg-rose-600 text-white z-10 whitespace-nowrap flex items-center justify-center"
                             >
-                              {d.permissionSlot === "EVENING" ? "-1hr E" : "-1hr M"}
+                              {d.permissionSlot === "EVENING" ? "-1hE" : "-1hM"}
                             </span>
                           )}
                         </div>
 
                         {d.otHours > 0 && (
-                          <span className="text-[10px] font-extrabold text-white bg-violet-600 px-1.5 py-0.5 rounded-full ring-1 ring-white shadow-xs">
+                          <span className="h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white bg-violet-600 text-white flex items-center justify-center">
                             +{d.otHours}h
                           </span>
                         )}

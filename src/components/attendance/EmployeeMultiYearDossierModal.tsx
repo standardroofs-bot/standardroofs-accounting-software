@@ -1066,9 +1066,9 @@ export default function EmployeeMultiYearDossierModal({
                                     </span>
                                     {rec.status === "1H" && (
                                       <span
-                                        className="absolute -top-2.5 -right-2 px-1.5 py-0.5 rounded-full bg-rose-600 text-white font-extrabold text-[9px] leading-none ring-2 ring-white dark:ring-slate-900 shadow-sm z-10 whitespace-nowrap"
+                                        className="absolute -top-1.5 -right-1 h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white dark:ring-slate-900 bg-rose-600 text-white z-10 whitespace-nowrap flex items-center justify-center"
                                       >
-                                        {rec.permissionSlot === "EVENING" ? "-1hr E" : "-1hr M"}
+                                        {rec.permissionSlot === "EVENING" ? "-1hE" : "-1hM"}
                                       </span>
                                     )}
                                   </div>
@@ -1078,7 +1078,7 @@ export default function EmployeeMultiYearDossierModal({
                                 </td>
                                 <td className="py-2 px-3 text-center">
                                   {rec.otHours && rec.otHours > 0 ? (
-                                    <span className="px-2 py-0.5 rounded-full bg-violet-600 text-white font-extrabold text-[10px] shadow-xs ring-1 ring-white">
+                                    <span className="h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white bg-violet-600 text-white inline-flex items-center justify-center">
                                       +{rec.otHours}h {rec.otTimeRange ? `(${rec.otTimeRange})` : ""}
                                     </span>
                                   ) : (

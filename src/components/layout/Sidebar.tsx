@@ -304,7 +304,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-gradient-to-b from-[#FAF9F6] via-[#F4F6FA] to-[#ECEFF6] text-slate-800 flex flex-col border-r border-slate-300/85 shadow-[4px_0_24px_-12px_rgba(15,23,42,0.08)] backdrop-blur-md ${
+      className={`fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out bg-gradient-to-b from-[#E5ECFA] via-[#EAEFFA] to-[#DFE7F7] text-slate-800 flex flex-col border-r border-indigo-200/80 shadow-[4px_0_24px_-12px_rgba(30,58,138,0.12)] backdrop-blur-md ${
         isCollapsed ? "w-20" : "w-[272px]"
       } ${
         isMobileOpen
@@ -313,7 +313,7 @@ export function Sidebar() {
       }`}
     >
       {/* Brand Header */}
-      <div className="h-14 flex items-center justify-between px-3.5 border-b border-slate-200/90 bg-white/80 shrink-0 backdrop-blur-sm">
+      <div className="h-14 flex items-center justify-between px-3.5 border-b border-indigo-200/70 bg-white/75 shrink-0 backdrop-blur-sm">
         <Link
           href="/"
           onClick={() => setIsMobileOpen(false)}
@@ -363,10 +363,10 @@ export function Sidebar() {
 
       {/* 4-Workspace Switcher Bar (Tactile White Porcelain Selector) */}
       {!isCollapsed ? (
-        <div className="p-2.5 border-b border-slate-200/90 bg-slate-50/50 relative">
+        <div className="p-2.5 border-b border-indigo-200/70 bg-indigo-50/40 relative">
           <button
             onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200/95 shadow-sm hover:border-indigo-400 hover:shadow-md transition text-left group cursor-pointer"
+            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white border border-indigo-200/90 shadow-sm hover:border-indigo-400 hover:shadow-md transition text-left group cursor-pointer"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div
@@ -393,7 +393,7 @@ export function Sidebar() {
             </div>
             <ChevronDown
               size={15}
-              className={`text-slate-400 group-hover:text-slate-700 transition-transform shrink-0 ml-1 ${
+              className={`text-slate-400 group-hover:text-slate-700 transition-transform duration-200 shrink-0 ml-1 ${
                 showWorkspaceMenu ? "rotate-180" : ""
               }`}
             />
@@ -401,7 +401,7 @@ export function Sidebar() {
 
           {/* Workspace Dropdown Menu */}
           {showWorkspaceMenu && (
-            <div className="absolute left-2.5 right-2.5 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 space-y-1">
+            <div className="absolute left-2.5 right-2.5 top-full mt-1 bg-white border border-indigo-200/90 rounded-xl shadow-2xl p-1.5 z-50 transition-all duration-200 ease-out origin-top animate-in fade-in zoom-in-95 space-y-1">
               <div className="px-2 py-1 text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">
                 Select Workspace
               </div>
@@ -503,10 +503,10 @@ export function Sidebar() {
                         href={item.href}
                         onClick={() => setIsMobileOpen(false)}
                         title={isCollapsed ? item.name : undefined}
-                        className={`flex items-center gap-2.5 px-3 py-2 text-[13.5px] transition-all group relative ${
+                        className={`flex items-center gap-2.5 px-3 py-2 text-[13.5px] transition-all duration-200 group relative ${
                           isActive
-                            ? "bg-indigo-600/10 text-indigo-700 font-bold border-l-[3px] border-indigo-600 rounded-r-xl rounded-l-xs shadow-2xs"
-                            : "text-slate-700 hover:bg-slate-200/50 hover:text-slate-950 font-medium rounded-xl"
+                            ? "bg-white text-indigo-700 font-bold shadow-sm border border-indigo-200/90 border-l-[4px] border-l-indigo-600 rounded-r-xl rounded-l-xs"
+                            : "text-slate-700 hover:bg-white/70 hover:text-indigo-950 font-medium rounded-xl hover:translate-x-1 hover:shadow-2xs"
                         }`}
                       >
                         <Icon
@@ -543,7 +543,7 @@ export function Sidebar() {
 
       {/* Super Admin Status Footer */}
       {!isCollapsed && currentUser && (
-        <div className="p-3 border-t border-slate-200/90 bg-white/80 text-xs flex items-center justify-between shrink-0 shadow-2xs backdrop-blur-sm">
+        <div className="p-3 border-t border-indigo-200/70 bg-white/75 text-xs flex items-center justify-between shrink-0 shadow-2xs backdrop-blur-sm">
           <div className="truncate">
             <div className="font-bold text-slate-900 truncate">
               {currentUser.email === "admin@standardroofs.in" || currentUser.role === "SUPER_ADMIN"
