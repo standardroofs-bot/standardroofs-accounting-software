@@ -267,6 +267,12 @@ export default function AttendancePage() {
   const [otHoursInput, setOtHoursInput] = useState<number>(0);
   const [otTimeRangeInput, setOtTimeRangeInput] = useState<string>("");
   const [otReasonInput, setOtReasonInput] = useState<string>("");
+  const [inTimeInput, setInTimeInput] = useState<string>("09:00");
+  const [outTimeInput, setOutTimeInput] = useState<string>("19:30");
+  const [permMinutesInput, setPermMinutesInput] = useState<number>(0);
+  const [permStatusInput, setPermStatusInput] = useState<string>("");
+  const [otStatusInput, setOtStatusInput] = useState<string>("");
+  const [cellModalTab, setCellModalTab] = useState<"ot" | "permission">("ot");
   const [otValidationError, setOtValidationError] = useState<string>("");
   const [permSlotInput, setPermSlotInput] = useState<"MORNING" | "EVENING">("MORNING");
   const [permTimeInput, setPermTimeInput] = useState<string>("");
@@ -760,7 +766,14 @@ export default function AttendancePage() {
     permissionTime?: string,
     otHours?: number,
     otTimeRange?: string,
-    otReason?: string
+    otReason?: string,
+    extraTiming?: {
+      inTime?: string;
+      outTime?: string;
+      permissionMinutes?: number;
+      permissionStatus?: string;
+      otApprovalStatus?: string;
+    }
   ) => {
     const markDate = dateOverride || selectedDate;
     const draftKey = `${employeeId}_${markDate}`;
@@ -850,9 +863,17 @@ export default function AttendancePage() {
             otTimeRange: otTimeRange || undefined,
             otReason: otReason || undefined,
             workNotes: finalNote || undefined,
-            permissionHours: status === "1H" ? 1.0 : undefined,
-            inTime: activeTab === "office" ? "09:00 AM" : undefined,
-            outTime: activeTab === "office" ? "07:00 PM" : undefined,
+            permissionHours:
+              extraTiming?.permissionMinutes && extraTiming.permissionMinutes > 0
+                ? Math.round((extraTiming.permissionMinutes / 60) * 100) / 100
+                : status === "1H"
+                ? 1.0
+                : undefined,
+            permissionMinutes: extraTiming?.permissionMinutes,
+            permissionStatus: extraTiming?.permissionStatus,
+            otApprovalStatus: extraTiming?.otApprovalStatus,
+            inTime: extraTiming?.inTime || (activeTab === "office" ? "09:00" : undefined),
+            outTime: extraTiming?.outTime || (activeTab === "office" ? "19:30" : undefined),
           },
         }),
       });
@@ -2525,7 +2546,7 @@ export default function AttendancePage() {
             <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase font-bold text-slate-400 bg-slate-50 dark:bg-slate-800/40">
-                  <th className="py-2.5 px-3 sticky left-0 bg-slate-50 dark:bg-slate-800 z-10 min-w-[160px] border-r border-slate-200 dark:border-slate-700">
+                  <th className="py-2.5 px-3 sticky left-0 bg-white dark:bg-slate-900 z-20 min-w-[190px] border-r border-slate-200 dark:border-slate-700 shadow-[4px_0_8px_-4px_rgba(15,23,42,0.08)]">
                     Personnel Name
                   </th>
 
@@ -2573,6 +2594,9 @@ export default function AttendancePage() {
                   </th>
                   <th className="w-16 min-w-[64px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-300 font-black">
                     OT HRS
+                  </th>
+                  <th className="w-16 min-w-[68px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-violet-800 dark:text-violet-300 font-black">
+                    PERM HRS
                   </th>
                   {activeTab === "office" && (
                     <th className="w-14 min-w-[56px] py-2.5 px-1 text-center bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-black">
@@ -2764,6 +2788,7 @@ export default function AttendancePage() {
                   let aTotal = 0;
                   let lTotal = 0;
                   let otHoursTotal = 0;
+                  let permMinutesTotal = 0;
 
                   const attList = Array.isArray(emp.attendances) ? emp.attendances : [];
 
@@ -2793,6 +2818,9 @@ export default function AttendancePage() {
                     else if (status === "L") lTotal++;
 
                     if (att?.otHours) otHoursTotal += Number(att.otHours);
+                    const pm = Number((att as any)?.permissionMinutes || 0);
+                    if (pm > 0) permMinutesTotal += pm;
+                    else if (status === "1H") permMinutesTotal += 60;
                   });
 
                   // Net Payable Days & Live Mid-Month Projection:
@@ -2826,7 +2854,7 @@ export default function AttendancePage() {
                   return (
                     <tr key={emp.id} className="h-11 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
                       {/* Fixed Left Column (Clickable to open Dossier) */}
-                      <td className="py-2 px-3.5 sticky left-0 bg-white dark:bg-slate-900 z-10 font-bold border-r border-slate-200 dark:border-slate-800 shadow-xs">
+                      <td className="py-2 px-3.5 sticky left-0 bg-white dark:bg-slate-900 z-20 min-w-[190px] font-bold border-r border-slate-200 dark:border-slate-800 shadow-[4px_0_8px_-4px_rgba(15,23,42,0.08)]">
                         <div
                           onClick={() => handleOpenDossier(emp)}
                           className="truncate max-w-[170px] text-[14px] font-bold text-slate-900 dark:text-slate-100 hover:text-blue-600 cursor-pointer flex items-center justify-between"
@@ -2835,9 +2863,23 @@ export default function AttendancePage() {
                           <span className="truncate">{emp.name}</span>
                           <History size={13} className="text-slate-400 opacity-60 shrink-0 ml-1.5" />
                         </div>
-                        <span className="text-[11px] text-slate-400 font-mono font-medium block">
-                          {emp.employeeCode}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                          <span className="text-[11px] text-slate-400 font-mono font-medium">
+                            {emp.employeeCode}
+                          </span>
+                          {otHoursTotal > 0 && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-violet-100 text-violet-700">
+                              +{otHoursTotal}h OT
+                            </span>
+                          )}
+                          {permMinutesTotal > 0 && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-rose-100 text-rose-700">
+                              {permMinutesTotal >= 60
+                                ? `${Math.floor(permMinutesTotal / 60)}h${permMinutesTotal % 60 ? `${permMinutesTotal % 60}m` : ""} Perm`
+                                : `${permMinutesTotal}m Perm`}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* 1..31 Clickable Day Cells */}
@@ -2872,6 +2914,13 @@ export default function AttendancePage() {
                               setOtHoursInput(att?.otHours || 0);
                               setOtTimeRangeInput(att?.otTimeRange || "");
                               setOtReasonInput(att?.otReason || "");
+                              setInTimeInput((att as any)?.inTime || "09:00");
+                              setOutTimeInput((att as any)?.outTime || "19:30");
+                              const initPermMins = Number((att as any)?.permissionMinutes || (currentSt === "1H" ? 60 : 0));
+                              setPermMinutesInput(initPermMins);
+                              setPermStatusInput((att as any)?.permissionStatus || "");
+                              setOtStatusInput((att as any)?.otApprovalStatus || "");
+                              setCellModalTab(initPermMins > 0 && !(att?.otHours && att.otHours > 0) ? "permission" : "ot");
                             }}
                             className={`py-1 px-0.5 text-center font-black cursor-pointer transition select-none border-r border-slate-100 dark:border-slate-800/50 hover:bg-blue-50/70 dark:hover:bg-blue-900/30 ${
                               d.isSunday && isOffice
@@ -2886,49 +2935,49 @@ export default function AttendancePage() {
                               att?.otHours ? `(OT: +${att.otHours}h)` : ""
                             }`}
                           >
-                            <span
-                              className={`relative min-w-[28px] h-6 px-1 rounded-md inline-flex items-center justify-center font-black transition ${
-                                status === "P" || status === "1H"
-                                  ? "bg-emerald-500 text-white shadow-2xs text-[10px]"
-                                  : status === "H"
-                                  ? "bg-amber-400 text-white shadow-2xs text-[10px]"
-                                  : status === "PL"
-                                  ? "bg-teal-600 text-white shadow-2xs text-[9px] font-extrabold tracking-tight"
-                                  : status === "UP"
-                                  ? "bg-slate-600 text-white shadow-2xs text-[9px] font-extrabold tracking-tight"
-                                  : status === "A"
-                                  ? "bg-rose-500 text-white shadow-2xs text-[10px]"
-                                  : status === "L"
-                                  ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px]"
-                                  : "bg-slate-100/60 text-slate-300 dark:text-slate-600 border border-dashed border-slate-200 dark:border-slate-700 text-[10px]"
-                              }`}
-                            >
-                              {status === "1H" ? "P" : status || "—"}
-
-                              {/* 1-Hour Permission Corner Pill (-1hM / -1hE) -> Bold Rose-Crimson Micro-Tag */}
-                              {status === "1H" && (
-                                <span
-                                  className={`absolute -top-1.5 ${
-                                    att?.otHours && att.otHours > 0 ? "-left-1" : "left-1/2 -translate-x-1/2"
-                                  } h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white dark:ring-slate-900 bg-rose-600 text-white z-10 whitespace-nowrap flex items-center justify-center`}
-                                  title={`1-Hour Permission: ${isEve ? "Evening (-1hE)" : "Morning (-1hM)"}`}
-                                >
-                                  {isEve ? "-1hE" : "-1hM"}
-                                </span>
+                            <div className="inline-flex flex-col items-center gap-0.5">
+                              <span
+                                className={`min-w-[28px] h-6 px-1 rounded-md inline-flex items-center justify-center font-black transition ${
+                                  status === "P" || status === "1H"
+                                    ? "bg-emerald-500 text-white shadow-2xs text-[10px]"
+                                    : status === "H"
+                                    ? "bg-amber-400 text-white shadow-2xs text-[10px]"
+                                    : status === "PL"
+                                    ? "bg-teal-600 text-white shadow-2xs text-[9px] font-extrabold tracking-tight"
+                                    : status === "UP"
+                                    ? "bg-slate-600 text-white shadow-2xs text-[9px] font-extrabold tracking-tight"
+                                    : status === "A"
+                                    ? "bg-rose-500 text-white shadow-2xs text-[10px]"
+                                    : status === "L"
+                                    ? "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px]"
+                                    : "bg-slate-100/60 text-slate-300 dark:text-slate-600 border border-dashed border-slate-200 dark:border-slate-700 text-[10px]"
+                                }`}
+                              >
+                                {status === "1H" ? "P" : status || "—"}
+                              </span>
+                              {(status === "1H" || Number((att as any)?.permissionMinutes || 0) > 0 || (att?.otHours && att.otHours > 0)) && (
+                                <div className="flex flex-wrap items-center justify-center gap-0.5">
+                                  {(status === "1H" || Number((att as any)?.permissionMinutes || 0) > 0) && (
+                                    <span
+                                      className="px-1 py-0.2 text-[8px] font-extrabold leading-none rounded bg-rose-600 text-white whitespace-nowrap"
+                                      title={`Permission: ${(att as any)?.permissionMinutes || 60}m`}
+                                    >
+                                      {Number((att as any)?.permissionMinutes || 0) > 0
+                                        ? `P${Number((att as any)?.permissionMinutes) >= 60 ? `${Math.floor(Number((att as any)?.permissionMinutes) / 60)}h${Number((att as any)?.permissionMinutes) % 60 ? `${Number((att as any)?.permissionMinutes) % 60}m` : ""}` : `${(att as any)?.permissionMinutes}m`}`
+                                        : isEve ? "-1hE" : "-1hM"}
+                                    </span>
+                                  )}
+                                  {att?.otHours && att.otHours > 0 ? (
+                                    <span
+                                      className="px-1 py-0.2 text-[8px] font-extrabold leading-none rounded bg-violet-600 text-white whitespace-nowrap"
+                                      title={`OT: +${att.otHours}h`}
+                                    >
+                                      +{att.otHours}h
+                                    </span>
+                                  ) : null}
+                                </div>
                               )}
-
-                              {/* Overtime Corner Pill (+1h / +2h) -> Vibrant Royal Violet Micro-Tag */}
-                              {att?.otHours && att.otHours > 0 ? (
-                                <span
-                                  className={`absolute -top-1.5 ${
-                                    status === "1H" ? "-right-1" : "left-1/2 -translate-x-1/2"
-                                  } h-[13px] px-1 text-[8.5px] font-extrabold leading-none rounded-[4px] tracking-tighter shadow-xs ring-1 ring-white dark:ring-slate-900 bg-violet-600 text-white z-10 whitespace-nowrap flex items-center justify-center`}
-                                  title={`After 9PM OT: +${att.otHours}h ${att.otTimeRange ? `(${att.otTimeRange})` : ""} - ${att.otReason || ""}`}
-                                >
-                                  +{att.otHours}h
-                                </span>
-                              ) : null}
-                            </span>
+                            </div>
                           </td>
                         );
                       })}
@@ -2964,6 +3013,13 @@ export default function AttendancePage() {
                       <td className="w-16 min-w-[64px] py-1 px-1 text-center font-bold text-amber-600 tabular-nums bg-white dark:bg-slate-900">
                         {otHoursTotal > 0 ? `${otHoursTotal}h` : "—"}
                       </td>
+                      <td className="w-16 min-w-[68px] py-1 px-1 text-center font-bold text-violet-700 tabular-nums bg-white dark:bg-slate-900">
+                        {permMinutesTotal > 0
+                          ? permMinutesTotal >= 60
+                            ? `${Math.floor(permMinutesTotal / 60)}h${permMinutesTotal % 60 ? ` ${permMinutesTotal % 60}m` : ""}`
+                            : `${permMinutesTotal}m`
+                          : "—"}
+                      </td>
                       {activeTab === "office" && (
                         <td className="w-14 min-w-[56px] py-1 px-1 text-center font-bold text-slate-500 tabular-nums bg-white dark:bg-slate-900">
                           {lTotal}
@@ -2995,16 +3051,41 @@ export default function AttendancePage() {
       )}
 
       {/* 5. MODAL: CELL EDIT POPOVER (FOR MONTHLY MATRIX) */}
-      {cellEditTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-sm w-full p-5 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+      {cellEditTarget && (() => {
+        const toMins = (hhmm: string) => {
+          const [h, m] = (hhmm || "09:00").split(":").map(Number);
+          return (h || 0) * 60 + (m || 0);
+        };
+        const fmtDur = (mins: number) => {
+          if (mins <= 0) return "0m";
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          if (h > 0 && m > 0) return `${h}h ${m}m`;
+          if (h > 0) return `${h}h`;
+          return `${m}m`;
+        };
+        const inM = toMins(inTimeInput);
+        const outM = toMins(outTimeInput);
+        const lateMinutes = inM > 540 ? Math.min(180, inM - 540) : 0;
+        const morningOtMins = inM < 540 ? 540 - inM : 0;
+        const eveningOtMins = outM > 1170 ? outM - 1170 : 0;
+        const detectedOtMinutes = morningOtMins + eveningOtMins;
+        const permChips = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180];
+
+        return (
+        <ViewportPortal onBackdropClick={() => setCellEditTarget(null)}>
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="shrink-0 px-5 py-3.5 flex items-center justify-between border-b border-slate-100 dark:border-slate-800 bg-slate-50/70">
               <div>
                 <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
                   {cellEditTarget.employee.name}
                 </h4>
-                <p className="text-[11px] text-slate-400">
-                  Date: <strong>{cellEditTarget.date}</strong> (Day {cellEditTarget.dayNum})
+                <p className="text-[11px] text-slate-500">
+                  Date: <strong>{cellEditTarget.date}</strong> (Day {cellEditTarget.dayNum}) · Shift 09:00 AM – 07:30 PM
                 </p>
               </div>
               <button
@@ -3018,7 +3099,7 @@ export default function AttendancePage() {
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="flex-1 overflow-y-auto p-5 space-y-3 text-xs">
               <label className="block font-bold text-slate-700 dark:text-slate-300">Set Status</label>
               <div className="grid grid-cols-7 gap-1">
                 {[
@@ -3043,26 +3124,105 @@ export default function AttendancePage() {
                 ))}
               </div>
 
+              {/* In Time & Out Time Inputs */}
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    In Time (Shift 09:00 AM)
+                  </label>
+                  <input
+                    type="time"
+                    value={inTimeInput}
+                    onChange={(e) => setInTimeInput(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono font-semibold text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Out Time (Shift 07:30 PM)
+                  </label>
+                  <input
+                    type="time"
+                    value={outTimeInput}
+                    onChange={(e) => setOutTimeInput(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono font-semibold text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Smart Late Login Detection (> 09:00 AM) */}
+              {lateMinutes > 0 && (
+                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 space-y-1.5">
+                  <div className="text-[11px] font-bold text-rose-900">
+                    Late check-in detected ({fmtDur(lateMinutes)}) — Is this an approved Permission?
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rounded = Math.min(180, Math.max(15, Math.ceil(lateMinutes / 15) * 15));
+                        setPermMinutesInput(rounded);
+                        setPermStatusInput("PENDING");
+                        setPermSlotInput("MORNING");
+                        setCellModalTab("permission");
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold cursor-pointer"
+                    >
+                      Yes, Mark Permission ({fmtDur(lateMinutes)})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPermMinutesInput(0);
+                        setPermStatusInput("UNAPPROVED_LATE");
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-white border border-rose-300 text-rose-700 text-[10px] font-bold cursor-pointer"
+                    >
+                      No, Unapproved Late
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Smart Overtime Detection (< 09:00 AM or > 07:30 PM) */}
+              {detectedOtMinutes > 0 && (
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 space-y-1.5">
+                  <div className="text-[11px] font-bold text-amber-900">
+                    Extra shift time detected ({fmtDur(detectedOtMinutes)}) — Count as Overtime (OT)?
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const otHrs = Math.round((detectedOtMinutes / 60) * 100) / 100;
+                        setOtHoursInput(otHrs);
+                        setOtStatusInput("PENDING");
+                        setOtTimeRangeInput(`${inTimeInput} - ${outTimeInput}`);
+                        if (!otReasonInput) setOtReasonInput(`Extended shift (${fmtDur(detectedOtMinutes)})`);
+                        setCellModalTab("ot");
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold cursor-pointer"
+                    >
+                      Yes, Add OT ({fmtDur(detectedOtMinutes)})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtHoursInput(0);
+                        setOtStatusInput("");
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-800 text-[10px] font-bold cursor-pointer"
+                    >
+                      No, Regular Shift
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Site Selector for Labours */}
               {cellEditTarget.employee.category !== "OFFICE_STAFF" && (
-                <div className="pt-2">
+                <div className="pt-1">
                   <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Site Location</label>
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {["SSM School", "Kalloviyam Gokul", "Ananthi Thindal", "Saravanan Chennai", "Office", "Yard Unloading"].map((st) => (
-                      <button
-                        key={st}
-                        type="button"
-                        onClick={() => setSiteInput(st)}
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
-                          siteInput === st
-                            ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
-                            : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
-                        }`}
-                      >
-                        {st}
-                      </button>
-                    ))}
-                  </div>
                   <select
                     value={siteInput}
                     onChange={(e) => setSiteInput(e.target.value)}
@@ -3077,259 +3237,231 @@ export default function AttendancePage() {
                 </div>
               )}
 
-              {/* 1-Hour Permission Morning / Evening Slot Toggle (Prominent Sky-Blue Box) */}
-              {cellEditStatus === "1H" && (
-                <div className="p-3.5 rounded-2xl bg-sky-50 dark:bg-sky-950/50 border-2 border-sky-300 dark:border-sky-700 shadow-sm space-y-2.5">
+              {/* 2 DEDICATED TABS: Overtime (OT) | Permission (15m - 3h) */}
+              <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setCellModalTab("ot")}
+                  className={`py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                    cellModalTab === "ot"
+                      ? "bg-white dark:bg-slate-900 text-amber-700 shadow-2xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Overtime (OT) {otHoursInput > 0 ? `· +${otHoursInput}h` : ""}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCellModalTab("permission")}
+                  className={`py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                    cellModalTab === "permission"
+                      ? "bg-white dark:bg-slate-900 text-violet-700 shadow-2xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Permission (15m–3h) {permMinutesInput > 0 ? `· ${fmtDur(permMinutesInput)}` : ""}
+                </button>
+              </div>
+
+              {cellModalTab === "ot" ? (
+                <div className="p-3 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <label className="font-black text-xs text-sky-900 dark:text-sky-200 flex items-center gap-1.5 uppercase tracking-wide">
-                      <Clock size={14} className="text-sky-600" />
-                      <span>Select 1-Hour Permission Slot</span>
+                    <label className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5 text-xs">
+                      <Timer size={14} className="text-amber-600" />
+                      <span>Overtime (OT) Hours</span>
                     </label>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-sky-200/80 dark:bg-sky-900 text-sky-900 dark:text-sky-100 uppercase">
-                      {permSlotInput === "EVENING" ? "Evening • 1H·E" : "Morning • 1H·M"}
+                    <span className="font-mono text-xs font-black text-amber-700 bg-amber-100 dark:bg-amber-900 px-2 py-0.5 rounded-md">
+                      {otHoursInput > 0 ? `+${otHoursInput} Hours` : "No OT"}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPermSlotInput("MORNING");
-                        setPermTimeInput("09:00 AM - 10:00 AM");
-                      }}
-                      className={`p-2.5 rounded-xl text-left border-2 transition cursor-pointer flex flex-col gap-0.5 ${
-                        permSlotInput === "MORNING"
-                          ? "bg-sky-600 text-white border-sky-700 shadow-md ring-2 ring-sky-300"
-                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-sky-400"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-black text-xs">Morning (Mrg)</span>
-                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${permSlotInput === "MORNING" ? "bg-white/20 text-white" : "bg-sky-100 text-sky-800"}`}>
-                          1H·M
-                        </span>
-                      </div>
-                      <span className={`text-[11px] font-mono ${permSlotInput === "MORNING" ? "text-sky-100" : "text-slate-500"}`}>
-                        09:00 AM – 10:00 AM
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPermSlotInput("EVENING");
-                        setPermTimeInput("06:30 PM - 07:30 PM");
-                      }}
-                      className={`p-2.5 rounded-xl text-left border-2 transition cursor-pointer flex flex-col gap-0.5 ${
-                        permSlotInput === "EVENING"
-                          ? "bg-cyan-600 text-white border-cyan-700 shadow-md ring-2 ring-cyan-300"
-                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-cyan-400"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-black text-xs">Evening (Eve)</span>
-                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${permSlotInput === "EVENING" ? "bg-white/20 text-white" : "bg-cyan-100 text-cyan-800"}`}>
-                          1H·E
-                        </span>
-                      </div>
-                      <span className={`text-[11px] font-mono ${permSlotInput === "EVENING" ? "text-cyan-100" : "text-slate-500"}`}>
-                        06:30 PM – 07:30 PM
-                      </span>
-                    </button>
+                  <div className="flex flex-wrap gap-1">
+                    {[0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 8].map((h) => (
+                      <button
+                        key={h}
+                        type="button"
+                        onClick={() => {
+                          setOtHoursInput(h);
+                          if (h > 0 && !otStatusInput) setOtStatusInput("PENDING");
+                        }}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                          otHoursInput === h
+                            ? "bg-amber-500 text-white border-amber-600 shadow-2xs"
+                            : "bg-white dark:bg-slate-800 text-slate-600 border-slate-200 dark:border-slate-700 hover:bg-amber-100/50"
+                        }`}
+                      >
+                        {h === 0 ? "None" : h === 0.5 ? "+30m" : `+${h}h`}
+                      </button>
+                    ))}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                    <div>
-                      <label className="block text-[10px] text-slate-600 dark:text-slate-400 font-bold mb-0.5">Time Range</label>
-                      <input
-                        type="text"
-                        placeholder={permSlotInput === "MORNING" ? "09:00 AM - 10:00 AM" : "06:30 PM - 07:30 PM"}
-                        value={permTimeInput}
-                        onChange={(e) => setPermTimeInput(e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-mono font-semibold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-600 dark:text-slate-400 font-bold mb-0.5">Permission Reason</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Bank work, Doctor visit, Traffic delay"
-                        value={permissionInput}
-                        onChange={(e) => setPermissionInput(e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Overtime (OT) Section */}
-              <div className="p-3 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5 text-xs">
-                    <Timer size={14} className="text-amber-600" />
-                    <span>Overtime (OT) Hours</span>
-                  </label>
-                  <span className="font-mono text-xs font-black text-amber-700 bg-amber-100 dark:bg-amber-900 px-2 py-0.5 rounded-md">
-                    {otHoursInput > 0 ? `+${otHoursInput} Hours` : "No OT"}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {[0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 8].map((h) => (
-                    <button
-                      key={h}
-                      type="button"
-                      onClick={() => setOtHoursInput(h)}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
-                        otHoursInput === h
-                          ? "bg-amber-500 text-white border-amber-600 shadow-2xs"
-                          : "bg-white dark:bg-slate-800 text-slate-600 border-slate-200 dark:border-slate-700 hover:bg-amber-100/50"
-                      }`}
-                    >
-                      {h === 0 ? "None" : `+${h}h`}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Quick Shift Presets */}
-                <div className="space-y-1 pt-1 border-t border-amber-200/60 dark:border-amber-800/60">
-                  <span className="text-[10px] font-bold text-amber-800 dark:text-amber-400 block">After 9:00 PM Overtime Presets:</span>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1.5 pt-1 border-t border-amber-200/60">
                     <button
                       type="button"
                       onClick={() => {
+                        setInTimeInput("08:00");
                         setOtHoursInput(1);
-                        setOtTimeRangeInput("09:00 PM - 10:00 PM");
+                        setOtTimeRangeInput("08:00 AM - 09:00 AM");
+                        setOtStatusInput("PENDING");
                         setOtValidationError("");
                       }}
-                      className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 text-[10px] font-bold border border-amber-300 hover:bg-amber-100/80 transition cursor-pointer"
+                      className="px-2 py-0.5 rounded-md bg-white text-amber-900 text-[10px] font-bold border border-amber-300 cursor-pointer"
                     >
-                      🌙 +1hr OT (09:00 PM - 10:00 PM)
+                      Before 9:00 AM (+1h)
                     </button>
                     <button
                       type="button"
                       onClick={() => {
-                        setOtHoursInput(2);
-                        setOtTimeRangeInput("09:00 PM - 11:00 PM");
+                        setOutTimeInput("20:30");
+                        setOtHoursInput(1);
+                        setOtTimeRangeInput("07:30 PM - 08:30 PM");
+                        setOtStatusInput("PENDING");
                         setOtValidationError("");
                       }}
-                      className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 text-[10px] font-bold border border-amber-300 hover:bg-amber-100/80 transition cursor-pointer"
+                      className="px-2 py-0.5 rounded-md bg-white text-amber-900 text-[10px] font-bold border border-amber-300 cursor-pointer"
                     >
-                      🌙 +2hr OT (09:00 PM - 11:00 PM)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOtHoursInput(8);
-                        setOtTimeRangeInput("09:00 AM - 05:00 PM");
-                        if (!otReasonInput) setOtReasonInput("Sunday / Full-Day OT deployment");
-                        setOtValidationError("");
-                      }}
-                      className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 text-[10px] font-bold border border-amber-300 hover:bg-amber-100/80 transition cursor-pointer"
-                    >
-                      ⭐ Full-Day / Custom OT
+                      After 7:30 PM (+1h)
                     </button>
                   </div>
-                </div>
-
-                {otHoursInput > 0 && (
-                  <div className="space-y-1.5 pt-1">
-                    <div className="grid grid-cols-2 gap-2">
+                  {otHoursInput > 0 && (
+                    <div className="grid grid-cols-2 gap-2 pt-1">
                       <div>
-                        <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">OT Time Slot (After 9 PM)</label>
+                        <label className="block text-[10px] text-slate-500 font-semibold mb-0.5">OT Time Slot</label>
                         <input
                           type="text"
-                          placeholder="e.g. 09:00 PM - 10:00 PM"
+                          placeholder="e.g. 07:30 PM - 09:30 PM"
                           value={otTimeRangeInput}
-                          onChange={(e) => {
-                            setOtTimeRangeInput(e.target.value);
-                            setOtValidationError("");
-                          }}
-                          className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
+                          onChange={(e) => setOtTimeRangeInput(e.target.value)}
+                          className="w-full px-2 py-1 rounded-lg border border-slate-200 bg-white text-xs font-mono"
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-amber-800 dark:text-amber-300 font-bold mb-0.5">
-                          OT Reason * <span className="text-[9px] text-rose-500">(Mandatory)</span>
-                        </label>
+                        <label className="block text-[10px] text-amber-800 font-bold mb-0.5">OT Reason *</label>
                         <input
                           type="text"
-                          placeholder="Explain work done after 9 PM"
+                          placeholder="Work done during OT"
                           value={otReasonInput}
                           onChange={(e) => {
                             setOtReasonInput(e.target.value);
                             if (e.target.value.trim()) setOtValidationError("");
                           }}
-                          className={`w-full px-2 py-1 rounded-lg border text-xs ${
-                            otValidationError
-                              ? "border-rose-500 bg-rose-50 dark:bg-rose-950/40 text-rose-900 dark:text-rose-200"
-                              : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                          }`}
+                          className="w-full px-2 py-1 rounded-lg border border-slate-200 bg-white text-xs"
                         />
                       </div>
                     </div>
-                    {otValidationError && (
-                      <div className="text-[11px] text-rose-600 font-bold bg-rose-50 dark:bg-rose-950/50 p-1.5 rounded-lg border border-rose-200 dark:border-rose-800 flex items-center gap-1.5 animate-in fade-in">
-                        <AlertCircle size={13} className="shrink-0" />
-                        <span>{otValidationError}</span>
-                      </div>
-                    )}
+                  )}
+                  {otValidationError && (
+                    <div className="text-[11px] text-rose-600 font-bold bg-rose-50 p-1.5 rounded-lg border border-rose-200">
+                      {otValidationError}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 rounded-2xl bg-violet-50/70 border border-violet-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-violet-900 flex items-center gap-1.5 text-xs">
+                      <Clock size={14} className="text-violet-600" />
+                      <span>Permission (15m – 3h)</span>
+                    </label>
+                    <span className="font-mono text-xs font-black text-violet-700 bg-violet-100 px-2 py-0.5 rounded-md">
+                      {permMinutesInput > 0 ? fmtDur(permMinutesInput) : "None"}
+                    </span>
                   </div>
-                )}
-              </div>
-
-              {/* Permission Note (when not 1H) */}
-              {cellEditStatus !== "1H" && (
-                <div className="pt-1">
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Work Note / Remarks (Optional)
-                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {permChips.map((mins) => (
+                      <button
+                        key={mins}
+                        type="button"
+                        onClick={() => {
+                          setPermMinutesInput(mins);
+                          setPermStatusInput(mins > 0 ? "PENDING" : "");
+                        }}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                          permMinutesInput === mins
+                            ? "bg-violet-600 text-white border-violet-700 shadow-2xs"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-violet-100/60"
+                        }`}
+                      >
+                        {mins === 0 ? "None" : fmtDur(mins)}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setPermSlotInput("MORNING")}
+                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border cursor-pointer ${
+                        permSlotInput === "MORNING" ? "bg-sky-600 text-white border-sky-700" : "bg-white text-slate-700 border-slate-200"
+                      }`}
+                    >
+                      Morning Slot
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPermSlotInput("EVENING")}
+                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border cursor-pointer ${
+                        permSlotInput === "EVENING" ? "bg-cyan-600 text-white border-cyan-700" : "bg-white text-slate-700 border-slate-200"
+                      }`}
+                    >
+                      Evening Slot
+                    </button>
+                  </div>
                   <input
                     type="text"
-                    placeholder="e.g. Completed site inspection, client meeting"
+                    placeholder="Permission reason (e.g. Bank work, Doctor visit)"
                     value={permissionInput}
                     onChange={(e) => setPermissionInput(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs"
                   />
                 </div>
               )}
+            </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (otHoursInput > 0 && !otReasonInput.trim()) {
-                      setOtValidationError("OT Reason is mandatory to explain work done after 9:00 PM");
-                      return;
+            <div className="shrink-0 px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setCellEditTarget(null)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (otHoursInput > 0 && !otReasonInput.trim()) {
+                    setOtValidationError("OT Reason is mandatory to explain overtime work");
+                    setCellModalTab("ot");
+                    return;
+                  }
+                  setOtValidationError("");
+                  handleMarkStatus(
+                    cellEditTarget.employee.id,
+                    cellEditStatus,
+                    siteInput,
+                    cellEditTarget.date,
+                    permissionInput,
+                    permSlotInput,
+                    permTimeInput,
+                    otHoursInput,
+                    otTimeRangeInput,
+                    otReasonInput,
+                    {
+                      inTime: inTimeInput,
+                      outTime: outTimeInput,
+                      permissionMinutes: permMinutesInput,
+                      permissionStatus: permStatusInput || undefined,
+                      otApprovalStatus: otHoursInput > 0 ? otStatusInput || "PENDING" : undefined,
                     }
-                    setOtValidationError("");
-                    handleMarkStatus(
-                      cellEditTarget.employee.id,
-                      cellEditStatus,
-                      siteInput,
-                      cellEditTarget.date,
-                      permissionInput,
-                      permSlotInput,
-                      permTimeInput,
-                      otHoursInput,
-                      otTimeRangeInput,
-                      otReasonInput
-                    );
-                    setCellEditTarget(null);
-                  }}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs"
-                >
-                  Save Changes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCellEditTarget(null)}
-                  className="text-xs text-slate-400 hover:text-slate-600"
-                >
-                  Cancel
-                </button>
-              </div>
+                  );
+                  setCellEditTarget(null);
+                }}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs"
+              >
+                Save Changes
+              </button>
             </div>
           </div>
-        </div>
-      )}
+        </ViewportPortal>
+        );
+      })()}
 
       {/* 6. MODAL: 1-HOUR PERMISSION PROMPT IN DAILY VIEW */}
       {permPromptTarget && (

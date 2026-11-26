@@ -110,6 +110,7 @@ export default function StandardPayrollPage() {
   const [halfPeriod, setHalfPeriod] = useState<"FULL" | "FIRST_HALF" | "SECOND_HALF">("FULL");
   const [companyFilter, setCompanyFilter] = useState<"ALL" | "STANDARD_ROOFS" | "INVI_CREATION">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewTab, setViewTab] = useState<"register" | "summary">("register");
 
   const [run, setRun] = useState<PayrollRun | null>(null);
   const [availableRuns, setAvailableRuns] = useState<AvailableRunSummary[]>([]);
@@ -528,29 +529,50 @@ export default function StandardPayrollPage() {
   };
 
   const handleExportExcel = () => {
-    if (!run || run.items.length === 0) return;
-    const rows = run.items.map((it, idx) => ({
-      "#": idx + 1,
-      Code: it.employeeCode,
-      Name: it.employeeName,
-      Designation: it.designation || "",
-      "Working Days": it.totalWorkingDays,
-      "Days Present": it.daysPresent,
-      Leave: it.leaveDays,
-      "Base Rate (₹)": it.baseRate,
-      "Gross Salary (₹)": it.grossSalary,
-      "OT / Night (₹)": it.otAndIncentive + it.nightDutyAmount,
-      "Vehicle (₹)": it.vehicleAllowance || 0,
-      "Prev Balance (₹)": it.lastMonthBalance,
-      "Advance Ded (₹)": it.advanceDeduction,
-      "Net Salary (₹)": it.netSalary,
-      "Paid Cash (₹)": it.paidCash,
-      "Paid Bank/GPay (₹)": it.paidBankOrGpay,
-      Channel: it.paymentChannel,
-      "Carry Fwd Bal (₹)": it.carryForwardBalance,
-      Notes: it.notes || "",
-    }));
-    exportToExcel(rows, `SR_Payroll_${cycleType}_${month}_${halfPeriod}`, "Payroll");
+    if (!run || visibleItems.length === 0) return;
+    const rows = visibleItems.map((it) => {
+      const otLastInc =
+        it.otAndIncentive +
+        (it.performanceIncentive || 0) +
+        it.nightDutyAmount +
+        (it.vehicleAllowance || 0) +
+        it.lastMonthBalance;
+      const bankTotal = (it.paidBankOrGpay || 0) + (it.paidGpay || 0);
+      return {
+        Name: it.employeeName,
+        "Total Working Days": it.totalWorkingDays,
+        "Number of Days Present": it.daysPresent,
+        "Salary per Month": it.baseRate,
+        "Gross Salary": it.grossSalary,
+        "Expenses Amount Balance": it.expenseBalanceDeduction || 0,
+        Advance: it.advanceDeduction || 0,
+        "OT Amount + Last Month Balance + Incentive": otLastInc,
+        "Net Salary": it.netSalary,
+        Cash: it.paidCash || 0,
+        "ICICI / Bank": bankTotal,
+        Balance: it.carryForwardBalance || 0,
+        Notes: it.notes || "",
+      };
+    });
+    rows.push({
+      Name: "Total Salary",
+      "Total Working Days": visibleItems.reduce((s, it) => s + it.totalWorkingDays, 0),
+      "Number of Days Present": visibleItems.reduce((s, it) => s + it.daysPresent, 0),
+      "Salary per Month": visibleItems.reduce((s, it) => s + it.baseRate, 0),
+      "Gross Salary": visibleItems.reduce((s, it) => s + it.grossSalary, 0),
+      "Expenses Amount Balance": visibleItems.reduce((s, it) => s + (it.expenseBalanceDeduction || 0), 0),
+      Advance: visibleItems.reduce((s, it) => s + (it.advanceDeduction || 0), 0),
+      "OT Amount + Last Month Balance + Incentive": visibleItems.reduce(
+        (s, it) => s + it.otAndIncentive + (it.performanceIncentive || 0) + it.nightDutyAmount + (it.vehicleAllowance || 0) + it.lastMonthBalance,
+        0
+      ),
+      "Net Salary": visibleItems.reduce((s, it) => s + it.netSalary, 0),
+      Cash: visibleItems.reduce((s, it) => s + (it.paidCash || 0), 0),
+      "ICICI / Bank": visibleItems.reduce((s, it) => s + (it.paidBankOrGpay || 0) + (it.paidGpay || 0), 0),
+      Balance: visibleItems.reduce((s, it) => s + (it.carryForwardBalance || 0), 0),
+      Notes: `Salary details for the Month of ${formatMonthLabel(month)}`,
+    });
+    exportToExcel(rows, `SR_Salary_Details_${formatMonthLabel(month).replace(/\s+/g, "_")}_${cycleType}`, "Salary Summary");
   };
 
   const visibleItems = (run?.items || []).filter((it) => {
@@ -906,8 +928,36 @@ export default function StandardPayrollPage() {
               )
             </h2>
           </div>
-          <div className="text-[11px] text-slate-500">
-            Click any employee name to open the full <strong>Payroll & Payslip Drawer</strong>, or edit numbers inline
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center p-0.5 rounded-lg bg-slate-200/75 border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={() => setViewTab("register")}
+                className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
+                  viewTab === "register" ? "bg-white text-indigo-700 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Payroll Register
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewTab("summary")}
+                className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
+                  viewTab === "summary" ? "bg-white text-indigo-700 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Monthly Summary Sheet
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={!run || visibleItems.length === 0}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+            >
+              <FileSpreadsheet size={13} />
+              <span>Export Excel (.xlsx)</span>
+            </button>
           </div>
         </div>
 
@@ -939,6 +989,76 @@ export default function StandardPayrollPage() {
                 ))}
               </div>
             )}
+          </div>
+        ) : viewTab === "summary" ? (
+          <div className="overflow-x-auto">
+            <div className="px-4 py-2.5 bg-indigo-950 text-white text-xs font-extrabold tracking-wide uppercase">
+              Salary details for the Month of {formatMonthLabel(month)}
+            </div>
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-slate-100 border-b border-slate-200 text-[10.5px] uppercase tracking-wider text-slate-700 font-extrabold">
+                <tr>
+                  <th className="py-3 px-3">Name</th>
+                  <th className="py-3 px-2 text-right">Total Working Days</th>
+                  <th className="py-3 px-2 text-right">Number of Days Present</th>
+                  <th className="py-3 px-2 text-right">Salary per Month</th>
+                  <th className="py-3 px-2 text-right">Gross Salary</th>
+                  <th className="py-3 px-2 text-right">Expenses Amount Balance</th>
+                  <th className="py-3 px-2 text-right">Advance</th>
+                  <th className="py-3 px-2 text-right">OT + Last Bal + Inc</th>
+                  <th className="py-3 px-2 text-right text-indigo-700">Net Salary</th>
+                  <th className="py-3 px-2 text-right">Cash</th>
+                  <th className="py-3 px-2 text-right">ICICI / Bank</th>
+                  <th className="py-3 px-2 text-right">Balance</th>
+                  <th className="py-3 px-3">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {visibleItems.map((it) => {
+                  const otLastInc =
+                    it.otAndIncentive +
+                    (it.performanceIncentive || 0) +
+                    it.nightDutyAmount +
+                    (it.vehicleAllowance || 0) +
+                    it.lastMonthBalance;
+                  const bankTotal = (it.paidBankOrGpay || 0) + (it.paidGpay || 0);
+                  return (
+                    <tr key={it.id} className="hover:bg-slate-50/80">
+                      <td className="py-2.5 px-3 font-bold text-slate-900">{it.employeeName}</td>
+                      <td className="py-2.5 px-2 text-right tabular-nums">{it.totalWorkingDays}</td>
+                      <td className="py-2.5 px-2 text-right tabular-nums font-semibold">{it.daysPresent}</td>
+                      <td className="py-2.5 px-2 text-right tabular-nums">{formatINR(it.baseRate)}</td>
+                      <td className="py-2.5 px-2 text-right tabular-nums font-semibold">{formatINR(it.grossSalary)}</td>
+                      <td className="py-2.5 px-2 text-right tabular-nums">{formatINR(it.expenseBalanceDeduction || 0)}</td>
+                      <td className="py-2.5 px-2 text-right tabular-nums text-rose-700">{formatINR(it.advanceDeduction || 0)}</td>
+                      <td className="py-2.5 px-2 text-right tabular-nums text-emerald-700">{formatINR(otLastInc)}</td>
+                      <td className="py-2.5 px-2 text-right tabular-nums font-extrabold text-indigo-700">{formatINR(it.netSalary)}</td>
+                      <td className="py-2.5 px-2 text-right tabular-nums">{formatINR(it.paidCash || 0)}</td>
+                      <td className="py-2.5 px-2 text-right tabular-nums">{formatINR(bankTotal)}</td>
+                      <td className="py-2.5 px-2 text-right tabular-nums font-bold">{formatINR(it.carryForwardBalance || 0)}</td>
+                      <td className="py-2.5 px-3 text-slate-500 max-w-[160px] truncate">{it.notes || "—"}</td>
+                    </tr>
+                  );
+                })}
+                <tr className="bg-slate-100 border-t-2 border-slate-300 font-extrabold text-slate-900">
+                  <td className="py-3 px-3">Total Salary</td>
+                  <td className="py-3 px-2 text-right tabular-nums">{visibleItems.reduce((s, it) => s + it.totalWorkingDays, 0)}</td>
+                  <td className="py-3 px-2 text-right tabular-nums">{visibleItems.reduce((s, it) => s + it.daysPresent, 0)}</td>
+                  <td className="py-3 px-2 text-right tabular-nums">{formatINR(visibleItems.reduce((s, it) => s + it.baseRate, 0))}</td>
+                  <td className="py-3 px-2 text-right tabular-nums">{formatINR(displayGross)}</td>
+                  <td className="py-3 px-2 text-right tabular-nums">{formatINR(visibleItems.reduce((s, it) => s + (it.expenseBalanceDeduction || 0), 0))}</td>
+                  <td className="py-3 px-2 text-right tabular-nums text-rose-700">{formatINR(visibleItems.reduce((s, it) => s + (it.advanceDeduction || 0), 0))}</td>
+                  <td className="py-3 px-2 text-right tabular-nums text-emerald-700">
+                    {formatINR(visibleItems.reduce((s, it) => s + it.otAndIncentive + (it.performanceIncentive || 0) + it.nightDutyAmount + (it.vehicleAllowance || 0) + it.lastMonthBalance, 0))}
+                  </td>
+                  <td className="py-3 px-2 text-right tabular-nums text-indigo-700">{formatINR(displayNet)}</td>
+                  <td className="py-3 px-2 text-right tabular-nums">{formatINR(displayCash)}</td>
+                  <td className="py-3 px-2 text-right tabular-nums">{formatINR(visibleItems.reduce((s, it) => s + (it.paidBankOrGpay || 0) + (it.paidGpay || 0), 0))}</td>
+                  <td className="py-3 px-2 text-right tabular-nums">{formatINR(displayCarryForward)}</td>
+                  <td className="py-3 px-3"></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="overflow-x-auto">

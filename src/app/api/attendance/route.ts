@@ -261,9 +261,12 @@ export async function POST(request: Request) {
         dailyAdvance,
         permissionNote,
         permissionHours,
+        permissionMinutes,
+        permissionStatus,
         permissionSlot,
         permissionTime,
         otHours,
+        otApprovalStatus,
         otTimeRange,
         otReason,
         workNotes,
@@ -275,6 +278,15 @@ export async function POST(request: Request) {
       });
 
       const savedNote = permissionNote || workNotes || (status === "1H" ? "1-Hour Permission" : null);
+      const parsedPermMins = permissionMinutes !== undefined ? Number(permissionMinutes) : status === "1H" ? 60 : 0;
+      const parsedPermHours =
+        permissionHours !== undefined && permissionHours !== null
+          ? Number(permissionHours)
+          : parsedPermMins > 0
+          ? Math.round((parsedPermMins / 60) * 100) / 100
+          : status === "1H"
+          ? 1.0
+          : null;
 
       const updated = await prisma.attendanceRecord.upsert({
         where: {
@@ -290,10 +302,13 @@ export async function POST(request: Request) {
           siteName: sName ?? null,
           dailyAdvance: dailyAdvance ? Number(dailyAdvance) : 0,
           permissionNote: savedNote,
-          permissionHours: permissionHours ? Number(permissionHours) : status === "1H" ? 1.0 : null,
+          permissionHours: parsedPermHours,
+          permissionMinutes: parsedPermMins,
+          permissionStatus: permissionStatus ?? null,
           permissionSlot: permissionSlot ?? null,
           permissionTime: permissionTime ?? null,
           otHours: otHours !== undefined ? Number(otHours) : 0,
+          otApprovalStatus: otApprovalStatus ?? null,
           otTimeRange: otTimeRange ?? null,
           otReason: otReason ?? null,
           workNotes: savedNote,
@@ -309,10 +324,13 @@ export async function POST(request: Request) {
           siteName: sName ?? null,
           dailyAdvance: dailyAdvance ? Number(dailyAdvance) : 0,
           permissionNote: savedNote,
-          permissionHours: permissionHours ? Number(permissionHours) : status === "1H" ? 1.0 : null,
+          permissionHours: parsedPermHours,
+          permissionMinutes: parsedPermMins,
+          permissionStatus: permissionStatus ?? null,
           permissionSlot: permissionSlot ?? null,
           permissionTime: permissionTime ?? null,
           otHours: otHours !== undefined ? Number(otHours) : 0,
+          otApprovalStatus: otApprovalStatus ?? null,
           otTimeRange: otTimeRange ?? null,
           otReason: otReason ?? null,
           workNotes: savedNote,
@@ -320,6 +338,53 @@ export async function POST(request: Request) {
           companyUnit: emp?.companyUnit,
         },
       });
+
+      // Log into Team Lead -> HR approval queue when Permission (15m-3h) or OT is flagged PENDING
+      const needsPermQueue = parsedPermMins > 0 && permissionStatus === "PENDING";
+      const needsOtQueue = Number(otHours || 0) > 0 && otApprovalStatus === "PENDING";
+      if ((needsPermQueue || needsOtQueue) && emp) {
+        const empCodeUpper = (emp.employeeCode || "").toUpperCase();
+        const approverCode =
+          emp.reportingManagerCode ||
+          (["SR004", "SR007", "SR008"].includes(empCodeUpper) ? "SR006" : "SR009");
+        const approverLabel = approverCode === "SR006" ? "Sri Manikandan (SR006)" : "Gowri (SR009)";
+        if (needsPermQueue) {
+          await prisma.leaveRequest.create({
+            data: {
+              employeeId,
+              leaveCategory: "PERMISSION_1H",
+              dayType: parsedPermMins >= 60 ? "PERMISSION" : `${parsedPermMins}M`,
+              startDate: targetDate,
+              endDate: targetDate,
+              totalDays: Math.round((parsedPermMins / 480) * 100) / 100 || 0.1,
+              reason: savedNote || `Permission (${parsedPermMins}m) · In ${inTime || "—"}`,
+              assignedTeamLead: approverLabel,
+              assignedApproverCode: approverCode,
+              teamLeadStatus: "PENDING",
+              hrStatus: "PENDING",
+              status: "PENDING_TEAM_LEAD",
+            },
+          });
+        }
+        if (needsOtQueue) {
+          await prisma.leaveRequest.create({
+            data: {
+              employeeId,
+              leaveCategory: "GENERAL_REQUEST",
+              dayType: "OT",
+              startDate: targetDate,
+              endDate: targetDate,
+              totalDays: Math.round((Number(otHours || 0) / 8) * 100) / 100 || 0.1,
+              reason: otReason || `Overtime +${otHours}h (${inTime || "09:00"} – ${outTime || "19:30"})`,
+              assignedTeamLead: approverLabel,
+              assignedApproverCode: approverCode,
+              teamLeadStatus: "PENDING",
+              hrStatus: "PENDING",
+              status: "PENDING_TEAM_LEAD",
+            },
+          });
+        }
+      }
 
       if (rDate) {
         await syncOpenDraftPayrollRunsForMonth(String(rDate).substring(0, 7));
