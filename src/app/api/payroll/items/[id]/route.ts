@@ -63,12 +63,24 @@ export async function PATCH(
 
     const paidCash = body.paidCash !== undefined ? Number(body.paidCash) : existing.paidCash;
     const paidBankOrGpay = body.paidBankOrGpay !== undefined ? Number(body.paidBankOrGpay) : existing.paidBankOrGpay;
-    const carryForwardBalance = Math.round((netSalary - (paidCash + paidBankOrGpay)) * 100) / 100;
+    const paidGpay = body.paidGpay !== undefined ? Number(body.paidGpay) : (existing.paidGpay || 0);
+    const gpayWallet = body.gpayWallet !== undefined ? body.gpayWallet : existing.gpayWallet;
+    const totalPaid = paidCash + paidBankOrGpay + paidGpay;
+    const carryForwardBalance = Math.round((netSalary - totalPaid) * 100) / 100;
     const paymentChannel = body.paymentChannel !== undefined ? String(body.paymentChannel) : existing.paymentChannel;
+    const paymentReason = body.paymentReason !== undefined ? (body.paymentReason ? String(body.paymentReason) : null) : existing.paymentReason;
+    const paymentStatus =
+      body.paymentStatus !== undefined
+        ? String(body.paymentStatus)
+        : Math.abs(carryForwardBalance) < 1 && totalPaid > 0
+        ? "PAID"
+        : totalPaid > 0
+        ? "PARTIAL"
+        : "UNPAID";
     const isCleared =
       body.isCleared !== undefined
         ? Boolean(body.isCleared)
-        : paidCash + paidBankOrGpay > 0 && Math.abs(carryForwardBalance) < 1;
+        : totalPaid > 0 && Math.abs(carryForwardBalance) < 1;
     const notes = body.notes !== undefined ? (body.notes ? String(body.notes) : null) : existing.notes;
 
     const updatedItem = await prisma.payrollItem.update({
@@ -89,7 +101,11 @@ export async function PATCH(
         netSalary,
         paidCash,
         paidBankOrGpay,
+        paidGpay,
+        gpayWallet,
         paymentChannel,
+        paymentStatus,
+        paymentReason,
         carryForwardBalance,
         isCleared,
         notes,

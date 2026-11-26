@@ -285,7 +285,63 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, updated });
     }
 
-    // 1.5 Approve Employee Leave Request
+    // 1.4 Submit Leave Request (Stage 1: PENDING_TEAM_LEAD)
+    if (action === "submit-leave" && body.employeeId) {
+      const start = new Date(body.startDate);
+      const end = new Date(body.endDate || body.startDate);
+      const days = Math.max(
+        0.5,
+        body.dayType === "HALF_DAY" ? 0.5 : Math.round((end.getTime() - start.getTime()) / 86400000) + 1
+      );
+      const created = await prisma.leaveRequest.create({
+        data: {
+          employeeId: body.employeeId,
+          leaveCategory: body.leaveCategory || "PLANNED",
+          dayType: body.dayType || "FULL_DAY",
+          startDate: start,
+          endDate: end,
+          totalDays: days,
+          reason: body.reason || "Personal / Medical Leave",
+          assignedTeamLead: body.assignedTeamLead || "Team Lead",
+          teamLeadStatus: "PENDING",
+          hrStatus: "PENDING",
+          status: "PENDING_TEAM_LEAD",
+        },
+      });
+      return NextResponse.json({ success: true, leaveRequest: created });
+    }
+
+    // 1.45 Stage 1 Team Lead Approve / Reject
+    if (action === "team-lead-approve" && body.requestId) {
+      const updated = await prisma.leaveRequest.update({
+        where: { id: body.requestId },
+        data: {
+          teamLeadStatus: "APPROVED",
+          teamLeadBy: body.reviewedBy || "Team Lead",
+          teamLeadAt: new Date(),
+          teamLeadRemarks: body.remarks || "Approved by Team Lead",
+          status: "PENDING_HR",
+        },
+      });
+      return NextResponse.json({ success: true, leaveRequest: updated, message: "Stage 1 approved. Routed to HR." });
+    }
+
+    if (action === "team-lead-reject" && body.requestId) {
+      const updated = await prisma.leaveRequest.update({
+        where: { id: body.requestId },
+        data: {
+          teamLeadStatus: "REJECTED",
+          teamLeadBy: body.reviewedBy || "Team Lead",
+          teamLeadAt: new Date(),
+          teamLeadRemarks: body.remarks || "Rejected by Team Lead",
+          rejectionNote: body.remarks || "Rejected by Team Lead",
+          status: "REJECTED",
+        },
+      });
+      return NextResponse.json({ success: true, leaveRequest: updated, message: "Rejected by Team Lead." });
+    }
+
+    // 1.5 Approve Employee Leave Request (Stage 2 HR Final Approval)
     if (action === "approve-leave" && body.requestId) {
       const leave = await prisma.leaveRequest.findUnique({
         where: { id: body.requestId },
@@ -298,6 +354,10 @@ export async function POST(request: Request) {
       await prisma.leaveRequest.update({
         where: { id: body.requestId },
         data: {
+          hrStatus: "APPROVED",
+          hrBy: body.reviewedBy || "HR Admin (Monika R)",
+          hrAt: new Date(),
+          hrRemarks: body.remarks || "Final HR approval",
           status: "APPROVED",
           reviewedBy: body.reviewedBy || "HR Admin",
           reviewedAt: new Date(),

@@ -3348,10 +3348,27 @@ export default function AttendancePage() {
                                 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                                 : req.status === "REJECTED"
                                 ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                                : req.status === "PENDING_HR"
+                                ? "bg-indigo-100 text-indigo-800"
                                 : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 animate-pulse"
                             }`}
                           >
-                            {req.status === "PENDING" ? "Waiting for Approval" : req.status}
+                            {req.status === "PENDING_TEAM_LEAD" || req.status === "PENDING"
+                              ? "1. Team Lead Pending"
+                              : req.status === "PENDING_HR"
+                              ? "1. Team Lead ✓ → 2. HR Pending"
+                              : req.status}
+                          </span>
+                        </div>
+
+                        {/* Visual 2-Tier Pipeline Indicator */}
+                        <div className="flex items-center gap-2 text-[10.5px] font-semibold">
+                          <span className={`px-2 py-0.5 rounded border ${req.teamLeadStatus === "APPROVED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : req.teamLeadStatus === "REJECTED" ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                            1. Team Lead {req.teamLeadStatus === "APPROVED" ? "✓" : req.teamLeadStatus === "REJECTED" ? "✕" : "⏳"}
+                          </span>
+                          <span className="text-slate-400">→</span>
+                          <span className={`px-2 py-0.5 rounded border ${req.hrStatus === "APPROVED" || req.status === "APPROVED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                            2. HR Final {req.hrStatus === "APPROVED" || req.status === "APPROVED" ? "✓" : "Pending"}
                           </span>
                         </div>
 
@@ -3411,8 +3428,27 @@ export default function AttendancePage() {
                             </button>
                           </div>
 
-                          {req.status === "PENDING" && (
+                          {(req.status === "PENDING" || req.status === "PENDING_TEAM_LEAD" || req.status === "PENDING_HR") && (
                             <div className="flex items-center gap-2">
+                              {(req.status === "PENDING" || req.status === "PENDING_TEAM_LEAD") && (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const res = await fetch("/api/attendance", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ action: "team-lead-approve", requestId: req.id }),
+                                    });
+                                    if (res.ok) {
+                                      showToast("Stage 1 Team Lead approved — routed to HR");
+                                      fetchAttendance();
+                                    }
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition cursor-pointer"
+                                >
+                                  Approve (Stage 1)
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => handleRejectLeave(req.id)}

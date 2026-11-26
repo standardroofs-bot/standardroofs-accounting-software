@@ -32,6 +32,15 @@ interface PayrollItem extends BrandedPayslipItem {
   payrollRunId: string;
   employeeId: string;
   isCleared: boolean;
+  performanceReview?: {
+    overallRating: number;
+    recommendedIncentive: number;
+    attendanceScore: number;
+    siteExecutionScore: number;
+    punctualityScore: number;
+    safetyDisciplineScore: number;
+    reviewerNotes?: string | null;
+  } | null;
   attendanceSummary?: {
     presentCount: number;
     halfDayCount: number;
@@ -110,6 +119,15 @@ export default function StandardPayrollPage() {
   // Modals & Drawers
   const [payslipItem, setPayslipItem] = useState<PayrollItem | null>(null);
   const [drawerItem, setDrawerItem] = useState<PayrollItem | null>(null);
+  const [kpiItem, setKpiItem] = useState<PayrollItem | null>(null);
+  const [kpiForm, setKpiForm] = useState({
+    attendanceScore: 24,
+    siteExecutionScore: 24,
+    punctualityScore: 23,
+    safetyDisciplineScore: 24,
+    recommendedIncentive: 500,
+    reviewerNotes: "",
+  });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showNewCycleModal, setShowNewCycleModal] = useState(false);
@@ -916,6 +934,17 @@ export default function StandardPayrollPage() {
                       )
                     }
                     onOpenDrawer={() => setDrawerItem(item)}
+                    onOpenKpi={() => {
+                      setKpiForm({
+                        attendanceScore: item.performanceReview?.attendanceScore ?? 24,
+                        siteExecutionScore: item.performanceReview?.siteExecutionScore ?? 24,
+                        punctualityScore: item.performanceReview?.punctualityScore ?? 23,
+                        safetyDisciplineScore: item.performanceReview?.safetyDisciplineScore ?? 24,
+                        recommendedIncentive: item.performanceReview?.recommendedIncentive ?? 500,
+                        reviewerNotes: item.performanceReview?.reviewerNotes ?? "",
+                      });
+                      setKpiItem(item);
+                    }}
                     onPatch={handleInlinePatch}
                     onDelete={() => handleDeleteRow(item)}
                     onPrint={() => setPayslipItem(item)}
@@ -1189,6 +1218,93 @@ export default function StandardPayrollPage() {
         </ViewportPortal>
       )}
 
+      {/* PERFORMANCE KPI SCORING MODAL */}
+      {kpiItem && run && (
+        <ViewportPortal onBackdropClick={() => setKpiItem(null)}>
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div>
+                <div className="text-sm font-bold text-slate-900">Performance KPI &amp; Incentive</div>
+                <div className="text-[11px] text-slate-600 font-mono">
+                  {kpiItem.employeeName} ({kpiItem.employeeCode}) • {formatMonthLabel(run.month)}
+                </div>
+              </div>
+              <button type="button" onClick={() => setKpiItem(null)} className="text-slate-500 cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Attendance (0-25)</label>
+                  <input type="number" min={0} max={25} value={kpiForm.attendanceScore} onChange={(e) => setKpiForm({ ...kpiForm, attendanceScore: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 font-bold" />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Site Execution (0-25)</label>
+                  <input type="number" min={0} max={25} value={kpiForm.siteExecutionScore} onChange={(e) => setKpiForm({ ...kpiForm, siteExecutionScore: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 font-bold" />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Punctuality (0-25)</label>
+                  <input type="number" min={0} max={25} value={kpiForm.punctualityScore} onChange={(e) => setKpiForm({ ...kpiForm, punctualityScore: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 font-bold" />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Safety &amp; Discipline (0-25)</label>
+                  <input type="number" min={0} max={25} value={kpiForm.safetyDisciplineScore} onChange={(e) => setKpiForm({ ...kpiForm, safetyDisciplineScore: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 font-bold" />
+                </div>
+              </div>
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between">
+                <span className="font-bold text-indigo-800">Overall KPI Rating</span>
+                <span className="text-lg font-extrabold text-indigo-700 tabular-nums">
+                  {kpiForm.attendanceScore + kpiForm.siteExecutionScore + kpiForm.punctualityScore + kpiForm.safetyDisciplineScore}/100
+                </span>
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Recommended Incentive (₹)</label>
+                <input type="number" value={kpiForm.recommendedIncentive} onChange={(e) => setKpiForm({ ...kpiForm, recommendedIncentive: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 font-bold text-emerald-700" />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Reviewer Notes</label>
+                <input type="text" value={kpiForm.reviewerNotes} onChange={(e) => setKpiForm({ ...kpiForm, reviewerNotes: e.target.value })} placeholder="Top site execution, zero late arrivals..." className="w-full px-3 py-2 rounded-lg border border-slate-200" />
+              </div>
+            </div>
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+              <button type="button" onClick={() => setKpiItem(null)} className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold cursor-pointer">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await fetch("/api/performance", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      employeeId: kpiItem.employeeId,
+                      month: run.month,
+                      ...kpiForm,
+                      applyToPayroll: true,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    setKpiItem(null);
+                    showToast(data.message);
+                    loadPayroll();
+                  } else {
+                    showToast(data.error || "Failed to save KPI", "error");
+                  }
+                }}
+                className="px-4 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold cursor-pointer"
+              >
+                Apply Performance Incentive to Payroll
+              </button>
+            </div>
+          </div>
+        </ViewportPortal>
+      )}
+
       {toast && (
         <div className={`fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-xl text-xs font-bold text-white flex items-center gap-2 ${toast.type === "error" ? "bg-rose-600" : "bg-indigo-600"}`}>
           <CheckCircle2 size={15} />
@@ -1225,7 +1341,11 @@ function PayrollDetailDrawer({
     expenseBalanceDeduction: item.expenseBalanceDeduction,
     paidCash: item.paidCash,
     paidBankOrGpay: item.paidBankOrGpay,
+    paidGpay: item.paidGpay || 0,
+    gpayWallet: item.gpayWallet || "Office GPay",
     paymentChannel: item.paymentChannel,
+    paymentStatus: item.paymentStatus || "UNPAID",
+    paymentReason: item.paymentReason || "",
     notes: item.notes || "",
   });
 
@@ -1245,7 +1365,7 @@ function PayrollDetailDrawer({
       form.advanceDeduction -
       form.expenseBalanceDeduction
   );
-  const balance = Math.round((net - (form.paidCash + form.paidBankOrGpay)) * 100) / 100;
+  const balance = Math.round((net - (form.paidCash + form.paidBankOrGpay + form.paidGpay)) * 100) / 100;
 
   return (
     <ViewportPortal variant="drawer" onBackdropClick={onClose}>
@@ -1328,19 +1448,49 @@ function PayrollDetailDrawer({
               <input type="number" value={form.paidCash} onChange={(e) => setForm({ ...form, paidCash: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Paid Bank / GPay (₹)</label>
+              <label className="block font-semibold text-slate-700 mb-1">Paid Bank / Acct (₹)</label>
               <input type="number" value={form.paidBankOrGpay} onChange={(e) => setForm({ ...form, paidBankOrGpay: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
+            </div>
+            <div>
+              <label className="block font-semibold text-violet-700 mb-1">Paid GPay / UPI (₹)</label>
+              <input type="number" value={form.paidGpay} onChange={(e) => setForm({ ...form, paidGpay: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">GPay Wallet</label>
+              <select value={form.gpayWallet} onChange={(e) => setForm({ ...form, gpayWallet: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 font-semibold focus:outline-none focus:border-[#4F46E5]">
+                <option value="Office GPay">Office GPay</option>
+                <option value="Ravi GPay">Ravi GPay</option>
+                <option value="Prabha GPay">Prabha GPay</option>
+                <option value="Periyasamy GPay">Periyasamy GPay</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Primary Channel</label>
+              <select value={form.paymentChannel} onChange={(e) => setForm({ ...form, paymentChannel: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 font-semibold focus:outline-none focus:border-[#4F46E5]">
+                <option value="CASH">Cash</option>
+                <option value="ICICI">ICICI</option>
+                <option value="RBL">RBL</option>
+                <option value="OFFICE_GPAY">Office GPay</option>
+                <option value="AGENT_ACCOUNT">Agent Account</option>
+              </select>
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Payment Status</label>
+              <select value={form.paymentStatus} onChange={(e) => setForm({ ...form, paymentStatus: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 font-semibold focus:outline-none focus:border-[#4F46E5]">
+                <option value="PAID">Paid in Full</option>
+                <option value="PARTIAL">Partially Paid</option>
+                <option value="HOLD">On Hold</option>
+                <option value="UNPAID">Unpaid</option>
+              </select>
             </div>
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Payment Channel</label>
-            <select value={form.paymentChannel} onChange={(e) => setForm({ ...form, paymentChannel: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 font-semibold focus:outline-none focus:border-[#4F46E5]">
-              <option value="CASH">Cash</option>
-              <option value="ICICI">ICICI</option>
-              <option value="OFFICE_GPAY">Office GPay</option>
-              <option value="AGENT_ACCOUNT">Agent Account</option>
-            </select>
+            <label className="block font-semibold text-slate-700 mb-1">Payment / Hold Reason</label>
+            <input type="text" placeholder="e.g. Settled via ICICI + Cash, Balance held pending tool return..." value={form.paymentReason} onChange={(e) => setForm({ ...form, paymentReason: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 focus:outline-none focus:border-[#4F46E5]" />
           </div>
 
           <div>
@@ -1418,6 +1568,7 @@ function PayrollTableRow({
   selected,
   onToggleSelect,
   onOpenDrawer,
+  onOpenKpi,
   onPatch,
   onDelete,
   onPrint,
@@ -1426,6 +1577,7 @@ function PayrollTableRow({
   selected: boolean;
   onToggleSelect: () => void;
   onOpenDrawer: () => void;
+  onOpenKpi: () => void;
   onPatch: (id: string, patch: Partial<PayrollItem>) => void;
   onDelete: () => void;
   onPrint: () => void;
@@ -1474,21 +1626,37 @@ function PayrollTableRow({
       </td>
 
       <td className="py-4 px-3">
-        <button
-          type="button"
-          onClick={onOpenDrawer}
-          className="flex items-center gap-3 text-left group cursor-pointer"
-        >
-          <InitialsAvatar name={item.employeeName} />
-          <div className="min-w-0">
-            <div className="font-semibold text-slate-900 group-hover:text-[#4F46E5] transition whitespace-nowrap">
-              {item.employeeName}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onOpenDrawer}
+            className="flex items-center gap-3 text-left group cursor-pointer"
+          >
+            <InitialsAvatar name={item.employeeName} />
+            <div className="min-w-0">
+              <div className="font-semibold text-slate-900 group-hover:text-[#4F46E5] transition whitespace-nowrap">
+                {item.employeeName}
+              </div>
+              <div className="text-[11px] text-slate-600 font-mono truncate">
+                {item.employeeCode} • {item.designation || (item.company === "INVI_CREATION" ? "Invi" : "SR")}
+              </div>
             </div>
-            <div className="text-[11px] text-slate-600 font-mono truncate">
-              {item.employeeCode} • {item.designation || (item.company === "INVI_CREATION" ? "Invi" : "SR")}
-            </div>
-          </div>
-        </button>
+          </button>
+          <button
+            type="button"
+            onClick={onOpenKpi}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border cursor-pointer whitespace-nowrap ${
+              (item.performanceReview?.overallRating ?? item.performanceScore)
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700"
+            }`}
+            title="Score Performance KPI & Apply Incentive"
+          >
+            {item.performanceReview?.overallRating ?? item.performanceScore
+              ? `${item.performanceReview?.overallRating ?? item.performanceScore}/100 KPI`
+              : "+ KPI"}
+          </button>
+        </div>
       </td>
 
       <td className="py-3.5 px-3 text-right tabular-nums">
@@ -1602,7 +1770,33 @@ function PayrollTableRow({
       </td>
 
       <td className="py-4 px-3 text-right tabular-nums">
-        <BalanceBadge amount={item.carryForwardBalance} />
+        <div className="flex flex-col items-end gap-1">
+          <BalanceBadge amount={item.carryForwardBalance} />
+          <span
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+              item.paymentStatus === "PAID"
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                : item.paymentStatus === "PARTIAL"
+                ? "bg-amber-50 text-amber-800 border-amber-200"
+                : item.paymentStatus === "HOLD"
+                ? "bg-rose-50 text-rose-700 border-rose-200"
+                : "bg-slate-100 text-slate-600 border-slate-200"
+            }`}
+          >
+            {item.paymentStatus === "PAID"
+              ? "Paid in Full"
+              : item.paymentStatus === "PARTIAL"
+              ? "Partially Paid"
+              : item.paymentStatus === "HOLD"
+              ? "On Hold"
+              : "Unpaid"}
+          </span>
+          {item.paymentReason && (
+            <span className="text-[10px] text-slate-500 max-w-[130px] truncate" title={item.paymentReason}>
+              {item.paymentReason}
+            </span>
+          )}
+        </div>
       </td>
 
       <td className="py-3.5 px-3">

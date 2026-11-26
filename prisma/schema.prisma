@@ -854,6 +854,14 @@ model EmployeeOrLabour {
   location                String             @default("ERODE")
   state                   String             @default("TAMIL NADU")
   dateOfJoining           DateTime?
+  offerLetterIssuedAt     DateTime?
+  offerLetterTerms        String?
+  resignationDate         DateTime?
+  lastWorkingDate         DateTime?
+  exitStatus              String             @default("ACTIVE") // ACTIVE, NOTICE_PERIOD, EXITED
+  handoverChecklistJson   String?
+  fnfSettlementAmount     Float?
+  fnfSettledAt            DateTime?
   active             Boolean            @default(true)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -864,6 +872,7 @@ model EmployeeOrLabour {
   payrolls           StaffPayroll[]
   attendances        AttendanceRecord[]
   leaveRequests      LeaveRequest[]
+  performanceReviews PerformanceReview[]
 }
 
 model AttendanceRecord {
@@ -936,26 +945,57 @@ model ContractorDailyLog {
 }
 
 model LeaveRequest {
-  id            String           @id @default(cuid())
-  employeeId    String
-  leaveCategory String           @default("PLANNED") // PLANNED, UNPLANNED, SICK, EMERGENCY
-  dayType       String           @default("FULL_DAY") // FULL_DAY, HALF_DAY
-  startDate     DateTime         @db.Date
-  endDate       DateTime         @db.Date
-  totalDays     Decimal          @default(1.0) @db.Decimal(5, 2)
-  reason        String
-  status        String           @default("PENDING") // PENDING, APPROVED, REJECTED
-  reviewedBy    String?
-  reviewedAt    DateTime?
-  rejectionNote String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id               String           @id @default(cuid())
+  employeeId       String
+  leaveCategory    String           @default("PLANNED") // PLANNED, UNPLANNED, SICK, EMERGENCY
+  dayType          String           @default("FULL_DAY") // FULL_DAY, HALF_DAY
+  startDate        DateTime         @db.Date
+  endDate          DateTime         @db.Date
+  totalDays        Decimal          @default(1.0) @db.Decimal(5, 2)
+  reason           String
+  assignedTeamLead String?
+  teamLeadStatus   String           @default("PENDING") // PENDING, APPROVED, REJECTED
+  teamLeadBy       String?
+  teamLeadAt       DateTime?
+  teamLeadRemarks  String?
+  hrStatus         String           @default("PENDING") // PENDING, APPROVED, REJECTED
+  hrBy             String?
+  hrAt             DateTime?
+  hrRemarks        String?
+  status           String           @default("PENDING_TEAM_LEAD") // PENDING_TEAM_LEAD, PENDING_HR, APPROVED, REJECTED
+  reviewedBy       String?
+  reviewedAt       DateTime?
+  rejectionNote    String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  employee      EmployeeOrLabour @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee         EmployeeOrLabour @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId])
   @@index([status])
   @@index([startDate, endDate])
+}
+
+model PerformanceReview {
+  id                    String           @id @default(cuid())
+  employeeId            String
+  month                 String           // YYYY-MM
+  attendanceScore       Int              @default(25) // out of 25
+  siteExecutionScore    Int              @default(25) // out of 25
+  punctualityScore      Int              @default(25) // out of 25
+  safetyDisciplineScore Int              @default(25) // out of 25
+  overallRating         Int              @default(100) // 0-100
+  recommendedIncentive  Float            @default(0)
+  reviewerNotes         String?
+  reviewedBy            String?
+  appliedToPayroll      Boolean          @default(false)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  employee              EmployeeOrLabour @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, month])
+  @@index([month])
 }
 
 model LabourMuster {
@@ -1898,7 +1938,12 @@ model PayrollItem {
   netSalary               Float      @default(0)
   paidCash                Float      @default(0)
   paidBankOrGpay          Float      @default(0)
+  paidGpay                Float      @default(0)
+  gpayWallet              String?
   paymentChannel          String     @default("CASH") // CASH | ICICI | OFFICE_GPAY | AGENT_ACCOUNT
+  paymentStatus           String     @default("UNPAID") // PAID | PARTIAL | HOLD | UNPAID
+  paymentReason           String?
+  performanceScore        Int?
   carryForwardBalance     Float      @default(0)
   isCleared               Boolean    @default(false)
   notes                   String?

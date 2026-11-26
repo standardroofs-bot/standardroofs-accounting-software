@@ -27,6 +27,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 
 export interface WorkerKycData {
   id: string;
@@ -74,16 +75,22 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   worker: WorkerKycData | null;
+  salaryVisible?: boolean;
   onEdit: (worker: WorkerKycData) => void;
   onRefresh: () => void;
+  onOpenOfferLetter?: (worker: WorkerKycData) => void;
+  onOpenExitFnf?: (worker: WorkerKycData) => void;
 }
 
 export default function WorkerKycProfileDrawer({
   isOpen,
   onClose,
   worker,
+  salaryVisible = false,
   onEdit,
   onRefresh,
+  onOpenOfferLetter,
+  onOpenExitFnf,
 }: Props) {
   const [activeTab, setActiveTab] = useState<"DOCS" | "BANK" | "EDUCATION" | "EXPERIENCE" | "WAGE">("DOCS");
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
@@ -302,9 +309,60 @@ export default function WorkerKycProfileDrawer({
     printWin.document.close();
   };
 
+  const handleDownload360Dossier = async () => {
+    try {
+      const res = await fetch(`/api/labour/${worker.id}/dossier`);
+      const data = await res.json();
+      if (!data.success) return;
+      const w = data.worker;
+      const rows = [
+        {
+          Section: "Profile",
+          Field: "Employee Code / Name",
+          Value: `${w.employeeCode} — ${w.name}`,
+          Extra: w.designation || w.category,
+        },
+        {
+          Section: "Profile",
+          Field: "Phone / Location",
+          Value: w.phone || "—",
+          Extra: `${w.location || "Erode"}, ${w.state || "Tamil Nadu"}`,
+        },
+        {
+          Section: "KYC",
+          Field: "Aadhaar / PAN / DL",
+          Value: w.aadhaarNumber || "—",
+          Extra: `PAN: ${w.panNumber || "—"} | DL: ${w.drivingLicenseNumber || "—"}`,
+        },
+        {
+          Section: "Bank",
+          Field: "Bank / Account / IFSC",
+          Value: `${w.bankName || "—"} (${w.bankAccountNo || w.bankAccountNumber || "—"})`,
+          Extra: w.bankIfsc || w.ifscCode || "—",
+        },
+        {
+          Section: "Compensation",
+          Field: "Monthly / Daily Rate",
+          Value: salaryVisible && !w.salaryMasked ? `₹${w.monthlySalary || w.dailyWage || 0}` : "••••••",
+          Extra: w.exitStatus || "ACTIVE",
+        },
+        ...(data.payrollHistory || []).map((p: any) => ({
+          Section: "Payroll",
+          Field: `${p.payrollRun?.month || ""} (${p.payrollRun?.halfPeriod || ""})`,
+          Value: salaryVisible && !p.salaryMasked ? `Net ₹${p.netSalary}` : "••••••",
+          Extra: `Days: ${p.daysPresent}/${p.totalWorkingDays} | Status: ${p.paymentStatus || p.payrollRun?.status}`,
+        })),
+      ];
+      exportToExcel(rows, `SR_360_Dossier_${w.employeeCode}_${w.name.replace(/\s+/g, "_")}`, "360_Dossier");
+    } catch {}
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-2xl h-full flex flex-col animate-in slide-in-from-right duration-200 font-sans">
+    <ViewportPortal variant="drawer" onBackdropClick={onClose}>
+      <div
+        className="bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-2xl h-full flex flex-col font-sans overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Top Header */}
         <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
           <div className="flex items-center gap-3">
@@ -784,18 +842,54 @@ export default function WorkerKycProfileDrawer({
             <div className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Daily Wage Rate (₹)</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Daily Wage Rate (₹)</span>
                   <strong className="text-base text-emerald-600 font-mono">
-                    ₹{Number(worker.dailyWage || 850).toLocaleString("en-IN")}/day
+                    {salaryVisible && !(worker as any).salaryMasked
+                      ? `₹${Number(worker.dailyWage || 850).toLocaleString("en-IN")}/day`
+                      : "••••••"}
                   </strong>
                 </div>
 
                 <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Monthly Salary (₹)</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Monthly Salary (₹)</span>
                   <strong className="text-base text-blue-600 font-mono">
-                    ₹{Number(worker.monthlySalary || (isOffice ? 15000 : 0)).toLocaleString("en-IN")}/mo
+                    {salaryVisible && !(worker as any).salaryMasked
+                      ? `₹${Number(worker.monthlySalary || (isOffice ? 15000 : 0)).toLocaleString("en-IN")}/mo`
+                      : "••••••"}
                   </strong>
                 </div>
+              </div>
+
+              {/* Digital Offer Letter, 360° Dossier Export & 1-Month Notice Exit Controls */}
+              <div className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/60 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownload360Dossier}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs cursor-pointer"
+                >
+                  <Download size={13} className="text-indigo-600" />
+                  <span>Download 360° Dossier (.xlsx)</span>
+                </button>
+                {onOpenOfferLetter && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenOfferLetter(worker)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] text-white font-bold text-xs cursor-pointer"
+                  >
+                    <FileCheck size={13} />
+                    <span>Generate Offer Letter</span>
+                  </button>
+                )}
+                {onOpenExitFnf && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenExitFnf(worker)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer"
+                  >
+                    <AlertTriangle size={13} />
+                    <span>1-Month Notice Exit / FnF</span>
+                  </button>
+                )}
               </div>
 
               {isContractor && (
@@ -823,6 +917,6 @@ export default function WorkerKycProfileDrawer({
           )}
         </div>
       </div>
-    </div>
+    </ViewportPortal>
   );
 }

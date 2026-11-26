@@ -70,7 +70,10 @@ export async function GET(request: Request) {
       ];
     }
 
-    const [labourers, srOfficeCount, inviOfficeCount, tamilCount, hindiCount, contractorCount] = await Promise.all([
+    const session = await getCurrentUserSession();
+    const isSuperAdmin = session?.role === "SUPER_ADMIN";
+
+    const [rawLabourers, srOfficeCount, inviOfficeCount, tamilCount, hindiCount, contractorCount] = await Promise.all([
       prisma.employeeOrLabour.findMany({
         where,
         include: {
@@ -86,6 +89,10 @@ export async function GET(request: Request) {
             orderBy: { periodEnd: "desc" },
             take: 5,
           },
+          performanceReviews: {
+            orderBy: { month: "desc" },
+            take: 3,
+          },
         },
         orderBy: [
           { companyUnit: "desc" },
@@ -99,10 +106,24 @@ export async function GET(request: Request) {
       prisma.contractor.count({ where: { status: "ACTIVE" } }),
     ]);
 
+    const labourers = rawLabourers.map((w) =>
+      isSuperAdmin
+        ? { ...w, salaryMasked: false }
+        : {
+            ...w,
+            monthlySalary: null,
+            dailyWage: null,
+            baseWage: null,
+            defaultVehicleAllowance: 0,
+            salaryMasked: true,
+          }
+    );
+
     return NextResponse.json({
       success: true,
       labourers,
       isContractor: false,
+      canRevealSalaries: isSuperAdmin,
       segmentCounts: {
         srOffice: srOfficeCount,
         inviOffice: inviOfficeCount,

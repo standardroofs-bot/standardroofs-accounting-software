@@ -33,6 +33,8 @@ import {
   Settings,
   LayoutGrid,
   List,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
 import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
@@ -40,6 +42,7 @@ import ArchiveConfirmModal from "@/components/common/ArchiveConfirmModal";
 import AttendanceSettingsModal from "@/components/attendance/AttendanceSettingsModal";
 import EmployeeMultiYearDossierModal from "@/components/attendance/EmployeeMultiYearDossierModal";
 import WorkerKycProfileDrawer, { WorkerKycData } from "@/components/labour/WorkerKycProfileDrawer";
+import { OfferLetterAndExitModal } from "@/components/labour/OfferLetterAndExitModal";
 import LabourSmartImportModal from "@/components/labour/LabourSmartImportModal";
 import { exportToExcel } from "@/lib/exportUtils";
 import { ViewportPortal } from "@/components/ui/ViewportPortal";
@@ -52,6 +55,21 @@ export default function LabourWorkforceMasterPage() {
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [showSalaries, setShowSalaries] = useState(false);
+  const [offerExitModal, setOfferExitModal] = useState<{
+    mode: "OFFER_LETTER" | "EXIT_FNF";
+    worker: any;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && d.user?.role === "SUPER_ADMIN") setIsSuperAdmin(true);
+      })
+      .catch(() => {});
+  }, []);
 
   // Workforce records from DB
   const [workers, setWorkers] = useState<any[]>([]);
@@ -388,8 +406,8 @@ export default function LabourWorkforceMasterPage() {
           ? "Hindi Crew"
           : "Contractor Team",
       "Designation / Role": w.designation || w.role || w.tradeSpecialty || w.specialty || "—",
-      "Monthly Salary (₹)": w.monthlySalary ? Number(w.monthlySalary) : "—",
-      "Daily Wage / Rate (₹)": w.dailyWage || w.dailyRate || "—",
+      "Monthly Salary (₹)": isSuperAdmin && showSalaries && w.monthlySalary ? Number(w.monthlySalary) : "••••••",
+      "Daily Wage / Rate (₹)": isSuperAdmin && showSalaries && (w.dailyWage || w.dailyRate) ? Number(w.dailyWage || w.dailyRate) : "••••••",
       "Phone": w.phone || "—",
       "Address / Native": w.address || "—",
       "Aadhaar Number": w.aadhaarNumber || "—",
@@ -452,6 +470,17 @@ export default function LabourWorkforceMasterPage() {
         onPrintPDF={() => window.print()}
         extraControls={
           <div className="flex items-center gap-2">
+            {isSuperAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowSalaries((v) => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition cursor-pointer"
+                title="Toggle Salary Visibility (Super Admin Only)"
+              >
+                {showSalaries ? <EyeOff size={14} /> : <Eye size={14} />}
+                <span>{showSalaries ? "Hide Salaries" : "Show Salaries"}</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setShowSmartImportModal(true)}
@@ -929,24 +958,28 @@ export default function LabourWorkforceMasterPage() {
                           )}
                         </td>
 
-                        {/* Column 3: Wage / Salary */}
+                        {/* Column 3: Wage / Salary (Masked unless SUPER_ADMIN + Show Salaries) */}
                         <td className="py-3.5 px-4 text-right font-mono tabular-nums">
-                          {w.monthlySalary && Number(w.monthlySalary) > 0 ? (
+                          {!isSuperAdmin || !showSalaries || w.salaryMasked ? (
+                            <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 font-bold text-xs tracking-widest">
+                              ••••••
+                            </span>
+                          ) : w.monthlySalary && Number(w.monthlySalary) > 0 ? (
                             <div className="inline-block">
                               <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold px-2.5 py-0.5 rounded-lg text-[13px] block">
                                 {formatINR(Number(w.monthlySalary))}
                               </span>
-                              <span className="text-[10px] text-slate-400 block font-sans mt-0.5">/ month</span>
+                              <span className="text-[10px] text-slate-500 block font-sans mt-0.5">/ month</span>
                             </div>
                           ) : w.dailyWage || w.dailyRate ? (
                             <div className="inline-block">
                               <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold px-2.5 py-0.5 rounded-lg text-[13px] block">
                                 ₹{Number(w.dailyWage || w.dailyRate).toLocaleString("en-IN")}
                               </span>
-                              <span className="text-[10px] text-slate-400 block font-sans mt-0.5">/ day</span>
+                              <span className="text-[10px] text-slate-500 block font-sans mt-0.5">/ day</span>
                             </div>
                           ) : (
-                            <span className="text-slate-400">—</span>
+                            <span className="text-slate-500">—</span>
                           )}
                         </td>
 
@@ -1300,12 +1333,25 @@ export default function LabourWorkforceMasterPage() {
         isOpen={Boolean(selectedWorkerForKyc)}
         onClose={() => setSelectedWorkerForKyc(null)}
         worker={selectedWorkerForKyc}
+        salaryVisible={isSuperAdmin && showSalaries}
         onEdit={(w) => {
           setSelectedWorkerForKyc(null);
           handleOpenEdit(w);
         }}
         onRefresh={fetchWorkers}
+        onOpenOfferLetter={(w) => setOfferExitModal({ mode: "OFFER_LETTER", worker: w })}
+        onOpenExitFnf={(w) => setOfferExitModal({ mode: "EXIT_FNF", worker: w })}
       />
+
+      {offerExitModal && (
+        <OfferLetterAndExitModal
+          mode={offerExitModal.mode}
+          worker={offerExitModal.worker}
+          salaryVisible={isSuperAdmin && showSalaries}
+          onClose={() => setOfferExitModal(null)}
+          onSuccess={() => fetchWorkers()}
+        />
+      )}
 
       {/* 6. LIFETIME ATTENDANCE DOSSIER MODAL */}
       <EmployeeMultiYearDossierModal
