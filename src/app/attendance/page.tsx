@@ -2941,7 +2941,7 @@ export default function AttendancePage() {
                               setOtStatusInput((att as any)?.otApprovalStatus || "");
                               setCellModalTab(initPermMins > 0 && !(att?.otHours && att.otHours > 0) ? "permission" : "ot");
                             }}
-                            className={`py-1 px-0.5 text-center font-black cursor-pointer transition select-none border-r border-slate-100 dark:border-slate-800/50 hover:bg-blue-50/70 dark:hover:bg-blue-900/30 ${
+                            className={`w-[46px] min-w-[46px] h-[52px] py-1 px-0.5 text-center align-bottom font-black cursor-pointer transition select-none border-r border-slate-100 dark:border-slate-800/50 hover:bg-blue-50/70 dark:hover:bg-blue-900/30 ${
                               d.isSunday && isOffice
                                 ? "bg-slate-100/60 dark:bg-slate-800/60"
                                 : d.fullDate === selectedDate
@@ -2954,7 +2954,29 @@ export default function AttendancePage() {
                               att?.otHours ? `(OT: +${att.otHours}h)` : ""
                             }`}
                           >
-                            <div className="inline-flex flex-col items-center gap-0.5">
+                            <div className="h-full flex flex-col items-center justify-end gap-0.5">
+                              {(status === "1H" || Number((att as any)?.permissionMinutes || 0) > 0 || Number(att?.otHours || 0) > 0) && (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  {Number(att?.otHours || 0) > 0 && (
+                                    <span
+                                      className="text-[10px] leading-none font-semibold px-1.5 py-0.5 rounded-full bg-indigo-600 text-white shadow-xs whitespace-nowrap"
+                                      title={`OT: +${att?.otHours}h`}
+                                    >
+                                      OT {att?.otHours}h
+                                    </span>
+                                  )}
+                                  {(status === "1H" || Number((att as any)?.permissionMinutes || 0) > 0) && (
+                                    <span
+                                      className="text-[10px] leading-none font-semibold px-1.5 py-0.5 rounded-full bg-amber-500 text-white shadow-xs whitespace-nowrap"
+                                      title={`Permission: ${(att as any)?.permissionMinutes || 60}m`}
+                                    >
+                                      {Number((att as any)?.permissionMinutes || 0) > 0
+                                        ? `Perm ${Number((att as any)?.permissionMinutes) >= 60 ? `${Math.round((Number((att as any)?.permissionMinutes) / 60) * 10) / 10}h` : `${(att as any)?.permissionMinutes}m`}`
+                                        : isEve ? "Perm 1hE" : "Perm 1hM"}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                               <span
                                 className={`min-w-[28px] h-6 px-1 rounded-md inline-flex items-center justify-center font-black transition ${
                                   status === "P" || status === "1H"
@@ -2974,28 +2996,6 @@ export default function AttendancePage() {
                               >
                                 {status === "1H" ? "P" : status || "—"}
                               </span>
-                              {(status === "1H" || Number((att as any)?.permissionMinutes || 0) > 0 || Number(att?.otHours || 0) > 0) && (
-                                <div className="flex flex-wrap items-center justify-center gap-0.5">
-                                  {(status === "1H" || Number((att as any)?.permissionMinutes || 0) > 0) && (
-                                    <span
-                                      className="px-1 py-0.2 text-[8px] font-extrabold leading-none rounded bg-rose-600 text-white whitespace-nowrap"
-                                      title={`Permission: ${(att as any)?.permissionMinutes || 60}m`}
-                                    >
-                                      {Number((att as any)?.permissionMinutes || 0) > 0
-                                        ? `Perm ${Number((att as any)?.permissionMinutes) >= 60 ? `${Math.floor(Number((att as any)?.permissionMinutes) / 60)}h${Number((att as any)?.permissionMinutes) % 60 ? `${Number((att as any)?.permissionMinutes) % 60}m` : ""}` : `${(att as any)?.permissionMinutes}m`}`
-                                        : isEve ? "-1hE" : "-1hM"}
-                                    </span>
-                                  )}
-                                  {Number(att?.otHours || 0) > 0 && (
-                                    <span
-                                      className="px-1 py-0.2 text-[8px] font-extrabold leading-none rounded bg-violet-600 text-white whitespace-nowrap"
-                                      title={`OT: +${att?.otHours}h`}
-                                    >
-                                      +{att?.otHours}h OT
-                                    </span>
-                                  )}
-                                </div>
-                              )}
                             </div>
                           </td>
                         );

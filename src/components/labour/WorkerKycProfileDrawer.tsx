@@ -346,7 +346,8 @@ export default function WorkerKycProfileDrawer({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col gap-3 bg-slate-50/50 dark:bg-slate-800/40 shrink-0">
+          <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="relative">
               {worker.photoUrl ? (
@@ -409,11 +410,22 @@ export default function WorkerKycProfileDrawer({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-9 h-9 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 flex items-center justify-center transition cursor-pointer shrink-0 self-start"
+              title="Close Drawer"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/70 w-full">
             <button
               type="button"
               onClick={() => setShowSalaryHistory(true)}
-              className="px-2.5 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition cursor-pointer flex items-center gap-1"
+              className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
               title="View Lifetime & Yearly Salary Ledger"
             >
               <FileText size={13} />
@@ -422,8 +434,8 @@ export default function WorkerKycProfileDrawer({
             <button
               type="button"
               onClick={handleDownload360Dossier}
-              className="px-2.5 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs transition cursor-pointer flex items-center gap-1"
-              title="Download Master Profile + Soft-Copy Dossier"
+              className="px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
+              title="Download Master Profile + Soft-Copy Dossier (.zip)"
             >
               <Download size={13} />
               <span>Download All Soft Copies</span>
@@ -431,7 +443,7 @@ export default function WorkerKycProfileDrawer({
             <button
               type="button"
               onClick={handlePrintDossier}
-              className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-2xs"
+              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
               title="Print Official A4 KYC Dossier"
             >
               <Printer size={13} className="text-blue-600" />
@@ -440,20 +452,11 @@ export default function WorkerKycProfileDrawer({
             <button
               type="button"
               onClick={() => onEdit(worker)}
-              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5 ml-auto"
               title="Edit Profile Details"
             >
               <Edit2 size={13} />
               <span>Edit</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 flex items-center justify-center transition cursor-pointer shrink-0 border border-slate-200/60 dark:border-slate-700"
-              title="Close Drawer"
-              aria-label="Close"
-            >
-              <X size={16} />
             </button>
           </div>
         </div>

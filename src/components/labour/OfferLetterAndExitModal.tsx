@@ -254,93 +254,139 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
                 </div>
               </div>
 
-              {/* OFFICIAL A4 LETTERHEAD REPLICA (Offer Letter_Kaviya E.pdf) */}
-              <div className="border border-slate-300 rounded-xl p-8 space-y-5 bg-white text-slate-900">
-                <div className="flex items-start justify-between gap-4 border-b-2 border-slate-900 pb-4">
+              {/* OFFICIAL A4 LETTER OF APPOINTMENT (CORPORATE IT TEMPLATE) */}
+              <div className="border border-slate-300 rounded-xl p-6 sm:p-7 space-y-4 bg-white text-slate-900 print:border-0 print:p-0 print:rounded-none">
+                {/* Corporate Letterhead */}
+                <div className="flex items-start justify-between gap-4 border-b-2 border-slate-900 pb-3.5">
                   <div className="flex items-start gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/logo.png" alt={orgName} className="w-12 h-12 object-contain shrink-0" />
+                    <img src="/logo.png" alt={orgName} className="w-11 h-11 object-contain shrink-0" />
                     <div>
-                      <div className="text-lg font-black tracking-tight text-slate-900 leading-tight">
+                      <div className="text-base font-black tracking-tight text-slate-900 leading-tight">
                         {orgName}{" "}
-                        <span className="text-xs font-bold text-slate-600">
-                          {isInvi ? "- DIGITAL & TECH SOLUTIONS" : "- HIGH QUALITY ROOFING SOLUTIONS"}
+                        <span className="text-[11px] font-bold text-slate-600">
+                          {isInvi ? "— DIGITAL & TECH SOLUTIONS" : "— HIGH QUALITY ROOFING SOLUTIONS"}
                         </span>
                       </div>
-                      <div className="text-[11px] text-slate-600 mt-1 max-w-sm leading-snug">
-                        <strong>Address:</strong> D144/A, Vellakkal Medu, Infront of Manjal Vaniga Valagam Nasiyanur post, Erode-638107
+                      <div className="text-[10.5px] text-slate-600 mt-0.5 max-w-sm leading-snug">
+                        D144/A, Vellakkal Medu, Infront of Manjal Vaniga Valagam, Nasiyanur Post, Erode - 638107
                       </div>
                     </div>
                   </div>
-                  <div className="text-right text-[10.5px] text-slate-700 font-mono leading-relaxed shrink-0">
+                  <div className="text-right text-[10px] text-slate-700 font-mono leading-snug shrink-0">
                     <div><strong>GSTIN:</strong> 33AEWFS5187G1ZD</div>
                     <div><strong>PAN:</strong> AEWFS5187</div>
-                    <div>8608475767</div>
-                    <div>info@standardroofs.in</div>
+                    <div>Ph: +91 86084 75767 • info@standardroofs.in</div>
+                    <div className="font-bold text-slate-900 mt-0.5">Ref: SR/HR/OFFER/{worker.employeeCode}</div>
                   </div>
                 </div>
 
-                <div className="text-xs font-bold text-slate-800">Date: {formattedLetterDate}</div>
-
-                <div className="text-[13px] leading-relaxed space-y-4">
-                  <p className="font-bold">
-                    Dear {salutation} {worker.name},
-                  </p>
-                  <p>
-                    We are pleased to offer you the position of <strong>{designation}</strong> in the{" "}
-                    <strong>{department}</strong> Department at <strong>{orgName}</strong>. We are confident that your
-                    skills, dedication, and abilities will contribute positively to the growth and success of our
-                    organization.
-                  </p>
-
-                  <div>
-                    <div className="font-extrabold text-slate-900 underline mb-2">Terms of Employment:</div>
-                    <ul className="list-disc pl-5 space-y-2">
-                      <li>
-                        <strong>Joining Date:</strong> Your official date of joining will be{" "}
-                        <strong>{formatDotDate(joiningDate)}</strong>.
-                      </li>
-                      <li>
-                        <strong>{worker.category === "OFFICE_STAFF" ? "Monthly Salary:" : "Daily Compensation:"}</strong>{" "}
-                        {salaryVisible || offerPayAmount > 0 ? (
-                          <>
-                            You will receive a {worker.category === "OFFICE_STAFF" ? "monthly salary" : "daily wage"} of{" "}
-                            <strong>
-                              {formatINR(offerPayAmount)}/- (Rupees {numberToIndianWords(offerPayAmount)})
-                            </strong>
-                            .
-                            {(isDriver || Number(worker.defaultVehicleAllowance || 0) > 0) &&
-                              ` Plus Vehicle Allowance of ${formatINR(Number(worker.defaultVehicleAllowance || 0))}/month.`}
-                          </>
-                        ) : (
-                          "Confidential compensation as agreed (Super Admin view required to unmask)."
-                        )}
-                      </li>
-                      <li>
-                        <strong>Notice Period:</strong> As per company policy, a one-month notice period is mandatory
-                        if you wish to resign from your position.
-                      </li>
-                      <li>
-                        <strong>Acceptance:</strong> Please confirm your acceptance of this offer by signing and
-                        returning a copy of this letter.
-                      </li>
-                    </ul>
-                  </div>
-
-                  <p>
-                    We look forward to welcoming you to the {orgName} family and wish you a successful and rewarding
-                    career with us.
-                  </p>
+                {/* Centered Document Banner */}
+                <div className="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 flex items-center justify-between">
+                  <span className="text-[11px] font-mono text-slate-600">
+                    Date: <strong className="text-slate-900">{formattedLetterDate}</strong>
+                  </span>
+                  <span className="text-xs font-black tracking-[0.18em] uppercase text-slate-900">
+                    OFFER OF APPOINTMENT
+                  </span>
+                  <span className="text-[11px] font-mono text-slate-600">
+                    Employee ID: <strong className="text-slate-900">{worker.employeeCode}</strong>
+                  </span>
                 </div>
 
-                <div className="pt-4 flex items-end justify-between text-[13px]">
-                  <div>
-                    <div>Best Regards,</div>
-                    <div className="font-extrabold text-slate-900 mt-8">{orgName}.</div>
+                {/* Addressee Block */}
+                <div className="text-xs leading-snug text-slate-800 space-y-0.5">
+                  <div className="font-bold text-slate-900">
+                    To, {salutation} {worker.name}
                   </div>
-                  <div className="text-center">
-                    <div className="w-48 border-t border-slate-500 pt-1 text-xs font-semibold text-slate-700">
-                      Candidate Acceptance ({worker.name})
+                  <div>
+                    {worker.location || "Erode"}, {worker.state || "Tamil Nadu"}
+                  </div>
+                </div>
+
+                {/* Structured 2-Column Compensation & Role Summary Table */}
+                <table className="w-full border-collapse border border-slate-300 text-[11px]">
+                  <tbody>
+                    <tr className="border-b border-slate-300">
+                      <td className="py-1.5 px-2.5 bg-slate-50 font-bold text-slate-600 w-[22%]">Designation</td>
+                      <td className="py-1.5 px-2.5 font-bold text-slate-900 w-[28%] border-r border-slate-300">{designation}</td>
+                      <td className="py-1.5 px-2.5 bg-slate-50 font-bold text-slate-600 w-[22%]">Department</td>
+                      <td className="py-1.5 px-2.5 font-semibold text-slate-900 w-[28%]">{department}</td>
+                    </tr>
+                    <tr className="border-b border-slate-300">
+                      <td className="py-1.5 px-2.5 bg-slate-50 font-bold text-slate-600">Date of Joining</td>
+                      <td className="py-1.5 px-2.5 font-bold text-slate-900 border-r border-slate-300">{formatDotDate(joiningDate)}</td>
+                      <td className="py-1.5 px-2.5 bg-slate-50 font-bold text-slate-600">Work Location</td>
+                      <td className="py-1.5 px-2.5 font-semibold text-slate-900">{worker.location || "Erode HQ"}</td>
+                    </tr>
+                    <tr className="border-b border-slate-300">
+                      <td className="py-1.5 px-2.5 bg-slate-50 font-bold text-slate-600">
+                        {worker.category === "OFFICE_STAFF" ? "Monthly Salary" : "Daily Wage"}
+                      </td>
+                      <td className="py-1.5 px-2.5 font-extrabold text-slate-900 border-r border-slate-300" colSpan={isDriver || Number(worker.defaultVehicleAllowance || 0) > 0 ? 1 : 1}>
+                        {salaryVisible || offerPayAmount > 0
+                          ? `${formatINR(offerPayAmount)}/- (Indian Rupee ${numberToIndianWords(offerPayAmount)})`
+                          : "As per Company Scale"}
+                      </td>
+                      <td className="py-1.5 px-2.5 bg-slate-50 font-bold text-slate-600">Notice Period</td>
+                      <td className="py-1.5 px-2.5 font-bold text-slate-900">1 Month Mandatory</td>
+                    </tr>
+                    {(isDriver || Number(worker.defaultVehicleAllowance || 0) > 0) && (
+                      <tr>
+                        <td className="py-1.5 px-2.5 bg-slate-50 font-bold text-slate-600">Driver / Vehicle Allowance</td>
+                        <td className="py-1.5 px-2.5 font-bold text-slate-900" colSpan={3}>
+                          {formatINR(Number(worker.defaultVehicleAllowance || 0))} / Month
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+
+                {/* Structured Numbered Corporate Clauses */}
+                <div className="text-[11.5px] leading-relaxed text-slate-800 space-y-2">
+                  <p>
+                    Dear <strong>{salutation} {worker.name}</strong>, following our discussions, we are pleased to appoint you at{" "}
+                    <strong>{orgName}</strong> under the terms outlined below:
+                  </p>
+                  <ol className="list-decimal pl-5 space-y-1.5">
+                    <li>
+                      <strong>Appointment &amp; Duties:</strong> You will serve as <strong>{designation}</strong> ({department}) and report to your assigned Team Lead (
+                      {["SR004", "SR007", "SR008"].includes(worker.employeeCode.toUpperCase())
+                        ? "Sri Manikandan"
+                        : "Gowri"}{" "}
+                      / HR Monika), performing all assigned operational and project responsibilities diligently.
+                    </li>
+                    <li>
+                      <strong>Compensation &amp; Disbursement:</strong>{" "}
+                      {worker.category === "OFFICE_STAFF"
+                        ? "Your monthly salary is disbursed on the 1st–2nd of every month"
+                        : "Your wages are settled on the 15-day cycle (1st–15th & 16th–30th)"}{" "}
+                      via Bank Transfer / UPI / Cash against an official SR-Books payslip.
+                    </li>
+                    <li>
+                      <strong>Working Hours &amp; Leave Policy:</strong> Standard shift hours are <strong>09:00 AM – 07:30 PM</strong>. Leave, permission (15m–3h), and overtime requests follow the 2-tier Team Lead → HR approval workflow.
+                    </li>
+                    <li>
+                      <strong>Confidentiality &amp; Company Property:</strong> You shall maintain strict confidentiality of all client, pricing, and technical records and return all company tools/assets upon separation.
+                    </li>
+                    <li>
+                      <strong>Notice Period &amp; Separation:</strong> Either party must provide a mandatory <strong>one (1) month prior written notice</strong> prior to resignation or separation.
+                    </li>
+                  </ol>
+                </div>
+
+                {/* Executive Sign-Off Footer */}
+                <div className="pt-5 flex items-end justify-between text-xs">
+                  <div>
+                    <div className="font-bold text-slate-900">For {orgName}</div>
+                    <div className="w-48 border-t border-slate-500 mt-8 pt-1 text-[11px] font-semibold text-slate-700">
+                      Managing Director / Authorized Signatory
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-slate-900">Accepted &amp; Signed By Candidate</div>
+                    <div className="w-52 border-t border-slate-500 mt-8 pt-1 text-[11px] font-semibold text-slate-700">
+                      {worker.name} &nbsp;•&nbsp; Date: __________
                     </div>
                   </div>
                 </div>
