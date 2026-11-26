@@ -42,6 +42,7 @@ import EmployeeMultiYearDossierModal from "@/components/attendance/EmployeeMulti
 import WorkerKycProfileDrawer, { WorkerKycData } from "@/components/labour/WorkerKycProfileDrawer";
 import LabourSmartImportModal from "@/components/labour/LabourSmartImportModal";
 import { exportToExcel } from "@/lib/exportUtils";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 
 type SegmentType = "SR_OFFICE" | "INVI_OFFICE" | "TAMIL" | "HINDI" | "CONTRACTOR";
 
@@ -1340,8 +1341,11 @@ export default function LabourWorkforceMasterPage() {
 
       {/* 9. ADD / EDIT WORKER MODAL WITH FULL KYC & UPLOADS */}
       {showAddEditModal && (
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 sm:p-4 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl max-w-3xl w-full flex flex-col max-h-[92vh] overflow-hidden relative z-[100001]">
+        <ViewportPortal onBackdropClick={() => setShowAddEditModal(false)}>
+          <div
+            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-2xl max-w-3xl w-full flex flex-col max-h-[90vh] overflow-hidden relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/90 dark:bg-slate-850">
               <div className="flex items-center gap-3">
@@ -1952,7 +1956,7 @@ export default function LabourWorkforceMasterPage() {
               </div>
             </form>
           </div>
-        </div>
+        </ViewportPortal>
       )}
 
       {/* 10. ARCHIVE / SOFT-DELETE CONFIRM MODAL */}

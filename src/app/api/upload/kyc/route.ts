@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     const filePath = path.join(uploadDir, filename);
 
     fs.writeFileSync(filePath, buffer);
-    const publicUrl = `/uploads/kyc/${filename}`;
+    const publicUrl = `/api/files/kyc/${filename}`;
 
     // If employeeId is provided, optionally link directly to the database column
     if (employeeId) {

@@ -2,9 +2,15 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { UserRole } from "@prisma/client";
 
-const SECRET_KEY = new TextEncoder().encode(
-  process.env.SESSION_SECRET || "standard-roofs-books-secret-jwt-key-2026-erode-tamil-nadu-production"
-);
+function getSecretKey(): Uint8Array {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      "FATAL SECURITY ERROR: process.env.SESSION_SECRET must be configured and at least 32 characters long."
+    );
+  }
+  return new TextEncoder().encode(secret);
+}
 
 export const COOKIE_NAME = "sr_session";
 
@@ -212,12 +218,12 @@ export async function createSessionToken(payload: SessionPayload): Promise<strin
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
-    .sign(SECRET_KEY);
+    .sign(getSecretKey());
 }
 
 export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, SECRET_KEY);
+    const { payload } = await jwtVerify(token, getSecretKey());
     return payload as unknown as SessionPayload;
   } catch (err) {
     return null;

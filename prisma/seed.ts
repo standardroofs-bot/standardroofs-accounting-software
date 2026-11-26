@@ -5,6 +5,13 @@ import { getDefaultPermissionsForRole } from "../src/lib/auth";
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.NODE_ENV === "production" && !process.argv.includes("--force-reset")) {
+    console.error(
+      "FATAL SAFEGUARD: prisma/seed.ts cannot run destructive reset when NODE_ENV=production unless --force-reset is explicitly passed."
+    );
+    process.exit(1);
+  }
+
   console.log("===============================================================");
   console.log("🌱 SR-BOOKS PRODUCTION CLEAN-SLATE RESET & SRM EXCEL SYNC");
   console.log("===============================================================");

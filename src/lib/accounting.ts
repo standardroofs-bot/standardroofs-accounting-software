@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { Decimal, toDecimal, isAmountEqual } from "./decimal";
-import { VoucherType, JournalStatus, AccountType } from "@prisma/client";
+import { Prisma, VoucherType, JournalStatus, AccountType } from "@prisma/client";
 
 export interface JournalLineInput {
   accountId: string;
@@ -25,48 +25,61 @@ export interface PostTransactionInput {
 }
 
 /**
- * Generates and increments the next voucher number sequentially
+ * Generates and increments the next voucher number sequentially & atomically.
+ * Accepts an optional transaction client so callers can keep voucher allocation
+ * inside the same atomic database transaction as document & journal creation.
  */
 export async function getNextVoucherNumber(
   financialYearId: string,
-  voucherType: string
+  voucherType: string,
+  txClient?: Prisma.TransactionClient
 ): Promise<{ voucherNumber: string; sequenceNumber: number }> {
-  return await prisma.$transaction(async (tx) => {
-    let seq = await tx.voucherSequence.findUnique({
+  const run = async (tx: Prisma.TransactionClient) => {
+    const fy = await tx.financialYear.findUnique({ where: { id: financialYearId } });
+    const shortFy = fy?.name?.slice(2) || "26-27";
+    const fallbackPrefix = `${voucherType.substring(0, 2)}/${shortFy}/`;
+
+    // Upsert ensures sequence exists, then atomic increment: 1 prevents concurrent duplicates
+    await tx.voucherSequence.upsert({
       where: {
         financialYearId_voucherType: {
           financialYearId,
           voucherType,
         },
       },
+      update: {},
+      create: {
+        financialYearId,
+        voucherType,
+        prefix: fallbackPrefix,
+        nextNumber: 1,
+        paddingLength: 4,
+      },
     });
 
-    if (!seq) {
-      // Create fallback sequence
-      const prefix = `${voucherType.substring(0, 2)}/26-27/`;
-      seq = await tx.voucherSequence.create({
-        data: {
+    const updated = await tx.voucherSequence.update({
+      where: {
+        financialYearId_voucherType: {
           financialYearId,
           voucherType,
-          prefix,
-          nextNumber: 1,
-          paddingLength: 4,
         },
-      });
-    }
-
-    const currentNum = seq.nextNumber;
-    const padded = String(currentNum).padStart(seq.paddingLength, "0");
-    const voucherNumber = `${seq.prefix}${padded}`;
-
-    // Increment sequence
-    await tx.voucherSequence.update({
-      where: { id: seq.id },
-      data: { nextNumber: currentNum + 1 },
+      },
+      data: {
+        nextNumber: { increment: 1 },
+      },
     });
 
-    return { voucherNumber, sequenceNumber: currentNum };
-  });
+    const allocatedNum = updated.nextNumber - 1;
+    const padded = String(allocatedNum).padStart(updated.paddingLength, "0");
+    const voucherNumber = `${updated.prefix}${padded}`;
+
+    return { voucherNumber, sequenceNumber: allocatedNum };
+  };
+
+  if (txClient) {
+    return await run(txClient);
+  }
+  return await prisma.$transaction(run);
 }
 
 /**
@@ -75,7 +88,10 @@ export async function getNextVoucherNumber(
  * - Updates chart of account balances accurately
  * - Records audit log
  */
-export async function postDoubleEntryTransaction(input: PostTransactionInput) {
+export async function postDoubleEntryTransaction(
+  input: PostTransactionInput,
+  txClient?: Prisma.TransactionClient
+) {
   let totalDebit = new Decimal(0);
   let totalCredit = new Decimal(0);
 
@@ -105,21 +121,21 @@ export async function postDoubleEntryTransaction(input: PostTransactionInput) {
     throw new Error("Double-Entry Bookkeeping Error: Transaction amount cannot be zero.");
   }
 
-  // Check if Financial Year is locked or closed
-  const fy = await prisma.financialYear.findUnique({
-    where: { id: input.financialYearId },
-  });
-  if (fy?.isLocked || fy?.isClosed) {
-    throw new Error(
-      `Financial Year ${fy?.name || input.financialYearId} is locked or closed. Transactions cannot be posted to a locked period.`
-    );
-  }
+  const execute = async (tx: Prisma.TransactionClient) => {
+    // Check if Financial Year is locked or closed inside transaction
+    const fy = await tx.financialYear.findUnique({
+      where: { id: input.financialYearId },
+    });
+    if (fy?.isLocked || fy?.isClosed) {
+      throw new Error(
+        `Financial Year ${fy?.name || input.financialYearId} is locked or closed. Transactions cannot be posted to a locked period.`
+      );
+    }
 
-  return await prisma.$transaction(async (tx) => {
     // 1. Resolve Entry Number if not provided
     let entryNum = input.entryNumber;
     if (!entryNum) {
-      const generated = await getNextVoucherNumber(input.financialYearId, input.voucherType);
+      const generated = await getNextVoucherNumber(input.financialYearId, input.voucherType, tx);
       entryNum = generated.voucherNumber;
     }
 
@@ -167,9 +183,6 @@ export async function postDoubleEntryTransaction(input: PostTransactionInput) {
       const currentBal = toDecimal(account.currentBalance);
       let newBal = currentBal;
 
-      // Normal balance logic:
-      // ASSET & EXPENSE: Debit increases, Credit decreases (+Debit - Credit)
-      // LIABILITY, EQUITY & INCOME: Credit increases, Debit decreases (+Credit - Debit)
       if (
         account.type === AccountType.ASSET ||
         account.type === AccountType.EXPENSE
@@ -202,7 +215,12 @@ export async function postDoubleEntryTransaction(input: PostTransactionInput) {
     });
 
     return journalEntry;
-  });
+  };
+
+  if (txClient) {
+    return await execute(txClient);
+  }
+  return await prisma.$transaction(execute);
 }
 
 /**

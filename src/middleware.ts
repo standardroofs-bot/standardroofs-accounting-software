@@ -21,6 +21,7 @@ const ROUTE_MODULE_MAP: Record<string, ModuleKey> = {
   "/reports": "reports",
   "/api/reports": "reports",
   "/capital": "capital",
+  "/capital-loans": "capital",
   "/api/capital": "capital",
   "/banking": "banking",
   "/api/banking": "banking",
@@ -45,6 +46,8 @@ const ROUTE_MODULE_MAP: Record<string, ModuleKey> = {
   "/api/projects": "projects",
   "/suppliers": "suppliers",
   "/api/suppliers": "suppliers",
+  "/vendors": "suppliers",
+  "/api/vendors": "suppliers",
   "/api/purchases": "suppliers",
   "/expenses": "expenses",
   "/api/expenses": "expenses",
@@ -54,6 +57,10 @@ const ROUTE_MODULE_MAP: Record<string, ModuleKey> = {
   "/api/inventory": "inventory",
   "/labour": "labour",
   "/api/labour": "labour",
+  "/payroll": "labour",
+  "/api/payroll": "labour",
+  "/attendance": "labour",
+  "/api/attendance": "labour",
   "/vouchers": "vouchers",
   "/api/vouchers": "vouchers",
   "/accounts": "accounts",
@@ -113,19 +120,18 @@ export async function middleware(request: NextRequest) {
   // 1. Correlation ID Tracing
   const requestId = request.headers.get("x-request-id") || crypto.randomUUID();
 
-  // 2. Allow static Next.js assets, public files, and whitelisted static paths
+  // 2. Allow static Next.js assets and public branding files ONLY (never bypass /uploads or /print!)
   if (
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/public") ||
-    pathname.startsWith("/uploads") ||
     pathname.startsWith("/images") ||
     pathname.startsWith("/icons") ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js" ||
     pathname === "/logo.png" ||
-    pathname.includes("/print") ||
     pathname === "/favicon.ico" ||
-    pathname.match(/\.(png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|eot|css|js|json|webmanifest)$/i)
+    (!pathname.startsWith("/uploads") &&
+      !pathname.startsWith("/api/") &&
+      pathname.match(/\.(png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|eot|css|js|json|webmanifest)$/i))
   ) {
     const res = NextResponse.next();
     res.headers.set("X-Request-Id", requestId);
@@ -178,7 +184,7 @@ export async function middleware(request: NextRequest) {
 
   // 5. Handle unauthenticated requests
   if (!session) {
-    if (pathname.startsWith("/api/")) {
+    if (pathname.startsWith("/api/") || pathname.startsWith("/uploads/")) {
       return applyGatewayHeaders(
         NextResponse.json(
           { success: false, error: "Authentication required. Please log in." },
@@ -192,6 +198,13 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return applyGatewayHeaders(NextResponse.redirect(loginUrl), requestId, startTime);
+  }
+
+  // 5.0 Rewrite authenticated /uploads/* requests to authenticated /api/files/* handler
+  if (pathname.startsWith("/uploads/")) {
+    const fileSubpath = pathname.slice("/uploads/".length);
+    const rewriteUrl = new URL(`/api/files/${fileSubpath}`, request.url);
+    return applyGatewayHeaders(NextResponse.rewrite(rewriteUrl), requestId, startTime, rateLimitInfo);
   }
 
   // 5.1 Strict Role Isolation for EMPLOYEE (Tier 3: Read-Only Self-Service Portal Only)
@@ -266,10 +279,19 @@ export async function middleware(request: NextRequest) {
     return applyGatewayHeaders(NextResponse.next(), requestId, startTime, rateLimitInfo);
   }
 
-  // 6. Granular Module Permission Enforcement
+  // 6. Granular Action-Level Module Permission Enforcement
+  const requiredAction: "view" | "create" | "edit" | "approve" =
+    method === "POST"
+      ? pathname.includes("/approve") || pathname.includes("/reverse") || pathname.includes("/fy-lock") || pathname.includes("/backup")
+        ? "approve"
+        : "create"
+      : method === "PUT" || method === "PATCH" || method === "DELETE"
+      ? "edit"
+      : "view";
+
   for (const [routePrefix, moduleKey] of Object.entries(ROUTE_MODULE_MAP)) {
     if (pathname === routePrefix || pathname.startsWith(routePrefix + "/")) {
-      const isAllowed = hasModulePermission(session, moduleKey, "view");
+      const isAllowed = hasModulePermission(session, moduleKey, requiredAction);
       if (!isAllowed) {
         if (pathname.startsWith("/api/")) {
           return applyGatewayHeaders(
@@ -307,6 +329,6 @@ export const config = {
      * - images, uploads, icons (static assets)
      * - sw.js, manifest.webmanifest (PWA files)
      */
-    "/((?!_next/static|_next/image|favicon.ico|logo.png|images|uploads|icons|manifest.webmanifest|sw.js).*)",
+    "/((?!_next/static|_next/image|favicon.ico|logo.png|images|icons|manifest.webmanifest|sw.js).*)",
   ],
 };

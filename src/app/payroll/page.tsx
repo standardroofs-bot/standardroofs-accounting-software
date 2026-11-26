@@ -26,6 +26,7 @@ import { exportToExcel } from "@/lib/exportUtils";
 import { BrandedPayslip, BrandedPayslipItem } from "@/components/payroll/BrandedPayslip";
 import { ModuleHeroBanner } from "@/components/ui/ModuleHeroBanner";
 import { TactileKpiCard, InitialsAvatar, ChannelBadge, BalanceBadge } from "@/components/ui/ErpPrimitives";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 
 interface PayrollItem extends BrandedPayslipItem {
   payrollRunId: string;
@@ -1143,10 +1144,7 @@ export default function StandardPayrollPage() {
 
       {/* OFFICIAL BRANDED PAYSLIP MODAL */}
       {payslipItem && run && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-950/50 backdrop-blur-xs print:static print:p-0 print:bg-white"
-          onClick={() => setPayslipItem(null)}
-        >
+        <ViewportPortal onBackdropClick={() => setPayslipItem(null)}>
           <div
             className="w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden print:max-h-none print:shadow-none print:border-0"
             onClick={(e) => e.stopPropagation()}
@@ -1188,7 +1186,7 @@ export default function StandardPayrollPage() {
               />
             </div>
           </div>
-        </div>
+        </ViewportPortal>
       )}
 
       {toast && (
@@ -1250,9 +1248,9 @@ function PayrollDetailDrawer({
   const balance = Math.round((net - (form.paidCash + form.paidBankOrGpay)) * 100) / 100;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/20 flex justify-end" onClick={onClose}>
+    <ViewportPortal variant="drawer" onBackdropClick={onClose}>
       <div
-        className="bg-white w-full max-w-md h-full shadow-2xl border-l border-slate-200 flex flex-col"
+        className="bg-white w-full max-w-md h-full shadow-2xl border-l border-slate-200 flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="shrink-0 px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
@@ -1411,7 +1409,7 @@ function PayrollDetailDrawer({
           </button>
         </div>
       </div>
-    </div>
+    </ViewportPortal>
   );
 }
 

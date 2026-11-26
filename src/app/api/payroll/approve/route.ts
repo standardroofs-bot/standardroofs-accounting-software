@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserSession } from "@/lib/auth";
 import { getNextVoucherNumber, postDoubleEntryTransaction } from "@/lib/accounting";
+import { requireAuthorizedSession } from "@/lib/rbac";
 import { VoucherType, CashFlowType } from "@prisma/client";
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuthorizedSession("labour", "APPROVE");
+    if (auth.error) return auth.error;
+
     const body = await req.json();
     const { payrollRunId } = body;
 
@@ -28,8 +31,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const session = await getCurrentUserSession();
-    const approvedByName = session?.name || "Prabhakaran T";
+    const session = auth.session;
+    const approvedByName = session.name || "Prabhakaran T";
 
     // Sum paid cash and paid bank
     const totalCash = Math.round(run.items.reduce((s, it) => s + it.paidCash, 0) * 100) / 100;

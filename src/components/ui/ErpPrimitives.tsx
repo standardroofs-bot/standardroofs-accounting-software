@@ -2,6 +2,7 @@
 
 import React from "react";
 import { X } from "lucide-react";
+import { ViewportPortal } from "./ViewportPortal";
 
 /* 1. TACTILE KPI CARD WITH TOP ACCENT BAR & PROGRESS METER */
 interface TactileKpiCardProps {
@@ -198,12 +199,9 @@ export function StickySlideOverDrawer({
   maxWidthClass = "max-w-md",
 }: StickySlideOverDrawerProps) {
   return (
-    <div
-      className="fixed inset-0 z-50 bg-slate-950/30 flex justify-end"
-      onClick={onClose}
-    >
+    <ViewportPortal variant="drawer" onBackdropClick={onClose}>
       <div
-        className={`bg-white w-full ${maxWidthClass} h-full shadow-2xl border-l border-slate-200 flex flex-col`}
+        className={`bg-white w-full ${maxWidthClass} h-full shadow-2xl border-l border-slate-200 flex flex-col overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="shrink-0 px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
@@ -232,6 +230,6 @@ export function StickySlideOverDrawer({
           {footer}
         </div>
       </div>
-    </div>
+    </ViewportPortal>
   );
 }

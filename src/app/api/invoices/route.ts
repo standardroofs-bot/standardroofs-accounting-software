@@ -3,10 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { postDoubleEntryTransaction, getNextVoucherNumber } from "@/lib/accounting";
 import { calculateGST, COMPANY_GST_STATE_CODE } from "@/lib/gst";
 import { toDecimal, Decimal } from "@/lib/decimal";
+import { requireAuthorizedSession } from "@/lib/rbac";
 import { VoucherType } from "@prisma/client";
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireAuthorizedSession("invoices", "VIEW");
+    if (auth.error) return auth.error;
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get("customerId");
     const status = searchParams.get("status");
@@ -43,6 +46,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAuthorizedSession("invoices", "CREATE");
+    if (auth.error) return auth.error;
+
     const body = await request.json();
     const {
       customerId,
@@ -114,22 +120,29 @@ export async function POST(request: Request) {
     let sgstTotal = new Decimal(0);
     let igstTotal = new Decimal(0);
 
-    const processedItems = items.map((it: any) => {
+    const processedItems = items.map((it: any, index: number) => {
       const qty = toDecimal(it.quantity || 1);
       const price = toDecimal(it.unitPrice || 0);
       const disc = toDecimal(it.discount || 0);
-      const rate = toDecimal(it.gstRate || 18);
+      const rate = toDecimal(it.gstRate !== undefined && it.gstRate !== null ? it.gstRate : 18);
+      const rawHsn = String(it.hsnSacCode || "7306").trim();
+      if (!/^[A-Za-z0-9]{4,8}$/.test(rawHsn)) {
+        throw new Error(`Invalid HSN/SAC code '${rawHsn}' on line item #${index + 1}. Expected 4–8 alphanumeric characters.`);
+      }
 
       const baseAmount = qty.times(price);
       const taxable = baseAmount.minus(disc).greaterThan(0) ? baseAmount.minus(disc) : new Decimal(0);
       const gstRes = calculateGST(taxable, effectiveStateCode, rate);
 
       subTotal = subTotal.plus(taxable);
+      cgstTotal = cgstTotal.plus(gstRes.cgstAmount);
+      sgstTotal = sgstTotal.plus(gstRes.sgstAmount);
+      igstTotal = igstTotal.plus(gstRes.igstAmount);
 
       return {
         description: it.description || "Roofing Material / Works",
         subDescription: it.subDescription ? String(it.subDescription).trim() : null,
-        hsnSacCode: it.hsnSacCode || "7306",
+        hsnSacCode: rawHsn,
         quantity: qty.toFixed(2),
         unit: it.unit || "nos",
         unitPrice: price.toFixed(2),
@@ -146,28 +159,16 @@ export async function POST(request: Request) {
       };
     });
 
-    // In Zoho Books, GST is calculated on aggregate taxable amount to avoid rounding creep
-    if (isInterState) {
-      igstTotal = toDecimal(subTotal.times(0.18).toFixed(2, Decimal.ROUND_HALF_UP));
-      cgstTotal = new Decimal(0);
-      sgstTotal = new Decimal(0);
-    } else {
-      cgstTotal = toDecimal(subTotal.times(0.09).toFixed(2, Decimal.ROUND_HALF_UP));
-      sgstTotal = toDecimal(subTotal.times(0.09).toFixed(2, Decimal.ROUND_HALF_UP));
-      igstTotal = new Decimal(0);
-    }
+    cgstTotal = toDecimal(cgstTotal.toFixed(2, Decimal.ROUND_HALF_UP));
+    sgstTotal = toDecimal(sgstTotal.toFixed(2, Decimal.ROUND_HALF_UP));
+    igstTotal = toDecimal(igstTotal.toFixed(2, Decimal.ROUND_HALF_UP));
 
     const adjDecimal = toDecimal(adjustment || 0);
     const unadjustedGrandTotal = subTotal.plus(cgstTotal).plus(sgstTotal).plus(igstTotal);
     const grandTotal = unadjustedGrandTotal.plus(adjDecimal);
 
-    // Obtain sequential invoice number starting at #33
-    const voucherInfo = await getNextVoucherNumber(fy.id, "INVOICE");
-    const invoiceNumber = voucherInfo.voucherNumber;
-    const sequenceNumber = voucherInfo.sequenceNumber;
-
-    // Post Double-Entry Journal Entry for genuine Tax Invoices (Skipped for DRAFT)
-    let journalEntryId: string | null = null;
+    // Effective shipping address
+    const resolvedShipping = shippingAddress || customer.shippingAddress || customer.billingAddress;
     const isDraft = status === "DRAFT";
     const isActualFinancialDoc =
       !isDraft &&
@@ -175,153 +176,171 @@ export async function POST(request: Request) {
         invoiceType === "FINAL_INVOICE" ||
         invoiceType === "ADVANCE_INVOICE");
 
-    if (isActualFinancialDoc) {
-      const journalLines: any[] = [
-        // Debit: Customer Receivable (Actual rounded grand total)
-        {
-          accountId: arAccount.id,
-          debit: grandTotal,
-          credit: 0,
-          narration: `Sales Invoice: ${invoiceNumber} to ${customer.name}`,
-          customerId: customer.id,
-          projectId: projectId || undefined,
-        },
-        // Credit: Roofing Contract Income
-        {
-          accountId: incomeAccount.id,
-          debit: 0,
-          credit: subTotal,
-          narration: `Taxable Income on ${invoiceNumber}`,
-          customerId: customer.id,
-          projectId: projectId || undefined,
-        },
-      ];
+    // Single atomic transaction: voucher allocation + journal posting + invoice creation + customer balance + AuditLog
+    const invoice = await prisma.$transaction(async (tx) => {
+      const voucherInfo = await getNextVoucherNumber(fy.id, "INVOICE", tx);
+      const invoiceNumber = voucherInfo.voucherNumber;
+      const sequenceNumber = voucherInfo.sequenceNumber;
 
-      // Taxes
-      if (isInterState) {
-        if (igstTotal.greaterThan(0)) {
-          journalLines.push({
-            accountId: igstAccount.id,
-            debit: 0,
-            credit: igstTotal,
-            narration: `IGST Output Liability on ${invoiceNumber}`,
-            customerId: customer.id,
-            projectId: projectId || undefined,
-          });
-        }
-      } else {
-        if (cgstTotal.greaterThan(0)) {
-          journalLines.push({
-            accountId: cgstAccount.id,
-            debit: 0,
-            credit: cgstTotal,
-            narration: `CGST Output Liability on ${invoiceNumber}`,
-            customerId: customer.id,
-            projectId: projectId || undefined,
-          });
-        }
-        if (sgstTotal.greaterThan(0)) {
-          journalLines.push({
-            accountId: sgstAccount.id,
-            debit: 0,
-            credit: sgstTotal,
-            narration: `SGST Output Liability on ${invoiceNumber}`,
-            customerId: customer.id,
-            projectId: projectId || undefined,
-          });
-        }
-      }
+      let journalEntryId: string | null = null;
 
-      // Round-off adjustment balancing
-      if (!adjDecimal.isZero() && roundOffAccount) {
-        if (adjDecimal.lessThan(0)) {
-          // Negative adjustment (discount/round down): Debit round off expense
-          journalLines.push({
-            accountId: roundOffAccount.id,
-            debit: adjDecimal.abs(),
+      if (isActualFinancialDoc) {
+        const journalLines: any[] = [
+          {
+            accountId: arAccount.id,
+            debit: grandTotal,
             credit: 0,
-            narration: `Round-off adjustment on ${invoiceNumber}`,
+            narration: `Sales Invoice: ${invoiceNumber} to ${customer.name}`,
             customerId: customer.id,
             projectId: projectId || undefined,
-          });
-        } else {
-          // Positive adjustment: Credit round off income
-          journalLines.push({
-            accountId: roundOffAccount.id,
+          },
+          {
+            accountId: incomeAccount.id,
             debit: 0,
-            credit: adjDecimal,
-            narration: `Round-off adjustment on ${invoiceNumber}`,
+            credit: subTotal,
+            narration: `Taxable Income on ${invoiceNumber}`,
             customerId: customer.id,
             projectId: projectId || undefined,
-          });
+          },
+        ];
+
+        if (isInterState) {
+          if (igstTotal.greaterThan(0)) {
+            journalLines.push({
+              accountId: igstAccount.id,
+              debit: 0,
+              credit: igstTotal,
+              narration: `IGST Output Liability on ${invoiceNumber}`,
+              customerId: customer.id,
+              projectId: projectId || undefined,
+            });
+          }
+        } else {
+          if (cgstTotal.greaterThan(0)) {
+            journalLines.push({
+              accountId: cgstAccount.id,
+              debit: 0,
+              credit: cgstTotal,
+              narration: `CGST Output Liability on ${invoiceNumber}`,
+              customerId: customer.id,
+              projectId: projectId || undefined,
+            });
+          }
+          if (sgstTotal.greaterThan(0)) {
+            journalLines.push({
+              accountId: sgstAccount.id,
+              debit: 0,
+              credit: sgstTotal,
+              narration: `SGST Output Liability on ${invoiceNumber}`,
+              customerId: customer.id,
+              projectId: projectId || undefined,
+            });
+          }
         }
+
+        if (!adjDecimal.isZero() && roundOffAccount) {
+          if (adjDecimal.lessThan(0)) {
+            journalLines.push({
+              accountId: roundOffAccount.id,
+              debit: adjDecimal.abs(),
+              credit: 0,
+              narration: `Round-off adjustment on ${invoiceNumber}`,
+              customerId: customer.id,
+              projectId: projectId || undefined,
+            });
+          } else {
+            journalLines.push({
+              accountId: roundOffAccount.id,
+              debit: 0,
+              credit: adjDecimal,
+              narration: `Round-off adjustment on ${invoiceNumber}`,
+              customerId: customer.id,
+              projectId: projectId || undefined,
+            });
+          }
+        }
+
+        const postedJournal = await postDoubleEntryTransaction(
+          {
+            voucherType: VoucherType.INVOICE,
+            financialYearId: fy.id,
+            entryNumber: invoiceNumber,
+            date: date ? new Date(date) : new Date(),
+            narration: `Tax Invoice ${invoiceNumber}: ${customer.name} (${processedItems.length} items)`,
+            createdById: auth.session.userId || defaultUser.id,
+            lines: journalLines,
+          },
+          tx
+        );
+
+        journalEntryId = postedJournal.id;
       }
 
-      const postedJournal = await postDoubleEntryTransaction({
-        voucherType: VoucherType.INVOICE,
-        financialYearId: fy.id,
-        entryNumber: invoiceNumber,
-        date: date ? new Date(date) : new Date(),
-        narration: `Tax Invoice ${invoiceNumber}: ${customer.name} (${processedItems.length} items)`,
-        createdById: defaultUser.id,
-        lines: journalLines,
-      });
-
-      journalEntryId = postedJournal.id;
-    }
-
-    // Effective shipping address
-    const resolvedShipping = shippingAddress || customer.shippingAddress || customer.billingAddress;
-
-    // Create Invoice record
-    const invoice = await prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        sequenceNumber,
-        invoiceType,
-        orderNumber: orderNumber || null,
-        salesperson: salesperson || null,
-        subject: subject || null,
-        date: date ? new Date(date) : new Date(),
-        dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + (customer.creditDays || 0) * 86400000),
-        customerId,
-        projectId: projectId || null,
-        financialYearId: fy.id,
-        placeOfSupply: effectiveState,
-        placeOfSupplyStateCode: effectiveStateCode,
-        isInterState,
-        subTotal: subTotal.toFixed(2),
-        cgstTotal: cgstTotal.toFixed(2),
-        sgstTotal: sgstTotal.toFixed(2),
-        igstTotal: igstTotal.toFixed(2),
-        adjustment: adjDecimal.toFixed(2),
-        totalAmount: grandTotal.toFixed(2),
-        balanceDue: grandTotal.toFixed(2),
-        status: isDraft ? "DRAFT" : "UNPAID",
-        notes: notes || null,
-        terms: terms || "Due on Receipt",
-        shippingAddress: resolvedShipping,
-        journalEntryId,
-        items: {
-          create: processedItems,
-        },
-      },
-      include: {
-        customer: true,
-        project: true,
-        items: true,
-      },
-    });
-
-    // Update Customer outstanding balance only if not draft
-    if (!isDraft) {
-      await prisma.customer.update({
-        where: { id: customer.id },
+      const createdInvoice = await tx.invoice.create({
         data: {
-          outstandingBalance: toDecimal(customer.outstandingBalance).plus(grandTotal).toFixed(2),
+          invoiceNumber,
+          sequenceNumber,
+          invoiceType,
+          orderNumber: orderNumber || null,
+          salesperson: salesperson || null,
+          subject: subject || null,
+          date: date ? new Date(date) : new Date(),
+          dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + (customer.creditDays || 0) * 86400000),
+          customerId,
+          projectId: projectId || null,
+          financialYearId: fy.id,
+          placeOfSupply: effectiveState,
+          placeOfSupplyStateCode: effectiveStateCode,
+          isInterState,
+          subTotal: subTotal.toFixed(2),
+          cgstTotal: cgstTotal.toFixed(2),
+          sgstTotal: sgstTotal.toFixed(2),
+          igstTotal: igstTotal.toFixed(2),
+          adjustment: adjDecimal.toFixed(2),
+          totalAmount: grandTotal.toFixed(2),
+          balanceDue: grandTotal.toFixed(2),
+          status: isDraft ? "DRAFT" : "UNPAID",
+          notes: notes || null,
+          terms: terms || "Due on Receipt",
+          shippingAddress: resolvedShipping,
+          journalEntryId,
+          items: {
+            create: processedItems,
+          },
+        },
+        include: {
+          customer: true,
+          project: true,
+          items: true,
         },
       });
-    }
+
+      if (!isDraft) {
+        await tx.customer.update({
+          where: { id: customer.id },
+          data: {
+            outstandingBalance: toDecimal(customer.outstandingBalance).plus(grandTotal).toFixed(2),
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          action: "CREATE",
+          entityType: "Invoice",
+          entityId: createdInvoice.id,
+          newValues: JSON.stringify({
+            invoiceNumber,
+            totalAmount: grandTotal.toFixed(2),
+            isInterState,
+            itemsCount: processedItems.length,
+          }),
+          performedById: auth.session.userId || defaultUser.id,
+        },
+      });
+
+      return createdInvoice;
+    });
 
     return NextResponse.json({ success: true, invoice });
   } catch (error: any) {

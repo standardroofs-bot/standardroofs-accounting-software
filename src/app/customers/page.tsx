@@ -33,6 +33,7 @@ import { ExcelImportModal } from "@/components/common/ExcelImportModal";
 import { ModuleHeaderWithAnalytics } from "@/components/common/ModuleHeaderWithAnalytics";
 import { ArchiveConfirmModal } from "@/components/common/ArchiveConfirmModal";
 import { InitialsAvatar, BalanceBadge } from "@/components/ui/ErpPrimitives";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 import { Download, Upload, Loader2 } from "lucide-react";
 
 interface CustomerItem {
@@ -526,8 +527,11 @@ export default function CustomersPage() {
 
       {/* Add / Edit Customer Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <ViewportPortal onBackdropClick={() => setShowModal(false)}>
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <Building className="text-blue-600" />
               {editingCustomer ? `Edit Customer: ${editingCustomer.name}` : "New Customer (Zoho Books Format)"}
@@ -721,7 +725,7 @@ export default function CustomersPage() {
               </div>
             </form>
           </div>
-        </div>
+        </ViewportPortal>
       )}
 
       {/* Archive Confirm Modal */}
@@ -736,8 +740,11 @@ export default function CustomersPage() {
 
       {/* Statement Modal */}
       {statementCustomer && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 max-h-[90vh] overflow-y-auto space-y-4">
+        <ViewportPortal onBackdropClick={() => setStatementCustomer(null)}>
+          <div
+            className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 max-h-[90vh] overflow-y-auto space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -796,7 +803,7 @@ export default function CustomersPage() {
               </div>
             )}
           </div>
-        </div>
+        </ViewportPortal>
       )}
       {/* Universal Zoho Excel Import Modal */}
       <ExcelImportModal

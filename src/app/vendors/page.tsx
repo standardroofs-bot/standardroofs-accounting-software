@@ -25,6 +25,7 @@ import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 import { ModuleHeaderWithAnalytics } from "@/components/common/ModuleHeaderWithAnalytics";
 import { ArchiveConfirmModal } from "@/components/common/ArchiveConfirmModal";
 import { InitialsAvatar, BalanceBadge } from "@/components/ui/ErpPrimitives";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 
 interface Vendor {
   id: string;
@@ -426,8 +427,11 @@ export default function VendorsPage() {
 
       {/* New Vendor Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <ViewportPortal onBackdropClick={() => setShowModal(false)}>
+          <div
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <h3 className="text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Users className="text-blue-600" /> Register New Supplier / Vendor
@@ -602,7 +606,7 @@ export default function VendorsPage() {
               </div>
             </form>
           </div>
-        </div>
+        </ViewportPortal>
       )}
 
       {/* Archive Confirmation Modal */}
