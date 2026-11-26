@@ -83,8 +83,17 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
   const [joiningDate, setJoiningDate] = useState(
     worker.dateOfJoining ? worker.dateOfJoining.split("T")[0] : new Date().toISOString().slice(0, 10)
   );
+  const [offerPayAmount, setOfferPayAmount] = useState<number>(basePay);
   const [savingOffer, setSavingOffer] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
+
+  const handlePrintSheet = () => {
+    document.body.classList.add("sr-printing");
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => document.body.classList.remove("sr-printing"), 300);
+    }, 50);
+  };
 
   // Exit / FnF State
   const [resignationDate, setResignationDate] = useState(
@@ -167,7 +176,7 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
   });
 
   return (
-    <ViewportPortal onBackdropClick={onClose}>
+    <ViewportPortal printScope onBackdropClick={onClose}>
       <div
         className="w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden print:max-h-none print:shadow-none print:border-0"
         onMouseDown={(e) => e.stopPropagation()}
@@ -194,7 +203,7 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={handlePrintSheet}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer"
             >
               <Printer size={14} />
@@ -215,7 +224,7 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
           {mode === "OFFER_LETTER" ? (
             <>
               {/* Inline Quick-Edit Controls (hidden on print) */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 print:hidden">
+              <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 print:hidden">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Letter Date</label>
                   <input type="date" value={letterDate} onChange={(e) => setLetterDate(e.target.value)} className="w-full px-2 py-1 rounded border border-slate-200 bg-white text-xs" />
@@ -238,6 +247,10 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Joining Date</label>
                   <input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className="w-full px-2 py-1 rounded border border-slate-200 bg-white text-xs" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-indigo-600 mb-0.5">Salary / Wage (₹)</label>
+                  <input type="number" value={offerPayAmount} onChange={(e) => setOfferPayAmount(Number(e.target.value) || 0)} className="w-full px-2 py-1 rounded border border-indigo-200 bg-white text-xs font-bold tabular-nums" />
                 </div>
               </div>
 
@@ -289,11 +302,11 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
                       </li>
                       <li>
                         <strong>{worker.category === "OFFICE_STAFF" ? "Monthly Salary:" : "Daily Compensation:"}</strong>{" "}
-                        {salaryVisible && !worker.salaryMasked ? (
+                        {salaryVisible || offerPayAmount > 0 ? (
                           <>
                             You will receive a {worker.category === "OFFICE_STAFF" ? "monthly salary" : "daily wage"} of{" "}
                             <strong>
-                              {formatINR(basePay)}/- (Rupees {numberToIndianWords(basePay)})
+                              {formatINR(offerPayAmount)}/- (Rupees {numberToIndianWords(offerPayAmount)})
                             </strong>
                             .
                             {(isDriver || Number(worker.defaultVehicleAllowance || 0) > 0) &&

@@ -17,12 +17,15 @@ export async function POST(request: Request) {
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
-    const documentType = (formData.get("documentType") as string) || "document";
-    const employeeId = formData.get("employeeId") as string | null;
+    const documentType = ((formData.get("documentType") || formData.get("docType")) as string) || "document";
+    const employeeId = (formData.get("employeeId") || formData.get("workerId")) as string | null;
     const employeeCode = formData.get("employeeCode") as string | null;
 
     if (!file) {
       return NextResponse.json({ success: false, error: "No file provided." }, { status: 400 });
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      return NextResponse.json({ success: false, error: "File exceeds 15 MB limit." }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();
@@ -33,10 +36,10 @@ export async function POST(request: Request) {
     const extMatch = originalName.match(/\.([a-zA-Z0-9]+)$/);
     const ext = extMatch ? extMatch[1].toLowerCase() : "png";
 
-    const allowedExtensions = ["png", "jpg", "jpeg", "webp", "pdf", "svg"];
+    const allowedExtensions = ["png", "jpg", "jpeg", "webp", "pdf", "svg", "doc", "docx", "xlsx", "xls"];
     if (!allowedExtensions.includes(ext)) {
       return NextResponse.json(
-        { success: false, error: `Invalid file type .${ext}. Allowed formats: PNG, JPG, JPEG, WEBP, PDF` },
+        { success: false, error: `Invalid file type .${ext}. Allowed formats: PDF, JPG, PNG, WEBP, DOC, DOCX, XLSX` },
         { status: 400 }
       );
     }

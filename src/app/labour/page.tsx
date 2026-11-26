@@ -1360,7 +1360,7 @@ export default function LabourWorkforceMasterPage() {
         <OfferLetterAndExitModal
           mode={offerExitModal.mode}
           worker={offerExitModal.worker}
-          salaryVisible={isSuperAdmin && showSalaries}
+          salaryVisible={isSuperAdmin || showSalaries}
           onClose={() => setOfferExitModal(null)}
           onSuccess={() => fetchWorkers()}
         />

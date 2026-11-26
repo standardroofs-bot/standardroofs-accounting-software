@@ -832,6 +832,7 @@ model EmployeeOrLabour {
   aadhaarDocUrl      String?
   drivingLicenseNumber String?
   drivingLicenseDocUrl String?
+  kycDocumentsJson   String?            // JSON array of soft-copy vault documents [{id,label,url,fileName,ext,uploadedAt}]
   tenthDetails       String?
   twelfthDetails     String?
   graduationDetails  String?

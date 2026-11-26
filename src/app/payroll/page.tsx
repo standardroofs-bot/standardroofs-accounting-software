@@ -1365,9 +1365,10 @@ export default function StandardPayrollPage() {
 
       {/* OFFICIAL BRANDED PAYSLIP MODAL */}
       {payslipItem && run && (
-        <ViewportPortal onBackdropClick={() => setPayslipItem(null)}>
+        <ViewportPortal printScope onBackdropClick={() => setPayslipItem(null)}>
           <div
             className="w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden print:max-h-none print:shadow-none print:border-0"
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="shrink-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between print:hidden">
@@ -1382,7 +1383,13 @@ export default function StandardPayrollPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    document.body.classList.add("sr-printing");
+                    setTimeout(() => {
+                      window.print();
+                      setTimeout(() => document.body.classList.remove("sr-printing"), 300);
+                    }, 50);
+                  }}
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold cursor-pointer shadow-xs"
                 >
                   <Printer size={14} />

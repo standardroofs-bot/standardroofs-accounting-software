@@ -46,6 +46,7 @@ export interface WorkerKycData {
   aadhaarDocUrl?: string | null;
   drivingLicenseNumber?: string | null;
   drivingLicenseDocUrl?: string | null;
+  kycDocumentsJson?: string | null;
   bankAccountName?: string | null;
   bankName?: string | null;
   bankAccountNo?: string | null;
@@ -97,15 +98,28 @@ export default function WorkerKycProfileDrawer({
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const [showSalaryHistory, setShowSalaryHistory] = useState(false);
   const [customDocLabel, setCustomDocLabel] = useState("");
-  const [vaultDocs, setVaultDocs] = useState<Array<{ label: string; url: string }>>(() => {
-    if (typeof window === "undefined") return [];
+  const [vaultDocs, setVaultDocs] = useState<Array<{ id?: string; label: string; url: string; fileName?: string; ext?: string; uploadedAt?: string }>>(() => {
     try {
-      const raw = localStorage.getItem(`sr_vault_${worker?.id || ""}`);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+      if (worker?.kycDocumentsJson) {
+        const parsed = JSON.parse(worker.kycDocumentsJson);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
   });
+
+  React.useEffect(() => {
+    try {
+      if (worker?.kycDocumentsJson) {
+        const parsed = JSON.parse(worker.kycDocumentsJson);
+        if (Array.isArray(parsed)) {
+          setVaultDocs(parsed);
+          return;
+        }
+      }
+    } catch {}
+    setVaultDocs([]);
+  }, [worker?.id, worker?.kycDocumentsJson]);
 
   if (!isOpen || !worker) return null;
 
@@ -321,52 +335,8 @@ export default function WorkerKycProfileDrawer({
     printWin.document.close();
   };
 
-  const handleDownload360Dossier = async () => {
-    try {
-      const res = await fetch(`/api/labour/${worker.id}/dossier`);
-      const data = await res.json();
-      if (!data.success) return;
-      const w = data.worker;
-      const rows = [
-        {
-          Section: "Profile",
-          Field: "Employee Code / Name",
-          Value: `${w.employeeCode} — ${w.name}`,
-          Extra: w.designation || w.category,
-        },
-        {
-          Section: "Profile",
-          Field: "Phone / Location",
-          Value: w.phone || "—",
-          Extra: `${w.location || "Erode"}, ${w.state || "Tamil Nadu"}`,
-        },
-        {
-          Section: "KYC",
-          Field: "Aadhaar / PAN / DL",
-          Value: w.aadhaarNumber || "—",
-          Extra: `PAN: ${w.panNumber || "—"} | DL: ${w.drivingLicenseNumber || "—"}`,
-        },
-        {
-          Section: "Bank",
-          Field: "Bank / Account / IFSC",
-          Value: `${w.bankName || "—"} (${w.bankAccountNo || w.bankAccountNumber || "—"})`,
-          Extra: w.bankIfsc || w.ifscCode || "—",
-        },
-        {
-          Section: "Compensation",
-          Field: "Monthly / Daily Rate",
-          Value: salaryVisible && !w.salaryMasked ? `₹${w.monthlySalary || w.dailyWage || 0}` : "••••••",
-          Extra: w.exitStatus || "ACTIVE",
-        },
-        ...(data.payrollHistory || []).map((p: any) => ({
-          Section: "Payroll",
-          Field: `${p.payrollRun?.month || ""} (${p.payrollRun?.halfPeriod || ""})`,
-          Value: salaryVisible && !p.salaryMasked ? `Net ₹${p.netSalary}` : "••••••",
-          Extra: `Days: ${p.daysPresent}/${p.totalWorkingDays} | Status: ${p.paymentStatus || p.payrollRun?.status}`,
-        })),
-      ];
-      exportToExcel(rows, `SR_360_Dossier_${w.employeeCode}_${w.name.replace(/\s+/g, "_")}`, "360_Dossier");
-    } catch {}
+  const handleDownload360Dossier = () => {
+    window.open(`/api/labour/${worker.id}/dossier?bundle=zip`, "_blank");
   };
 
   return (
@@ -764,20 +734,46 @@ export default function WorkerKycProfileDrawer({
                           </div>
                         </div>
                         {existing ? (
-                          <a
-                            href={existing.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-bold text-[11px] shrink-0"
-                          >
-                            View
-                          </a>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <a
+                              href={existing.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-1 rounded-lg bg-blue-50 text-blue-700 font-bold text-[10px]"
+                            >
+                              View
+                            </a>
+                            <a
+                              href={existing.url}
+                              download={existing.fileName || slotLabel}
+                              className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold text-[10px]"
+                            >
+                              Download
+                            </a>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const res = await fetch(
+                                  `/api/labour/${worker.id}/documents?docId=${encodeURIComponent(existing.id || "")}&url=${encodeURIComponent(existing.url)}`,
+                                  { method: "DELETE" }
+                                );
+                                const d = await res.json();
+                                if (d.success) {
+                                  setVaultDocs(d.documents || []);
+                                  onRefresh();
+                                }
+                              }}
+                              className="px-1.5 py-1 rounded-lg bg-rose-50 text-rose-600 font-bold text-[10px] cursor-pointer"
+                            >
+                              Del
+                            </button>
+                          </div>
                         ) : (
                           <label className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold text-[11px] cursor-pointer shrink-0 hover:bg-slate-100">
                             Upload
                             <input
                               type="file"
-                              accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx"
+                              accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xlsx,.xls"
                               className="hidden"
                               onChange={async (e) => {
                                 const f = e.target.files?.[0];
@@ -786,16 +782,29 @@ export default function WorkerKycProfileDrawer({
                                 try {
                                   const fd = new FormData();
                                   fd.append("file", f);
-                                  fd.append("workerId", worker.id);
-                                  fd.append("docType", slotLabel);
+                                  fd.append("employeeId", worker.id);
+                                  fd.append("employeeCode", worker.employeeCode);
+                                  fd.append("documentType", slotLabel);
                                   const res = await fetch("/api/upload/kyc", { method: "POST", body: fd });
                                   const data = await res.json();
-                                  const nextUrl = data.url || data.fileUrl || URL.createObjectURL(f);
-                                  const next = [...vaultDocs.filter((v) => v.label !== slotLabel), { label: slotLabel, url: nextUrl }];
-                                  setVaultDocs(next);
-                                  try {
-                                    localStorage.setItem(`sr_vault_${worker.id}`, JSON.stringify(next));
-                                  } catch {}
+                                  if (data.success && data.url) {
+                                    const saveRes = await fetch(`/api/labour/${worker.id}/documents`, {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        label: slotLabel,
+                                        url: data.url,
+                                        fileName: data.originalName || f.name,
+                                        ext: (data.originalName || f.name).split(".").pop()?.toUpperCase(),
+                                        replaceSlot: true,
+                                      }),
+                                    });
+                                    const saved = await saveRes.json();
+                                    if (saved.success) {
+                                      setVaultDocs(saved.documents || []);
+                                      onRefresh();
+                                    }
+                                  }
                                 } finally {
                                   setUploadingDoc(null);
                                 }
@@ -820,7 +829,7 @@ export default function WorkerKycProfileDrawer({
                     <span>{uploadingDoc ? "Uploading..." : "Add Soft Copy"}</span>
                     <input
                       type="file"
-                      accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx"
+                      accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.xlsx,.xls"
                       className="hidden"
                       onChange={async (e) => {
                         const f = e.target.files?.[0];
@@ -830,17 +839,29 @@ export default function WorkerKycProfileDrawer({
                         try {
                           const fd = new FormData();
                           fd.append("file", f);
-                          fd.append("workerId", worker.id);
-                          fd.append("docType", label);
+                          fd.append("employeeId", worker.id);
+                          fd.append("employeeCode", worker.employeeCode);
+                          fd.append("documentType", label);
                           const res = await fetch("/api/upload/kyc", { method: "POST", body: fd });
                           const data = await res.json();
-                          const nextUrl = data.url || data.fileUrl || URL.createObjectURL(f);
-                          const next = [...vaultDocs, { label, url: nextUrl }];
-                          setVaultDocs(next);
-                          setCustomDocLabel("");
-                          try {
-                            localStorage.setItem(`sr_vault_${worker.id}`, JSON.stringify(next));
-                          } catch {}
+                          if (data.success && data.url) {
+                            const saveRes = await fetch(`/api/labour/${worker.id}/documents`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                label,
+                                url: data.url,
+                                fileName: data.originalName || f.name,
+                                ext: (data.originalName || f.name).split(".").pop()?.toUpperCase(),
+                              }),
+                            });
+                            const saved = await saveRes.json();
+                            if (saved.success) {
+                              setVaultDocs(saved.documents || []);
+                              setCustomDocLabel("");
+                              onRefresh();
+                            }
+                          }
                         } finally {
                           setUploadingDoc(null);
                         }
@@ -854,11 +875,39 @@ export default function WorkerKycProfileDrawer({
                   "Resume & Experience Letters",
                   "Bank Passbook / Cancelled Cheque",
                 ].includes(v.label)).map((doc, idx) => (
-                  <div key={idx} className="px-3 py-2 rounded-xl border border-slate-200 bg-white flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-800">{doc.label}</span>
-                    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline">
-                      Open File
-                    </a>
+                  <div key={doc.id || idx} className="px-3 py-2 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-2 text-xs">
+                    <div className="min-w-0 flex items-center gap-2">
+                      <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono text-[9px] font-bold shrink-0">
+                        {doc.ext || "FILE"}
+                      </span>
+                      <span className="font-semibold text-slate-800 truncate">{doc.label}</span>
+                      {doc.fileName && <span className="text-[10px] text-slate-400 truncate hidden sm:inline">({doc.fileName})</span>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline">
+                        View
+                      </a>
+                      <a href={doc.url} download={doc.fileName || doc.label} className="text-emerald-600 font-bold hover:underline">
+                        Download
+                      </a>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const res = await fetch(
+                            `/api/labour/${worker.id}/documents?docId=${encodeURIComponent(doc.id || "")}&url=${encodeURIComponent(doc.url)}`,
+                            { method: "DELETE" }
+                          );
+                          const d = await res.json();
+                          if (d.success) {
+                            setVaultDocs(d.documents || []);
+                            onRefresh();
+                          }
+                        }}
+                        className="text-rose-600 font-bold hover:underline cursor-pointer"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

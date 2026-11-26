@@ -172,3 +172,25 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.6);
 }
+
+/* Isolated 1-Page A4 Print Engine */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+  body.sr-printing > *:not(.sr-print-portal) {
+    display: none !important;
+  }
+  .sr-print-portal {
+    position: static !important;
+    inset: auto !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+}

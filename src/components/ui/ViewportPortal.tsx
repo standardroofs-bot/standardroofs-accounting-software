@@ -6,6 +6,7 @@ import ReactDOM from "react-dom";
 interface ViewportPortalProps {
   children: React.ReactNode;
   variant?: "modal" | "drawer";
+  printScope?: boolean;
   onBackdropClick?: () => void;
   className?: string;
 }
@@ -17,6 +18,7 @@ interface ViewportPortalProps {
 export function ViewportPortal({
   children,
   variant = "modal",
+  printScope = false,
   onBackdropClick,
   className = "",
 }: ViewportPortalProps) {
@@ -44,7 +46,7 @@ export function ViewportPortal({
 
   return ReactDOM.createPortal(
     <div
-      className={`${layoutClasses} ${className}`}
+      className={`${layoutClasses} ${printScope ? "sr-print-portal" : ""} ${className}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && onBackdropClick) {
           onBackdropClick();
