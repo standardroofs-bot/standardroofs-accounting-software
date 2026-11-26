@@ -48,6 +48,10 @@ interface PayrollItem extends BrandedPayslipItem {
     absentCount: number;
     otHours: number;
     payableDays: number;
+    markedPayableSoFar?: number;
+    remainingScheduledDays?: number;
+    projectedPayableDays?: number;
+    scheduledWorkingDays?: number;
     dailyAdvanceSum: number;
     totalRecords: number;
   };
@@ -1855,7 +1859,9 @@ function PayrollTableRow({
         </div>
         {item.attendanceSummary && item.attendanceSummary.totalRecords > 0 && (
           <div className="text-[10px] font-semibold text-[#4F46E5] whitespace-nowrap mt-0.5">
-            Synced: {item.attendanceSummary.presentCount}P · {item.attendanceSummary.paidLeaveCount}PL · {item.attendanceSummary.halfDayCount}H
+            {item.attendanceSummary.remainingScheduledDays && item.attendanceSummary.remainingScheduledDays > 0
+              ? `Proj: ${item.attendanceSummary.markedPayableSoFar ?? item.attendanceSummary.payableDays} marked + ${item.attendanceSummary.remainingScheduledDays} left`
+              : `Synced: ${item.attendanceSummary.presentCount}P · ${item.attendanceSummary.paidLeaveCount}PL · ${item.attendanceSummary.halfDayCount}H`}
           </div>
         )}
       </td>

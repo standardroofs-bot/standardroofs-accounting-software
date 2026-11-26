@@ -604,11 +604,45 @@ export default function AttendancePage() {
     setSelectedDate(`${newYear}-${newMonthNum}-${safeDay}`);
   };
 
+  const todayISO = useMemo(() => {
+    const now = new Date();
+    const istMs = now.getTime() + 5.5 * 60 * 60 * 1000;
+    return new Date(istMs).toISOString().slice(0, 10);
+  }, []);
+
   // Pre-calculated Month Grid Days
   const daysInMonth = useMemo(() => {
     const totalDays = new Date(selectedYear, parseInt(selectedMonthNum, 10), 0).getDate();
     const days = [];
-    const holidayDates = new Set(holidays.map((h) => h.date.split("T")[0]));
+    const paidHolidayDates = new Set(
+      holidays
+        .filter((h) => (h.holidayType || "PL").toUpperCase() !== "UP")
+        .map((h) => h.date.split("T")[0])
+    );
+    const unpaidShutdownDates = new Set(
+      holidays
+        .filter((h) => (h.holidayType || "").toUpperCase() === "UP")
+        .map((h) => h.date.split("T")[0])
+    );
+
+    // Also detect any non-Sunday date where >= 50% of active office staff are marked UP
+    const officeStaffList = employees.filter((e) => e.category === "OFFICE_STAFF");
+    if (officeStaffList.length > 0) {
+      const upCounts = new Map<string, number>();
+      officeStaffList.forEach((emp) => {
+        const list = Array.isArray(emp.attendances) ? emp.attendances : [];
+        list.forEach((a) => {
+          if ((a?.status || "").toUpperCase() === "UP" && a?.date) {
+            const iso = typeof a.date === "string" ? a.date.split("T")[0] : new Date(a.date).toISOString().split("T")[0];
+            upCounts.set(iso, (upCounts.get(iso) || 0) + 1);
+          }
+        });
+      });
+      const threshold = Math.max(2, Math.ceil(officeStaffList.length * 0.5));
+      upCounts.forEach((cnt, iso) => {
+        if (cnt >= threshold) unpaidShutdownDates.add(iso);
+      });
+    }
 
     for (let day = 1; day <= totalDays; day++) {
       const dayStr = String(day).padStart(2, "0");
@@ -616,7 +650,9 @@ export default function AttendancePage() {
       const dateObj = new Date(Date.UTC(selectedYear, parseInt(selectedMonthNum, 10) - 1, day));
       const dayOfWeek = dateObj.getUTCDay(); // 0 = Sunday, 1 = Monday ... 6 = Saturday
       const isSunday = dayOfWeek === 0;
-      const isHoliday = holidayDates.has(fullDate);
+      const isPaidHoliday = paidHolidayDates.has(fullDate);
+      const isUnpaidShutdown = unpaidShutdownDates.has(fullDate);
+      const isHoliday = isPaidHoliday || isUnpaidShutdown;
 
       const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       days.push({
@@ -625,23 +661,30 @@ export default function AttendancePage() {
         dayName: dayNames[dayOfWeek],
         isSunday,
         isHoliday,
-        isWorkingDay: !isSunday && !isHoliday,
+        isPaidHoliday,
+        isUnpaidShutdown,
+        isWorkingDay: !isSunday && !isUnpaidShutdown,
       });
     }
     return days;
-  }, [selectedYear, selectedMonthNum, holidays]);
+  }, [selectedYear, selectedMonthNum, holidays, employees]);
 
   const totalSundaysInMonth = useMemo(() => {
     return daysInMonth.filter((d) => d.isSunday).length;
   }, [daysInMonth]);
 
   const totalHolidaysInMonth = useMemo(() => {
-    return daysInMonth.filter((d) => d.isHoliday && !d.isSunday).length;
+    return daysInMonth.filter((d) => d.isPaidHoliday && !d.isSunday).length;
   }, [daysInMonth]);
 
+  const totalUnpaidShutdownInMonth = useMemo(() => {
+    return daysInMonth.filter((d) => d.isUnpaidShutdown && !d.isSunday).length;
+  }, [daysInMonth]);
+
+  // Exact Office Working Days Denominator: never subtract Paid Holidays (PL)
   const totalWorkingDaysInMonth = useMemo(() => {
-    return Math.max(0, daysInMonth.length - totalSundaysInMonth - totalHolidaysInMonth);
-  }, [daysInMonth, totalSundaysInMonth, totalHolidaysInMonth]);
+    return Math.max(0, daysInMonth.length - totalSundaysInMonth - totalUnpaidShutdownInMonth);
+  }, [daysInMonth, totalSundaysInMonth, totalUnpaidShutdownInMonth]);
 
   const handlePrevMonth = () => {
     let m = parseInt(selectedMonthNum, 10) - 1;
@@ -1448,8 +1491,13 @@ export default function AttendancePage() {
                   Sundays (Off L): <strong>{totalSundaysInMonth}</strong>
                 </span>
                 <span className="px-2 py-0.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 font-bold text-[11px] border border-teal-200 dark:border-teal-800">
-                  Holidays (PL): <strong>{totalHolidaysInMonth}</strong>
+                  Paid Holidays (PL): <strong>{totalHolidaysInMonth}</strong>
                 </span>
+                {totalUnpaidShutdownInMonth > 0 && (
+                  <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[11px] border border-slate-200 dark:border-slate-700">
+                    Unpaid Off (UP): <strong>{totalUnpaidShutdownInMonth}</strong>
+                  </span>
+                )}
                 <span className="px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-extrabold text-[11px] border border-blue-200 dark:border-blue-800">
                   Working Days: <strong>{totalWorkingDaysInMonth}</strong>
                 </span>
@@ -2674,12 +2722,33 @@ export default function AttendancePage() {
                     if (att?.otHours) otHoursTotal += Number(att.otHours);
                   });
 
-                  // Net Payable Days:
-                  // Office = P + 1H + PL + (0.5 * H) + (0.5 * halfPaidPl)
+                  // Net Payable Days & Live Mid-Month Projection:
+                  // Office = marked (P + 1H + PL + 0.5*H + 0.5*halfPaidPl) + remaining unmarked working days
                   // Labour = P + 1H + (0.5 * H)
-                  const netPayableDays = isOffice
+                  const markedPayableSoFar = isOffice
                     ? pTotal + p1hTotal + plTotal + hTotal * 0.5 + halfPaidPlTotal * 0.5
                     : pTotal + p1hTotal + hTotal * 0.5;
+                  const markedDateSet = new Set(
+                    attList
+                      .filter((a) => a && a.date)
+                      .map((a) =>
+                        typeof a.date === "string"
+                          ? a.date.split("T")[0]
+                          : new Date(a.date).toISOString().split("T")[0]
+                      )
+                  );
+                  const remainingScheduledDays = isOffice
+                    ? daysInMonth.filter(
+                        (d) =>
+                          d.fullDate > todayISO &&
+                          !d.isSunday &&
+                          !d.isUnpaidShutdown &&
+                          !markedDateSet.has(d.fullDate)
+                      ).length
+                    : 0;
+                  const netPayableDays = isOffice
+                    ? Math.min(totalWorkingDaysInMonth, markedPayableSoFar + remainingScheduledDays)
+                    : markedPayableSoFar;
 
                   return (
                     <tr key={emp.id} className="h-11 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
@@ -2827,8 +2896,15 @@ export default function AttendancePage() {
                           {lTotal}
                         </td>
                       )}
-                      <td className="w-20 min-w-[80px] py-1 px-2 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-slate-50 dark:bg-slate-900 sticky right-0 z-20 border-l border-slate-200 dark:border-slate-700 shadow-sm">
-                        {netPayableDays}
+                      <td className="w-28 min-w-[112px] py-1 px-2 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-slate-50 dark:bg-slate-900 sticky right-0 z-20 border-l border-slate-200 dark:border-slate-700 shadow-sm">
+                        <div className="leading-tight">
+                          {isOffice ? `Payable: ${netPayableDays}` : netPayableDays}
+                        </div>
+                        {isOffice && remainingScheduledDays > 0 && (
+                          <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-tight whitespace-nowrap">
+                            ({markedPayableSoFar} marked + {remainingScheduledDays} left)
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );

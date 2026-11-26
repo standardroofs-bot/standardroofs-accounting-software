@@ -1,38 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { computeAttendanceBreakdownMap, syncLinkedCashBookForPaidRun } from "@/lib/payrollAttendanceSync";
-
-function getCycleDateRange(month: string, halfPeriod: string) {
-  const [yStr, mStr] = month.split("-");
-  const year = Number(yStr);
-  const mon = Number(mStr);
-  const lastDay = new Date(year, mon, 0).getDate();
-
-  if (halfPeriod === "FIRST_HALF") {
-    return {
-      start: new Date(Date.UTC(year, mon - 1, 1)),
-      end: new Date(Date.UTC(year, mon - 1, 15)),
-      defaultWorkingDays: 15,
-    };
-  }
-  if (halfPeriod === "SECOND_HALF") {
-    return {
-      start: new Date(Date.UTC(year, mon - 1, 16)),
-      end: new Date(Date.UTC(year, mon - 1, lastDay)),
-      defaultWorkingDays: lastDay - 15,
-    };
-  }
-  let workingDays = 0;
-  for (let d = 1; d <= lastDay; d++) {
-    const dayOfWeek = new Date(year, mon - 1, d).getDay();
-    if (dayOfWeek !== 0) workingDays++;
-  }
-  return {
-    start: new Date(Date.UTC(year, mon - 1, 1)),
-    end: new Date(Date.UTC(year, mon - 1, lastDay)),
-    defaultWorkingDays: workingDays,
-  };
-}
+import {
+  computeAttendanceBreakdownMap,
+  computeMonthWorkingDaysInfo,
+  getCycleDateRange,
+  syncLinkedCashBookForPaidRun,
+} from "@/lib/payrollAttendanceSync";
 
 function getPreviousCycle(month: string, halfPeriod: string): { month: string; halfPeriod: string } {
   const [yStr, mStr] = month.split("-");
@@ -84,7 +57,12 @@ export async function POST(req: NextRequest) {
         : "HINDI_CREW";
 
     const { start, end, defaultWorkingDays } = getCycleDateRange(month, halfPeriod);
-    const effectiveDefaultWorkingDays = customWorkingDays || defaultWorkingDays;
+    const monthInfo =
+      cycleType === "MONTHLY_OFFICE"
+        ? await computeMonthWorkingDaysInfo(month, halfPeriod)
+        : null;
+    const effectiveDefaultWorkingDays =
+      customWorkingDays || monthInfo?.scheduledWorkingDays || defaultWorkingDays;
 
     const employees = await prisma.employeeOrLabour.findMany({
       where: {
@@ -145,26 +123,28 @@ export async function POST(req: NextRequest) {
     });
 
     const existingByEmp = new Map(existingRun?.items.map((it) => [it.employeeId, it]) || []);
+    const attBreakdownMap = await computeAttendanceBreakdownMap(
+      employees.map((e) => e.id),
+      month,
+      halfPeriod
+    );
 
     const newItems = employees.map((emp) => {
       const recs = attByEmp.get(emp.id) || [];
-      let daysPresent = 0;
-      let dailyAdvSum = 0;
-      let totalOtHours = 0;
-
-      for (const r of recs) {
-        const st = (r.status || "").toUpperCase();
-        if (st === "P" || st === "PL" || st === "1H" || st === "1H_MORNING" || st === "1H_EVENING") {
-          daysPresent += 1.0;
-        } else if (st === "H") {
-          daysPresent += 0.5;
-        }
-        dailyAdvSum += Number(r.dailyAdvance || 0);
-        totalOtHours += Number(r.otHours || 0);
-      }
+      const summary = attBreakdownMap.get(emp.id);
+      let daysPresent =
+        cycleType === "MONTHLY_OFFICE"
+          ? summary?.projectedPayableDays ?? 0
+          : summary?.markedPayableSoFar ?? 0;
+      const dailyAdvSum = summary?.dailyAdvanceSum ?? 0;
+      const totalOtHours = summary?.otHours ?? 0;
 
       const prevIt = existingByEmp.get(emp.id);
-      const totalWorkingDays = customWorkingDays || prevIt?.totalWorkingDays || effectiveDefaultWorkingDays;
+      const totalWorkingDays =
+        customWorkingDays ||
+        (cycleType === "MONTHLY_OFFICE" ? monthInfo?.scheduledWorkingDays : undefined) ||
+        prevIt?.totalWorkingDays ||
+        effectiveDefaultWorkingDays;
 
       // For future/unmarked cycles with 0 attendance records, allow full-days planning default
       if (recs.length === 0 && defaultFullDaysIfNoAttendance && !prevIt) {
@@ -184,7 +164,7 @@ export async function POST(req: NextRequest) {
         cycleType === "MONTHLY_OFFICE"
           ? baseRate <= 2500
             ? Math.round(baseRate * daysPresent)
-            : Math.round((baseRate / (totalWorkingDays || 26)) * daysPresent)
+            : Math.round((baseRate / (totalWorkingDays || 24)) * daysPresent)
           : Math.round(baseRate * daysPresent);
 
       const otRatePerHr = cycleType === "MONTHLY_OFFICE" ? Math.round(baseRate / ((totalWorkingDays || 26) * 8)) : Math.round(baseRate / 8);

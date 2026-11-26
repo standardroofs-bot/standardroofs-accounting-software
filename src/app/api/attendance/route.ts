@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { syncOpenDraftPayrollRunsForMonth } from "@/lib/payrollAttendanceSync";
+import { computeMonthWorkingDaysInfo, syncOpenDraftPayrollRunsForMonth } from "@/lib/payrollAttendanceSync";
 
 export const dynamic = "force-dynamic";
 
@@ -167,6 +167,8 @@ export async function GET(request: Request) {
     });
     const contractorHeadcount = contractorsOnDate.reduce((sum, c) => sum + (c.headcount || 0), 0);
 
+    const monthInfo = await computeMonthWorkingDaysInfo(monthStr, "FULL");
+
     return NextResponse.json({
       success: true,
       date: dateStr,
@@ -178,6 +180,14 @@ export async function GET(request: Request) {
       contractorLogs,
       holidays,
       leaveRequests,
+      monthSummary: {
+        totalDaysInMonth: monthInfo.totalDaysInMonth,
+        sundaysCount: monthInfo.sundaysCount,
+        paidHolidaysCount: monthInfo.paidHolidaysCount,
+        unpaidShutdownCount: monthInfo.unpaidShutdownCount,
+        scheduledWorkingDays: monthInfo.scheduledWorkingDays,
+        todayISO: monthInfo.todayISO,
+      },
       kpis: {
         totalOfficeStaff: officeStaff.length || 13,
         presentOfficeToday: presentOffice || (isSunday ? 0 : 12),
