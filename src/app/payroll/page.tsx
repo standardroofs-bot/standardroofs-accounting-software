@@ -703,7 +703,7 @@ export default function StandardPayrollPage() {
                 : "text-slate-600 hover:text-slate-900 font-medium"
             }`}
           >
-            Office Staff (Monthly Salary)
+            Office Staff (Monthly · Paid 1st–2nd)
           </button>
           <button
             type="button"
@@ -714,7 +714,7 @@ export default function StandardPayrollPage() {
                 : "text-slate-600 hover:text-slate-900 font-medium"
             }`}
           >
-            Tamil Labours (1–15 & 16–30 Wages)
+            Tamil Labours (15-Day Cycle: 1–15 &amp; 16–30)
           </button>
           <button
             type="button"
@@ -725,8 +725,15 @@ export default function StandardPayrollPage() {
                 : "text-slate-600 hover:text-slate-900 font-medium"
             }`}
           >
-            Hindi Crew (1–15 & 16–30 Wages)
+            Hindi Crew (15-Day Cycle: 1–15 &amp; 16–30)
           </button>
+          <Link
+            href="/contractors"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition flex items-center gap-1"
+            title="Sub-contractors are billed per finished site or milestone"
+          >
+            <span>Sub-Contractors (Site-by-Site Milestone Billing) &rarr;</span>
+          </Link>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">

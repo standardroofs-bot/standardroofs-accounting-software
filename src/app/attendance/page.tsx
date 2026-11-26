@@ -156,10 +156,30 @@ export default function AttendancePage() {
   const [viewMode, setViewMode] = useState<"monthly" | "daily">("monthly");
   const [showTodayRollCall, setShowTodayRollCall] = useState<boolean>(false);
 
-  // Multi-Year & Multi-Month persistent navigation
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
-  const [selectedMonthNum, setSelectedMonthNum] = useState<string>("11");
-  const [selectedDate, setSelectedDate] = useState<string>("2026-11-20");
+  // Multi-Year & Multi-Month persistent navigation (live today auto-init + midnight refresh)
+  const [selectedYear, setSelectedYear] = useState<number>(() => {
+    const today = new Date().toLocaleDateString("en-CA");
+    return Number(today.slice(0, 4)) || 2026;
+  });
+  const [selectedMonthNum, setSelectedMonthNum] = useState<string>(() => {
+    const today = new Date().toLocaleDateString("en-CA");
+    return today.slice(5, 7) || "11";
+  });
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    return new Date().toLocaleDateString("en-CA");
+  });
+
+  useEffect(() => {
+    let lastToday = new Date().toLocaleDateString("en-CA");
+    const timer = setInterval(() => {
+      const nowToday = new Date().toLocaleDateString("en-CA");
+      if (nowToday !== lastToday) {
+        setSelectedDate((prev) => (prev === lastToday ? nowToday : prev));
+        lastToday = nowToday;
+      }
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   const selectedMonth = `${selectedYear}-${selectedMonthNum}`;
 
@@ -2065,11 +2085,64 @@ export default function AttendancePage() {
                     <Clock size={16} />
                   </div>
                   <div>
-                    <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex flex-wrap items-center gap-2">
                       <span>Today's Live Roll-Call & Site Muster</span>
-                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                        {selectedDate}
-                      </span>
+                      <div className="inline-flex items-center gap-1 bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 rounded-xl px-1.5 py-0.5 shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date(`${selectedDate}T00:00:00Z`);
+                            d.setUTCDate(d.getUTCDate() - 1);
+                            const next = d.toISOString().slice(0, 10);
+                            setSelectedDate(next);
+                            setSelectedYear(Number(next.slice(0, 4)));
+                            setSelectedMonthNum(next.slice(5, 7));
+                          }}
+                          className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 cursor-pointer"
+                          title="Previous Day"
+                        >
+                          <ChevronLeft size={13} />
+                        </button>
+                        <input
+                          type="date"
+                          value={selectedDate}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            if (!next) return;
+                            setSelectedDate(next);
+                            setSelectedYear(Number(next.slice(0, 4)));
+                            setSelectedMonthNum(next.slice(5, 7));
+                          }}
+                          className="text-xs font-mono font-bold text-blue-800 dark:text-blue-200 bg-transparent focus:outline-none cursor-pointer"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date(`${selectedDate}T00:00:00Z`);
+                            d.setUTCDate(d.getUTCDate() + 1);
+                            const next = d.toISOString().slice(0, 10);
+                            setSelectedDate(next);
+                            setSelectedYear(Number(next.slice(0, 4)));
+                            setSelectedMonthNum(next.slice(5, 7));
+                          }}
+                          className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 cursor-pointer"
+                          title="Next Day"
+                        >
+                          <ChevronRight size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const today = new Date().toLocaleDateString("en-CA");
+                            setSelectedDate(today);
+                            setSelectedYear(Number(today.slice(0, 4)));
+                            setSelectedMonthNum(today.slice(5, 7));
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold cursor-pointer"
+                        >
+                          Today
+                        </button>
+                      </div>
                     </h4>
                     <p className="text-[11px] text-slate-500">
                       Marking a person here immediately updates both Today and the Month Matrix grid below in real time.
@@ -3444,13 +3517,13 @@ export default function AttendancePage() {
                         </div>
 
                         {/* Visual 2-Tier Pipeline Indicator */}
-                        <div className="flex items-center gap-2 text-[10.5px] font-semibold">
+                        <div className="flex flex-wrap items-center gap-2 text-[10.5px] font-semibold">
                           <span className={`px-2 py-0.5 rounded border ${req.teamLeadStatus === "APPROVED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : req.teamLeadStatus === "REJECTED" ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
-                            1. Team Lead {req.teamLeadStatus === "APPROVED" ? "✓" : req.teamLeadStatus === "REJECTED" ? "✕" : "⏳"}
+                            1. {req.assignedTeamLead || "Team Lead"} {req.teamLeadStatus === "APPROVED" ? "✓" : req.teamLeadStatus === "REJECTED" ? "✕" : "⏳"}
                           </span>
                           <span className="text-slate-400">→</span>
                           <span className={`px-2 py-0.5 rounded border ${req.hrStatus === "APPROVED" || req.status === "APPROVED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                            2. HR Final {req.hrStatus === "APPROVED" || req.status === "APPROVED" ? "✓" : "Pending"}
+                            2. HR Final (Monika) {req.hrStatus === "APPROVED" || req.status === "APPROVED" ? "✓" : "Pending"}
                           </span>
                         </div>
 

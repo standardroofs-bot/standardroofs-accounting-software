@@ -1,13 +1,35 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { computeMonthWorkingDaysInfo, syncOpenDraftPayrollRunsForMonth } from "@/lib/payrollAttendanceSync";
+import { getCurrentUserSession } from "@/lib/auth";
+import { computeMonthWorkingDaysInfo, getTodayISTDateString, syncOpenDraftPayrollRunsForMonth } from "@/lib/payrollAttendanceSync";
+
+function resolveSessionEmpCode(session: { email?: string | null; name?: string | null; role?: string | null } | null): string | null {
+  if (!session) return null;
+  const email = (session.email || "").toLowerCase();
+  const match = email.match(/^(sr\d{3}|invi\d{3})@/i);
+  if (match) return match[1].toUpperCase();
+  const name = (session.name || "").toLowerCase();
+  if (name.includes("manikandan")) return "SR006";
+  if (name.includes("gowri")) return "SR009";
+  if (name.includes("monika")) return "SR002";
+  return null;
+}
+
+function isHrOrSuperAdmin(session: { email?: string | null; name?: string | null; role?: string | null } | null): boolean {
+  if (!session) return true; // internal/non-auth fallback
+  const role = String(session.role || "").toUpperCase();
+  if (role === "SUPER_ADMIN" || role === "HR" || role === "ADMIN") return true;
+  const email = (session.email || "").toLowerCase();
+  if (email.startsWith("hr@") || email.startsWith("sr002@")) return true;
+  return false;
+}
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const dateStr = searchParams.get("date") || "2026-11-20"; // default to current live date
+    const dateStr = searchParams.get("date") || getTodayISTDateString(); // live auto-today default
     const monthStr = searchParams.get("month") || dateStr.substring(0, 7); // YYYY-MM
     const category = searchParams.get("category"); // OFFICE_STAFF, TAMIL_LABOUR, HINDI_LABOUR
     const companyUnit = searchParams.get("companyUnit"); // STANDARD_ROOFS, INVI_CREATION
@@ -100,6 +122,7 @@ export async function GET(request: Request) {
                   employeeCode: true,
                   category: true,
                   companyUnit: true,
+                  reportingManagerCode: true,
                 },
               },
             },
@@ -112,7 +135,17 @@ export async function GET(request: Request) {
         contractorLogs = results[2];
         holidays = results[3];
         contractorList = results[4];
-        leaveRequests = results[5];
+        const allLeaves = results[5];
+        const session = await getCurrentUserSession();
+        const myCode = resolveSessionEmpCode(session);
+        if (!isHrOrSuperAdmin(session) && (myCode === "SR006" || myCode === "SR009")) {
+          leaveRequests = allLeaves.filter((lr: any) => {
+            const approver = lr.assignedApproverCode || lr.employee?.reportingManagerCode || "SR009";
+            return approver === myCode;
+          });
+        } else {
+          leaveRequests = allLeaves;
+        }
         break;
       } catch (dbErr: any) {
         attempts++;
@@ -303,6 +336,17 @@ export async function POST(request: Request) {
         0.5,
         body.dayType === "HALF_DAY" ? 0.5 : Math.round((end.getTime() - start.getTime()) / 86400000) + 1
       );
+      const emp = await prisma.employeeOrLabour.findUnique({
+        where: { id: body.employeeId },
+        select: { employeeCode: true, reportingManagerCode: true },
+      });
+      const empCodeUpper = (emp?.employeeCode || "").toUpperCase();
+      const approverCode =
+        emp?.reportingManagerCode ||
+        (["SR004", "SR007", "SR008"].includes(empCodeUpper) ? "SR006" : "SR009");
+      const approverLabel =
+        approverCode === "SR006" ? "Sri Manikandan (SR006)" : "Gowri (SR009)";
+
       const created = await prisma.leaveRequest.create({
         data: {
           employeeId: body.employeeId,
@@ -312,7 +356,8 @@ export async function POST(request: Request) {
           endDate: end,
           totalDays: days,
           reason: body.reason || "Personal / Medical Leave",
-          assignedTeamLead: body.assignedTeamLead || "Team Lead",
+          assignedTeamLead: body.assignedTeamLead || approverLabel,
+          assignedApproverCode: approverCode,
           teamLeadStatus: "PENDING",
           hrStatus: "PENDING",
           status: "PENDING_TEAM_LEAD",
@@ -323,11 +368,29 @@ export async function POST(request: Request) {
 
     // 1.45 Stage 1 Team Lead Approve / Reject
     if (action === "team-lead-approve" && body.requestId) {
+      const session = await getCurrentUserSession();
+      const myCode = resolveSessionEmpCode(session);
+      const existingLeave = await prisma.leaveRequest.findUnique({
+        where: { id: body.requestId },
+        include: { employee: { select: { reportingManagerCode: true } } },
+      });
+      if (!existingLeave) {
+        return NextResponse.json({ success: false, error: "Leave request not found" }, { status: 404 });
+      }
+      const assignedCode =
+        existingLeave.assignedApproverCode || existingLeave.employee?.reportingManagerCode || "SR009";
+      if (!isHrOrSuperAdmin(session) && myCode && assignedCode !== myCode) {
+        return NextResponse.json(
+          { success: false, error: `Only assigned Team Lead (${assignedCode}) or HR can approve Stage 1.` },
+          { status: 403 }
+        );
+      }
+
       const updated = await prisma.leaveRequest.update({
         where: { id: body.requestId },
         data: {
           teamLeadStatus: "APPROVED",
-          teamLeadBy: body.reviewedBy || "Team Lead",
+          teamLeadBy: body.reviewedBy || existingLeave.assignedTeamLead || "Team Lead",
           teamLeadAt: new Date(),
           teamLeadRemarks: body.remarks || "Approved by Team Lead",
           status: "PENDING_HR",
@@ -337,11 +400,29 @@ export async function POST(request: Request) {
     }
 
     if (action === "team-lead-reject" && body.requestId) {
+      const session = await getCurrentUserSession();
+      const myCode = resolveSessionEmpCode(session);
+      const existingLeave = await prisma.leaveRequest.findUnique({
+        where: { id: body.requestId },
+        include: { employee: { select: { reportingManagerCode: true } } },
+      });
+      if (!existingLeave) {
+        return NextResponse.json({ success: false, error: "Leave request not found" }, { status: 404 });
+      }
+      const assignedCode =
+        existingLeave.assignedApproverCode || existingLeave.employee?.reportingManagerCode || "SR009";
+      if (!isHrOrSuperAdmin(session) && myCode && assignedCode !== myCode) {
+        return NextResponse.json(
+          { success: false, error: `Only assigned Team Lead (${assignedCode}) or HR can reject Stage 1.` },
+          { status: 403 }
+        );
+      }
+
       const updated = await prisma.leaveRequest.update({
         where: { id: body.requestId },
         data: {
           teamLeadStatus: "REJECTED",
-          teamLeadBy: body.reviewedBy || "Team Lead",
+          teamLeadBy: body.reviewedBy || existingLeave.assignedTeamLead || "Team Lead",
           teamLeadAt: new Date(),
           teamLeadRemarks: body.remarks || "Rejected by Team Lead",
           rejectionNote: body.remarks || "Rejected by Team Lead",

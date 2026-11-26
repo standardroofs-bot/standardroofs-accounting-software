@@ -851,6 +851,7 @@ model EmployeeOrLabour {
   monthlySalary      Decimal            @default(0.00) @db.Decimal(15, 2) // Fixed monthly salary for office staff
   cashAdvanceBalance      Decimal            @default(0.00) @db.Decimal(15, 2)
   defaultVehicleAllowance Float              @default(0)
+  reportingManagerCode    String?            // SR006 (Sri Manikandan) for SR004/SR007/SR008; SR009 (Gowri) for others
   location                String             @default("ERODE")
   state                   String             @default("TAMIL NADU")
   dateOfJoining           DateTime?
@@ -954,6 +955,7 @@ model LeaveRequest {
   totalDays        Decimal          @default(1.0) @db.Decimal(5, 2)
   reason           String
   assignedTeamLead String?
+  assignedApproverCode String?       // SR006 | SR009
   teamLeadStatus   String           @default("PENDING") // PENDING, APPROVED, REJECTED
   teamLeadBy       String?
   teamLeadAt       DateTime?

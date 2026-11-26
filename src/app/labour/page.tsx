@@ -66,7 +66,7 @@ export default function LabourWorkforceMasterPage() {
     fetch("/api/auth/me", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
-        if (d.success && d.user?.role === "SUPER_ADMIN") setIsSuperAdmin(true);
+        if (d.success && String(d.user?.role || "").toUpperCase() === "SUPER_ADMIN") setIsSuperAdmin(true);
       })
       .catch(() => {});
   }, []);
@@ -812,6 +812,22 @@ export default function LabourWorkforceMasterPage() {
               Archived
             </button>
           </div>
+
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => setShowSalaries((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs border transition cursor-pointer shadow-xs ${
+                showSalaries
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+                  : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+              }`}
+              title="Toggle Salary Visibility (Super Admin Only)"
+            >
+              {showSalaries ? <EyeOff size={13} /> : <Eye size={13} />}
+              <span>{showSalaries ? "Hide Salaries" : "Show Salaries"}</span>
+            </button>
+          )}
 
           <Link
             href="/attendance"

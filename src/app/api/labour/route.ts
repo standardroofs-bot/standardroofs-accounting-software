@@ -71,7 +71,7 @@ export async function GET(request: Request) {
     }
 
     const session = await getCurrentUserSession();
-    const isSuperAdmin = session?.role === "SUPER_ADMIN";
+    const isSuperAdmin = String(session?.role || "").toUpperCase() === "SUPER_ADMIN";
 
     const [rawLabourers, srOfficeCount, inviOfficeCount, tamilCount, hindiCount, contractorCount] = await Promise.all([
       prisma.employeeOrLabour.findMany({
