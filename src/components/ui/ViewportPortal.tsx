@@ -45,7 +45,11 @@ export function ViewportPortal({
   return ReactDOM.createPortal(
     <div
       className={`${layoutClasses} ${className}`}
-      onClick={onBackdropClick}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && onBackdropClick) {
+          onBackdropClick();
+        }
+      }}
     >
       {children}
     </div>,

@@ -46,6 +46,7 @@ import { OfferLetterAndExitModal } from "@/components/labour/OfferLetterAndExitM
 import LabourSmartImportModal from "@/components/labour/LabourSmartImportModal";
 import { exportToExcel } from "@/lib/exportUtils";
 import { ViewportPortal } from "@/components/ui/ViewportPortal";
+import { InitialsAvatar } from "@/components/ui/ErpPrimitives";
 
 type SegmentType = "SR_OFFICE" | "INVI_OFFICE" | "TAMIL" | "HINDI" | "CONTRACTOR";
 
@@ -913,19 +914,17 @@ export default function LabourWorkforceMasterPage() {
                             <button
                               type="button"
                               onClick={() => setSelectedWorkerForKyc(w)}
-                              className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs shrink-0 cursor-pointer overflow-hidden border border-slate-200/90 dark:border-slate-700 shadow-xs ring-2 ring-blue-500/30 group-hover:ring-blue-500 transition-all ${
-                                w.photoUrl ? "bg-white" : `bg-gradient-to-br ${avatarGrad}`
-                              }`}
+                              className="shrink-0 cursor-pointer transition-transform group-hover:scale-105"
                               title="Open Worker KYC Dossier"
                             >
                               {w.photoUrl ? (
                                 <img
                                   src={w.photoUrl}
                                   alt={w.name}
-                                  className="w-full h-full object-cover"
+                                  className="w-9 h-9 rounded-xl object-cover border border-slate-200"
                                 />
                               ) : (
-                                <span>{initials}</span>
+                                <InitialsAvatar name={w.name || "SR"} />
                               )}
                             </button>
 
@@ -1179,19 +1178,17 @@ export default function LabourWorkforceMasterPage() {
                             <button
                               type="button"
                               onClick={() => setSelectedWorkerForKyc(w)}
-                              className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 cursor-pointer overflow-hidden border border-slate-200/90 dark:border-slate-700 shadow-xs ring-2 ring-blue-500/30 group-hover:ring-blue-500 transition-all ${
-                                w.photoUrl ? "bg-white" : `bg-gradient-to-br ${avatarGrad}`
-                              }`}
+                              className="shrink-0 cursor-pointer transition-transform group-hover:scale-105"
                               title="Open Worker KYC Dossier"
                             >
                               {w.photoUrl ? (
                                 <img
                                   src={w.photoUrl}
                                   alt={w.name}
-                                  className="w-full h-full object-cover"
+                                  className="w-9 h-9 rounded-xl object-cover border border-slate-200"
                                 />
                               ) : (
-                                <span>{initials}</span>
+                                <InitialsAvatar name={w.name || "SR"} />
                               )}
                             </button>
 

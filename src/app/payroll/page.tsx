@@ -106,7 +106,7 @@ function formatMonthLabel(ym: string): string {
 
 export default function StandardPayrollPage() {
   const [cycleType, setCycleType] = useState<"MONTHLY_OFFICE" | "BI_MONTHLY_TAMIL" | "BI_MONTHLY_HINDI">("MONTHLY_OFFICE");
-  const [month, setMonth] = useState("2026-10");
+  const [month, setMonth] = useState("2026-11");
   const [halfPeriod, setHalfPeriod] = useState<"FULL" | "FIRST_HALF" | "SECOND_HALF">("FULL");
   const [companyFilter, setCompanyFilter] = useState<"ALL" | "STANDARD_ROOFS" | "INVI_CREATION">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -608,7 +608,7 @@ export default function StandardPayrollPage() {
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white border border-white/15 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
             >
               <RefreshCw size={14} className={syncing ? "animate-spin text-indigo-200" : "text-indigo-200"} />
-              <span>{syncing ? "Syncing..." : "Sync Attendance"}</span>
+              <span>{syncing ? "Syncing..." : month === "2026-11" ? "Sync Nov Attendance Now" : "Sync Attendance Now"}</span>
             </button>
 
             {run?.status === "PAID" ? (

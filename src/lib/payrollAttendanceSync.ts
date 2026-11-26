@@ -316,6 +316,10 @@ export async function syncLinkedCashBookForPaidRun(payrollRunId: string) {
 
 export async function syncOpenDraftPayrollRunsForMonth(month: string) {
   try {
+    // Protect historical / closed months (e.g. Oct 2026) from being overwritten by sparse attendance records
+    const currentMonthIST = getTodayISTDateString().slice(0, 7);
+    if (month < currentMonthIST) return;
+
     const draftRuns = await prisma.payrollRun.findMany({
       where: { month, status: "DRAFT" },
       include: { items: true },
@@ -329,7 +333,7 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string) {
 
       for (const item of run.items) {
         const summary = attMap.get(item.employeeId);
-        if (!summary || summary.totalRecords === 0) continue;
+        if (!summary || summary.totalRecords < 5) continue;
 
         const totalWorkingDays = isOfficeCycle
           ? summary.scheduledWorkingDays
