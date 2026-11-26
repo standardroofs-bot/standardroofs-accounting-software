@@ -61,7 +61,7 @@ export function ModuleHeroBanner({
         </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-[22px] font-extrabold tracking-tight text-white leading-tight">
+            <h1 className="text-[22px] font-extrabold tracking-tight !text-white leading-tight">
               {title}
             </h1>
             {statusBadge && (

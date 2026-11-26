@@ -118,6 +118,17 @@ export default function StandardPayrollPage() {
 
   // Modals & Drawers
   const [payslipItem, setPayslipItem] = useState<PayrollItem | null>(null);
+  const [markPaidItem, setMarkPaidItem] = useState<PayrollItem | null>(null);
+  const [markingPaid, setMarkingPaid] = useState(false);
+  const [markPaidForm, setMarkPaidForm] = useState({
+    paidCash: 0,
+    paidBankOrGpay: 0,
+    paidGpay: 0,
+    gpayWallet: "Office Gpay",
+    paymentRef: "",
+    paidDate: new Date().toISOString().slice(0, 10),
+    paymentReason: "",
+  });
   const [drawerItem, setDrawerItem] = useState<PayrollItem | null>(null);
   const [kpiItem, setKpiItem] = useState<PayrollItem | null>(null);
   const [kpiForm, setKpiForm] = useState({
@@ -821,6 +832,30 @@ export default function StandardPayrollPage() {
         />
       </div>
 
+      {/* 4-STEP LIVE FORMULA BAR */}
+      <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 font-bold">
+            1. Base Earned = {formatINR(displayGross)}
+          </span>
+          <span className="text-slate-400 font-bold">+</span>
+          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
+            2. OT / Inc / Veh = {formatINR(visibleItems.reduce((s, it) => s + it.otAndIncentive + (it.performanceIncentive || 0) + (it.vehicleAllowance || 0) + it.lastMonthBalance, 0))}
+          </span>
+          <span className="text-slate-400 font-bold">–</span>
+          <span className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 font-bold">
+            3. Advances = {formatINR(displayDeductions)}
+          </span>
+          <span className="text-slate-400 font-bold">=</span>
+          <span className="px-2.5 py-1 rounded-lg bg-slate-900 text-white font-extrabold">
+            4. Net Payable = {formatINR(displayNet)}
+          </span>
+        </div>
+        <div className="text-[11px] font-semibold text-slate-600 tabular-nums">
+          Disbursed {formatINR(displayCash + displayBank)} • Balance C/F <strong className="text-amber-700">{formatINR(displayCarryForward)}</strong>
+        </div>
+      </div>
+
       {/* BULK ACTION BAR */}
       {selectedIds.length > 0 && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -948,6 +983,19 @@ export default function StandardPayrollPage() {
                     onPatch={handleInlinePatch}
                     onDelete={() => handleDeleteRow(item)}
                     onPrint={() => setPayslipItem(item)}
+                    onMarkPaid={() => {
+                      const alreadyPaid = (item.paidCash || 0) + (item.paidBankOrGpay || 0) + (item.paidGpay || 0);
+                      setMarkPaidForm({
+                        paidCash: item.paidCash || 0,
+                        paidBankOrGpay: alreadyPaid > 0 ? (item.paidBankOrGpay || 0) : item.netSalary,
+                        paidGpay: item.paidGpay || 0,
+                        gpayWallet: item.gpayWallet || "Office Gpay",
+                        paymentRef: item.paymentRef || "",
+                        paidDate: item.paidDate ? String(item.paidDate).slice(0, 10) : new Date().toISOString().slice(0, 10),
+                        paymentReason: item.paymentReason || "",
+                      });
+                      setMarkPaidItem(item);
+                    }}
                   />
                 ))}
               </tbody>
@@ -958,7 +1006,7 @@ export default function StandardPayrollPage() {
 
       {/* CREATE / OPEN ANY MONTH CYCLE MODAL */}
       {showNewCycleModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <ViewportPortal onBackdropClick={() => setShowNewCycleModal(false)}>
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="font-bold text-sm text-slate-900">Create / Open Any Month Cycle</div>
@@ -1033,7 +1081,7 @@ export default function StandardPayrollPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ViewportPortal>
       )}
 
       {/* INTERACTIVE SLIDE-OVER PAYROLL & ATTENDANCE DRAWER */}
@@ -1054,7 +1102,7 @@ export default function StandardPayrollPage() {
 
       {/* ADD EMPLOYEE / LABOUR MODAL */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <ViewportPortal onBackdropClick={() => setShowAddModal(false)}>
           <form onSubmit={handleAddRow} className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="font-bold text-sm text-slate-900">Add Employee / Ad-hoc Worker</div>
@@ -1144,12 +1192,12 @@ export default function StandardPayrollPage() {
               </button>
             </div>
           </form>
-        </div>
+        </ViewportPortal>
       )}
 
       {/* CONFIRMATION DIALOG */}
       {confirmAction && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <ViewportPortal onBackdropClick={() => setConfirmAction(null)}>
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-5 space-y-3">
             <div className="text-sm font-extrabold text-slate-900">{confirmAction.title}</div>
             <p className="text-xs text-slate-600 leading-relaxed">{confirmAction.message}</p>
@@ -1168,7 +1216,7 @@ export default function StandardPayrollPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ViewportPortal>
       )}
 
       {/* OFFICIAL BRANDED PAYSLIP MODAL */}
@@ -1302,6 +1350,129 @@ export default function StandardPayrollPage() {
               </button>
             </div>
           </div>
+        </ViewportPortal>
+      )}
+
+      {/* 1-CLICK MARK PAID & RECORD BANK PROOF MODAL */}
+      {markPaidItem && (
+        <ViewportPortal onBackdropClick={() => setMarkPaidItem(null)}>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setMarkingPaid(true);
+              try {
+                const res = await fetch(`/api/payroll/items/${markPaidItem.id}/mark-paid`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(markPaidForm),
+                });
+                const data = await res.json();
+                if (data.success) {
+                  showToast(`Payment & CashBook proof recorded for ${markPaidItem.employeeName}`);
+                  setMarkPaidItem(null);
+                  loadPayroll();
+                } else {
+                  showToast(data.error || "Failed to record payment", "error");
+                }
+              } finally {
+                setMarkingPaid(false);
+              }
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden"
+          >
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div>
+                <div className="text-sm font-extrabold text-slate-900">Mark Paid &amp; Record Proof</div>
+                <div className="text-[11px] text-slate-500">
+                  {markPaidItem.employeeName} • Net Payable {formatINR(markPaidItem.netSalary)}
+                </div>
+              </div>
+              <button type="button" onClick={() => setMarkPaidItem(null)} className="text-slate-500 cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 space-y-3 text-xs">
+              <div className="grid grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Cash (₹)</label>
+                  <input
+                    type="number"
+                    value={markPaidForm.paidCash}
+                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, paidCash: Number(e.target.value) })}
+                    className="w-full px-2.5 py-2 rounded-lg border border-slate-200 font-semibold tabular-nums"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Bank / ICICI (₹)</label>
+                  <input
+                    type="number"
+                    value={markPaidForm.paidBankOrGpay}
+                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, paidBankOrGpay: Number(e.target.value) })}
+                    className="w-full px-2.5 py-2 rounded-lg border border-slate-200 font-semibold tabular-nums"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-violet-700 mb-1">GPay / UPI (₹)</label>
+                  <input
+                    type="number"
+                    value={markPaidForm.paidGpay}
+                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, paidGpay: Number(e.target.value) })}
+                    className="w-full px-2.5 py-2 rounded-lg border border-slate-200 font-semibold tabular-nums"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">UTR / Bank Ref No.</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. ICICI2611249981"
+                    value={markPaidForm.paymentRef}
+                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, paymentRef: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Paid Date</label>
+                  <input
+                    type="date"
+                    value={markPaidForm.paidDate}
+                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, paidDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 font-semibold"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Payment Note / Proof Remark</label>
+                <input
+                  type="text"
+                  placeholder="e.g. NEFT cleared from ICICI Current Acct"
+                  value={markPaidForm.paymentReason}
+                  onChange={(e) => setMarkPaidForm({ ...markPaidForm, paymentReason: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                />
+              </div>
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5 flex items-center justify-between">
+                <span className="font-semibold text-emerald-900">Total Paying Now</span>
+                <span className="text-sm font-black text-emerald-700 tabular-nums">
+                  {formatINR(markPaidForm.paidCash + markPaidForm.paidBankOrGpay + markPaidForm.paidGpay)}
+                </span>
+              </div>
+            </div>
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+              <button type="button" onClick={() => setMarkPaidItem(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold cursor-pointer">
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={markingPaid}
+                className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+              >
+                {markingPaid ? "Posting..." : "Mark Paid & Post to Cash Book"}
+              </button>
+            </div>
+          </form>
         </ViewportPortal>
       )}
 
@@ -1498,25 +1669,33 @@ function PayrollDetailDrawer({
             <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 focus:outline-none focus:border-[#4F46E5]" />
           </div>
 
-          {/* Live Summary */}
-          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5 flex items-center justify-between">
-            <div>
-              <div className="text-[10px] font-bold uppercase text-[#4F46E5]">Live Net Salary</div>
-              <div className="text-xl font-extrabold text-slate-900 tabular-nums">{formatINR(net)}</div>
+          {/* Live 4-Step Formula Breakdown */}
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5 space-y-2">
+            <div className="grid grid-cols-2 gap-1.5 text-[11px] font-semibold">
+              <div className="bg-white/80 rounded-lg px-2 py-1 text-slate-700">1. Earned: {formatINR(gross)}</div>
+              <div className="bg-white/80 rounded-lg px-2 py-1 text-emerald-700">2. +Additions: {formatINR(form.otAndIncentive + form.nightDutyAmount + form.vehicleAllowance + form.lastMonthBalance)}</div>
+              <div className="bg-white/80 rounded-lg px-2 py-1 text-rose-700">3. -Deductions: {formatINR(form.advanceDeduction + form.expenseBalanceDeduction)}</div>
+              <div className="bg-slate-900 rounded-lg px-2 py-1 text-white font-bold">4. =Net: {formatINR(net)}</div>
             </div>
-            <div className="text-right">
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  balance > 0
-                    ? "bg-amber-100 text-[#D97706]"
-                    : balance < 0
-                    ? "bg-rose-100 text-[#E11D48]"
-                    : "bg-emerald-100 text-[#059669]"
-                }`}
-              >
-                {balance > 0 ? "Pending Balance" : balance < 0 ? "Advance to Recover" : "Cleared"}
-              </span>
-              <div className="text-sm font-extrabold text-slate-900 mt-1 tabular-nums">{formatINR(balance)}</div>
+            <div className="flex items-center justify-between pt-1 border-t border-indigo-200/70">
+              <div>
+                <div className="text-[10px] font-bold uppercase text-[#4F46E5]">Live Net Salary</div>
+                <div className="text-xl font-extrabold text-slate-900 tabular-nums">{formatINR(net)}</div>
+              </div>
+              <div className="text-right">
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    balance > 0
+                      ? "bg-amber-100 text-[#D97706]"
+                      : balance < 0
+                      ? "bg-rose-100 text-[#E11D48]"
+                      : "bg-emerald-100 text-[#059669]"
+                  }`}
+                >
+                  {balance > 0 ? "Pending Balance" : balance < 0 ? "Advance to Recover" : "Cleared"}
+                </span>
+                <div className="text-sm font-extrabold text-slate-900 mt-1 tabular-nums">{formatINR(balance)}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -1572,6 +1751,7 @@ function PayrollTableRow({
   onPatch,
   onDelete,
   onPrint,
+  onMarkPaid,
 }: {
   item: PayrollItem;
   selected: boolean;
@@ -1581,6 +1761,7 @@ function PayrollTableRow({
   onPatch: (id: string, patch: Partial<PayrollItem>) => void;
   onDelete: () => void;
   onPrint: () => void;
+  onMarkPaid: () => void;
 }) {
   const [daysPresent, setDaysPresent] = useState(String(item.daysPresent));
   const [baseRate, setBaseRate] = useState(String(item.baseRate));
@@ -1815,6 +1996,18 @@ function PayrollTableRow({
 
       <td className="py-3.5 px-4 text-center">
         <div className="flex items-center justify-center gap-1">
+          <button
+            type="button"
+            onClick={onMarkPaid}
+            className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+              item.paymentStatus === "PAID"
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                : "bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs"
+            }`}
+            title="Mark Paid & Record Cash/Bank Proof"
+          >
+            {item.paymentStatus === "PAID" ? "Proof" : "Mark Paid"}
+          </button>
           <button
             type="button"
             onClick={onOpenDrawer}

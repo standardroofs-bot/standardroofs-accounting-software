@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
 import { ModuleHeroBanner } from "@/components/ui/ModuleHeroBanner";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 import { ChannelBadge, StickySlideOverDrawer } from "@/components/ui/ErpPrimitives";
 
 interface CashEntry {
@@ -569,7 +570,7 @@ export default function CashBookPage() {
 
       {/* DELETE CONFIRM MODAL */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <ViewportPortal onBackdropClick={() => setConfirmDelete(null)}>
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-5 space-y-3">
             <div className="text-sm font-extrabold text-slate-900">Delete Cash Book Entry?</div>
             <p className="text-xs text-slate-600">
@@ -584,7 +585,7 @@ export default function CashBookPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ViewportPortal>
       )}
 
       {toast && (

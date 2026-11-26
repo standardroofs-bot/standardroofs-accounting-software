@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
 import { ModuleHeroBanner } from "@/components/ui/ModuleHeroBanner";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 import {
   TactileKpiCard,
   InitialsAvatar,
@@ -994,7 +995,7 @@ export default function StandardSubContractorsPage() {
 
       {/* CONFIRM DELETE DIALOG */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <ViewportPortal onBackdropClick={() => setConfirmDelete(null)}>
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-5 space-y-3">
             <div className="text-sm font-extrabold text-slate-900">{confirmDelete.title}</div>
             <p className="text-xs text-slate-600 leading-relaxed">{confirmDelete.message}</p>
@@ -1007,7 +1008,7 @@ export default function StandardSubContractorsPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ViewportPortal>
       )}
 
       {toast && (

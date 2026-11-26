@@ -231,7 +231,7 @@ export function ModuleHeaderWithAnalytics({
           )}
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-[22px] font-extrabold text-white tracking-tight leading-tight">
+              <h1 className="text-[22px] font-extrabold !text-white tracking-tight leading-tight">
                 {title}
               </h1>
               {badge && (

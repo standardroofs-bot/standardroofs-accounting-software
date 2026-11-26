@@ -1930,6 +1930,7 @@ model PayrollItem {
   baseRate                Float      @default(0)
   grossSalary             Float      @default(0)
   otAndIncentive          Float      @default(0)
+  performanceIncentive    Float      @default(0)
   nightDutyAmount         Float      @default(0)
   vehicleAllowance        Float      @default(0)
   lastMonthBalance        Float      @default(0)
@@ -1943,6 +1944,8 @@ model PayrollItem {
   paymentChannel          String     @default("CASH") // CASH | ICICI | OFFICE_GPAY | AGENT_ACCOUNT
   paymentStatus           String     @default("UNPAID") // PAID | PARTIAL | HOLD | UNPAID
   paymentReason           String?
+  paymentRef              String?
+  paidDate                DateTime?
   performanceScore        Int?
   carryForwardBalance     Float      @default(0)
   isCleared               Boolean    @default(false)

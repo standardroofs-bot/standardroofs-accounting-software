@@ -42,6 +42,10 @@ export async function PATCH(
     }
 
     const otAndIncentive = body.otAndIncentive !== undefined ? Number(body.otAndIncentive) : existing.otAndIncentive;
+    const performanceIncentive =
+      body.performanceIncentive !== undefined
+        ? Number(body.performanceIncentive)
+        : (existing.performanceIncentive || 0);
     const nightDutyAmount = body.nightDutyAmount !== undefined ? Number(body.nightDutyAmount) : existing.nightDutyAmount;
     const vehicleAllowance = body.vehicleAllowance !== undefined ? Number(body.vehicleAllowance) : existing.vehicleAllowance;
     const lastMonthBalance = body.lastMonthBalance !== undefined ? Number(body.lastMonthBalance) : existing.lastMonthBalance;
@@ -54,6 +58,7 @@ export async function PATCH(
     const netSalary = Math.round(
       grossSalary +
         otAndIncentive +
+        performanceIncentive +
         nightDutyAmount +
         vehicleAllowance +
         lastMonthBalance -
@@ -69,10 +74,17 @@ export async function PATCH(
     const carryForwardBalance = Math.round((netSalary - totalPaid) * 100) / 100;
     const paymentChannel = body.paymentChannel !== undefined ? String(body.paymentChannel) : existing.paymentChannel;
     const paymentReason = body.paymentReason !== undefined ? (body.paymentReason ? String(body.paymentReason) : null) : existing.paymentReason;
+    const paymentRef = body.paymentRef !== undefined ? (body.paymentRef ? String(body.paymentRef) : null) : existing.paymentRef;
+    const paidDate =
+      body.paidDate !== undefined
+        ? body.paidDate
+          ? new Date(body.paidDate)
+          : null
+        : existing.paidDate;
     const paymentStatus =
       body.paymentStatus !== undefined
         ? String(body.paymentStatus)
-        : Math.abs(carryForwardBalance) < 1 && totalPaid > 0
+        : totalPaid >= netSalary && netSalary > 0
         ? "PAID"
         : totalPaid > 0
         ? "PARTIAL"
@@ -80,7 +92,7 @@ export async function PATCH(
     const isCleared =
       body.isCleared !== undefined
         ? Boolean(body.isCleared)
-        : totalPaid > 0 && Math.abs(carryForwardBalance) < 1;
+        : totalPaid >= netSalary && netSalary > 0;
     const notes = body.notes !== undefined ? (body.notes ? String(body.notes) : null) : existing.notes;
 
     const updatedItem = await prisma.payrollItem.update({
@@ -93,6 +105,7 @@ export async function PATCH(
         baseRate,
         grossSalary,
         otAndIncentive,
+        performanceIncentive,
         nightDutyAmount,
         vehicleAllowance,
         lastMonthBalance,
@@ -106,6 +119,8 @@ export async function PATCH(
         paymentChannel,
         paymentStatus,
         paymentReason,
+        paymentRef,
+        paidDate,
         carryForwardBalance,
         isCleared,
         notes,

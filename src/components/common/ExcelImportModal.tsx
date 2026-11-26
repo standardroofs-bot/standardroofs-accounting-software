@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 import { X, Upload, Download, CheckCircle2, AlertTriangle, FileSpreadsheet, Loader2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { downloadSampleExcel } from "@/lib/exportUtils";
@@ -127,8 +128,11 @@ export function ExcelImportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-5 sm:p-6 space-y-4 my-8 animate-in fade-in zoom-in-95 font-sans">
+    <ViewportPortal onBackdropClick={onClose}>
+      <div
+        className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto font-sans"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -279,7 +283,7 @@ export function ExcelImportModal({
           </button>
         </div>
       </div>
-    </div>
+    </ViewportPortal>
   );
 }
 

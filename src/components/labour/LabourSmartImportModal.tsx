@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 import {
   X,
   Upload,
@@ -390,8 +391,11 @@ export default function LabourSmartImportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
+    <ViewportPortal onBackdropClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-slate-50 via-white to-slate-50">
           <div className="flex items-center gap-3">
@@ -664,6 +668,6 @@ export default function LabourSmartImportModal({
           </div>
         </div>
       </div>
-    </div>
+    </ViewportPortal>
   );
 }

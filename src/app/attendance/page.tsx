@@ -54,6 +54,7 @@ import AttendanceSettingsModal from "@/components/attendance/AttendanceSettingsM
 import UniversalAttendanceExportModal from "@/components/attendance/UniversalAttendanceExportModal";
 import { exportToExcel, exportToPDF } from "@/lib/exportUtils";
 import { formatINR } from "@/lib/decimal";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 
 interface AttendanceRecordItem {
   id: string;
@@ -3243,7 +3244,7 @@ export default function AttendancePage() {
 
       {/* 7. MODAL: EMPLOYEE LEAVE REQUESTS & ESS DRAWER (FOR HR) */}
       {showLeaveDrawer && (
-        <div className="fixed inset-0 z-[9999] flex justify-end bg-slate-900/60 backdrop-blur-xs p-0 animate-in fade-in">
+        <ViewportPortal variant="drawer" onBackdropClick={() => setShowLeaveDrawer(false)}>
           <div className="bg-white dark:bg-slate-900 w-full max-w-xl h-full shadow-2xl p-5 sm:p-6 flex flex-col space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
@@ -3721,7 +3722,7 @@ export default function AttendancePage() {
               )}
             </div>
           </div>
-        </div>
+        </ViewportPortal>
       )}
 
       {/* 8. MODAL: COMPANY HOLIDAY CALENDAR */}

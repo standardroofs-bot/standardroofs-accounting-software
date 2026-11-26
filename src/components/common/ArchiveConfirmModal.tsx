@@ -2,6 +2,7 @@
 
 import React from "react";
 import { AlertTriangle, Archive, RotateCcw, X, Loader2 } from "lucide-react";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 
 export interface ArchiveConfirmModalProps {
   isOpen: boolean;
@@ -36,8 +37,11 @@ export function ArchiveConfirmModal({
   const displayLabel = recordLabel || recordName;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+    <ViewportPortal onBackdropClick={handleClose}>
+      <div
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           type="button"
           onClick={handleClose}
@@ -121,7 +125,7 @@ export function ArchiveConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </ViewportPortal>
   );
 }
 
