@@ -2898,11 +2898,16 @@ export default function AttendancePage() {
                       )}
                       <td className="w-28 min-w-[112px] py-1 px-2 text-center font-black text-blue-700 dark:text-blue-300 tabular-nums bg-slate-50 dark:bg-slate-900 sticky right-0 z-20 border-l border-slate-200 dark:border-slate-700 shadow-sm">
                         <div className="leading-tight">
-                          {isOffice ? `Payable: ${netPayableDays}` : netPayableDays}
+                          {isOffice ? `Payable: ${netPayableDays}` : `Worked: ${netPayableDays}d`}
                         </div>
                         {isOffice && remainingScheduledDays > 0 && (
                           <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-tight whitespace-nowrap">
                             ({markedPayableSoFar} marked + {remainingScheduledDays} left)
+                          </div>
+                        )}
+                        {!isOffice && (
+                          <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 leading-tight whitespace-nowrap">
+                            × {formatINR(Number((emp as any).dailyWage || (emp as any).baseWage || 0))}
                           </div>
                         )}
                       </td>

@@ -104,6 +104,8 @@ export default function StandardSubContractorsPage() {
     siteName: string;
     particulars: string;
     entryType: "WORK_BILL" | "EXTRA_LABOUR" | "MATERIAL_DEDUCTION" | "PAYMENT" | "ADJUSTMENT";
+    billingMode: "SQFT_RATE" | "FIXED_CONTRACT";
+    fixedContractAmount: string;
     sqft: string;
     ratePerSqft: string;
     otherAllowance: string;
@@ -201,14 +203,17 @@ export default function StandardSubContractorsPage() {
   const handleSaveEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!entryModal || !activeTeam) return;
+    const isFixed = entryModal.entryType === "WORK_BILL" && entryModal.billingMode === "FIXED_CONTRACT";
     const payload = {
       entryDate: entryModal.entryDate,
       siteName: entryModal.siteName.trim() || null,
       particulars: entryModal.particulars.trim() || entryModal.entryType,
       entryType: entryModal.entryType,
-      sqft: Number(entryModal.sqft) || 0,
-      ratePerSqft: Number(entryModal.ratePerSqft) || 0,
-      otherAllowance: Number(entryModal.otherAllowance) || 0,
+      sqft: isFixed ? 0 : Number(entryModal.sqft) || 0,
+      ratePerSqft: isFixed ? 0 : Number(entryModal.ratePerSqft) || 0,
+      otherAllowance: isFixed
+        ? Number(entryModal.fixedContractAmount) || 0
+        : Number(entryModal.otherAllowance) || 0,
       materialReduction: Number(entryModal.materialReduction) || 0,
       givenAmount: Number(entryModal.givenAmount) || 0,
       walletUsed: entryModal.walletUsed,
@@ -287,6 +292,8 @@ export default function StandardSubContractorsPage() {
           ? "Welding Rod / Cutting Wheel Deduction"
           : "Payment",
       entryType: type,
+      billingMode: "SQFT_RATE",
+      fixedContractAmount: "",
       sqft: "",
       ratePerSqft: "",
       otherAllowance: "",
@@ -521,7 +528,7 @@ export default function StandardSubContractorsPage() {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
               >
                 <Plus size={14} />
-                <span>+ Add Sq.Ft Work Bill</span>
+                <span>+ Site Contract / Work Bill</span>
               </button>
               <button
                 type="button"
@@ -626,6 +633,14 @@ export default function StandardSubContractorsPage() {
                             siteName: entry.siteName || "",
                             particulars: entry.particulars,
                             entryType: entry.entryType,
+                            billingMode:
+                              entry.entryType === "WORK_BILL" && entry.sqft === 0 && entry.ratePerSqft === 0 && entry.otherAllowance > 0
+                                ? "FIXED_CONTRACT"
+                                : "SQFT_RATE",
+                            fixedContractAmount:
+                              entry.entryType === "WORK_BILL" && entry.sqft === 0 && entry.ratePerSqft === 0 && entry.otherAllowance > 0
+                                ? String(entry.otherAllowance)
+                                : "",
                             sqft: String(entry.sqft),
                             ratePerSqft: String(entry.ratePerSqft),
                             otherAllowance: String(entry.otherAllowance),
@@ -704,6 +719,14 @@ export default function StandardSubContractorsPage() {
                                   siteName: entry.siteName || "",
                                   particulars: entry.particulars,
                                   entryType: entry.entryType,
+                                  billingMode:
+                                    entry.entryType === "WORK_BILL" && entry.sqft === 0 && entry.ratePerSqft === 0 && entry.otherAllowance > 0
+                                      ? "FIXED_CONTRACT"
+                                      : "SQFT_RATE",
+                                  fixedContractAmount:
+                                    entry.entryType === "WORK_BILL" && entry.sqft === 0 && entry.ratePerSqft === 0 && entry.otherAllowance > 0
+                                      ? String(entry.otherAllowance)
+                                      : "",
                                   sqft: String(entry.sqft),
                                   ratePerSqft: String(entry.ratePerSqft),
                                   otherAllowance: String(entry.otherAllowance),
@@ -912,38 +935,87 @@ export default function StandardSubContractorsPage() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            {entryModal.entryType === "WORK_BILL" && (
+              <div className="p-1 rounded-xl bg-slate-100 border border-slate-200 grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setEntryModal({ ...entryModal, billingMode: "SQFT_RATE" })}
+                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                    entryModal.billingMode === "SQFT_RATE"
+                      ? "bg-white text-indigo-700 shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Area Measurement (Sq.Ft × Rate)
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEntryModal({
+                      ...entryModal,
+                      billingMode: "FIXED_CONTRACT",
+                      particulars: entryModal.particulars || "Site Work Bill — Fixed Contract",
+                    })
+                  }
+                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                    entryModal.billingMode === "FIXED_CONTRACT"
+                      ? "bg-white text-indigo-700 shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Fixed Lump-Sum Site Contract (₹)
+                </button>
+              </div>
+            )}
+            {entryModal.entryType === "WORK_BILL" && entryModal.billingMode === "FIXED_CONTRACT" ? (
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Sq.Ft</label>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Fixed Site Contract Milestone Amount (₹) *
+                </label>
                 <input
+                  required
                   type="number"
                   step="0.01"
-                  value={entryModal.sqft}
-                  onChange={(e) => setEntryModal({ ...entryModal, sqft: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 tabular-nums"
+                  placeholder="e.g. 200000"
+                  value={entryModal.fixedContractAmount}
+                  onChange={(e) => setEntryModal({ ...entryModal, fixedContractAmount: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-indigo-300 bg-indigo-50/40 text-slate-900 font-bold tabular-nums"
                 />
               </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Rate / Sq.Ft (₹)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={entryModal.ratePerSqft}
-                  onChange={(e) => setEntryModal({ ...entryModal, ratePerSqft: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 tabular-nums"
-                />
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Sq.Ft</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={entryModal.sqft}
+                    onChange={(e) => setEntryModal({ ...entryModal, sqft: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 tabular-nums"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Rate / Sq.Ft (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={entryModal.ratePerSqft}
+                    onChange={(e) => setEntryModal({ ...entryModal, ratePerSqft: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 tabular-nums"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Other Allowance</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={entryModal.otherAllowance}
+                    onChange={(e) => setEntryModal({ ...entryModal, otherAllowance: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 tabular-nums"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Other Allowance</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={entryModal.otherAllowance}
-                  onChange={(e) => setEntryModal({ ...entryModal, otherAllowance: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 tabular-nums"
-                />
-              </div>
-            </div>
+            )}
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Tool Deduction (₹)</label>

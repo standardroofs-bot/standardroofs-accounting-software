@@ -1859,8 +1859,10 @@ function PayrollTableRow({
         </div>
         {item.attendanceSummary && item.attendanceSummary.totalRecords > 0 && (
           <div className="text-[10px] font-semibold text-[#4F46E5] whitespace-nowrap mt-0.5">
-            {item.attendanceSummary.remainingScheduledDays && item.attendanceSummary.remainingScheduledDays > 0
+            {item.category === "OFFICE" && item.attendanceSummary.remainingScheduledDays && item.attendanceSummary.remainingScheduledDays > 0
               ? `Proj: ${item.attendanceSummary.markedPayableSoFar ?? item.attendanceSummary.payableDays} marked + ${item.attendanceSummary.remainingScheduledDays} left`
+              : item.category !== "OFFICE"
+              ? `Worked: ${item.daysPresent}d × ${formatINR(item.baseRate)}`
               : `Synced: ${item.attendanceSummary.presentCount}P · ${item.attendanceSummary.paidLeaveCount}PL · ${item.attendanceSummary.halfDayCount}H`}
           </div>
         )}
