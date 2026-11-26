@@ -816,6 +816,20 @@ export default function AttendancePage() {
                   otHours: otHours !== undefined ? otHours : a.otHours,
                   otTimeRange: otTimeRange !== undefined ? otTimeRange : a.otTimeRange,
                   otReason: otReason !== undefined ? otReason : a.otReason,
+                  inTime: extraTiming?.inTime !== undefined ? extraTiming.inTime : (a as any).inTime,
+                  outTime: extraTiming?.outTime !== undefined ? extraTiming.outTime : (a as any).outTime,
+                  permissionMinutes:
+                    extraTiming?.permissionMinutes !== undefined
+                      ? extraTiming.permissionMinutes
+                      : (a as any).permissionMinutes,
+                  permissionStatus:
+                    extraTiming?.permissionStatus !== undefined
+                      ? extraTiming.permissionStatus
+                      : (a as any).permissionStatus,
+                  otApprovalStatus:
+                    extraTiming?.otApprovalStatus !== undefined
+                      ? extraTiming.otApprovalStatus
+                      : (a as any).otApprovalStatus,
                   workNotes: finalNote !== undefined ? finalNote : a.workNotes,
                 }
               : a
@@ -836,6 +850,11 @@ export default function AttendancePage() {
               otHours: otHours || 0,
               otTimeRange: otTimeRange || null,
               otReason: otReason || null,
+              inTime: extraTiming?.inTime || null,
+              outTime: extraTiming?.outTime || null,
+              permissionMinutes: extraTiming?.permissionMinutes || 0,
+              permissionStatus: extraTiming?.permissionStatus || null,
+              otApprovalStatus: extraTiming?.otApprovalStatus || null,
               permissionHours: status === "1H" ? 1.0 : null,
               workNotes: finalNote || null,
             },
@@ -2955,7 +2974,7 @@ export default function AttendancePage() {
                               >
                                 {status === "1H" ? "P" : status || "—"}
                               </span>
-                              {(status === "1H" || Number((att as any)?.permissionMinutes || 0) > 0 || (att?.otHours && att.otHours > 0)) && (
+                              {(status === "1H" || Number((att as any)?.permissionMinutes || 0) > 0 || Number(att?.otHours || 0) > 0) && (
                                 <div className="flex flex-wrap items-center justify-center gap-0.5">
                                   {(status === "1H" || Number((att as any)?.permissionMinutes || 0) > 0) && (
                                     <span
@@ -2963,18 +2982,18 @@ export default function AttendancePage() {
                                       title={`Permission: ${(att as any)?.permissionMinutes || 60}m`}
                                     >
                                       {Number((att as any)?.permissionMinutes || 0) > 0
-                                        ? `P${Number((att as any)?.permissionMinutes) >= 60 ? `${Math.floor(Number((att as any)?.permissionMinutes) / 60)}h${Number((att as any)?.permissionMinutes) % 60 ? `${Number((att as any)?.permissionMinutes) % 60}m` : ""}` : `${(att as any)?.permissionMinutes}m`}`
+                                        ? `Perm ${Number((att as any)?.permissionMinutes) >= 60 ? `${Math.floor(Number((att as any)?.permissionMinutes) / 60)}h${Number((att as any)?.permissionMinutes) % 60 ? `${Number((att as any)?.permissionMinutes) % 60}m` : ""}` : `${(att as any)?.permissionMinutes}m`}`
                                         : isEve ? "-1hE" : "-1hM"}
                                     </span>
                                   )}
-                                  {att?.otHours && att.otHours > 0 ? (
+                                  {Number(att?.otHours || 0) > 0 && (
                                     <span
                                       className="px-1 py-0.2 text-[8px] font-extrabold leading-none rounded bg-violet-600 text-white whitespace-nowrap"
-                                      title={`OT: +${att.otHours}h`}
+                                      title={`OT: +${att?.otHours}h`}
                                     >
-                                      +{att.otHours}h
+                                      +{att?.otHours}h OT
                                     </span>
-                                  ) : null}
+                                  )}
                                 </div>
                               )}
                             </div>

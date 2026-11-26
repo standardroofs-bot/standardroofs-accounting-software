@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Printer, FileCheck, LogOut, CheckCircle2, Calendar, AlertTriangle } from "lucide-react";
+import { X, Printer, FileCheck, LogOut, CheckCircle2, Calendar, AlertTriangle, Save } from "lucide-react";
 import { ViewportPortal } from "@/components/ui/ViewportPortal";
 
 interface OfferExitWorker {
@@ -41,6 +41,31 @@ function formatINR(val: number) {
   }).format(Math.round(val || 0));
 }
 
+function numberToIndianWords(num: number): string {
+  const n = Math.round(Math.abs(num));
+  if (n === 0) return "Zero Only";
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  const two = (v: number) => (v < 20 ? ones[v] : tens[Math.floor(v / 10)] + (v % 10 ? " " + ones[v % 10] : ""));
+  const three = (v: number) => (v < 100 ? two(v) : ones[Math.floor(v / 100)] + " Hundred" + (v % 100 ? " " + two(v % 100) : ""));
+  let res = "";
+  const crore = Math.floor(n / 10000000);
+  const lakh = Math.floor((n % 10000000) / 100000);
+  const thousand = Math.floor((n % 100000) / 1000);
+  const rest = n % 1000;
+  if (crore) res += three(crore) + " Crore ";
+  if (lakh) res += two(lakh) + " Lakh ";
+  if (thousand) res += two(thousand) + " Thousand ";
+  if (rest) res += three(rest);
+  return `${res.trim()} Only`;
+}
+
+function formatDotDate(dStr?: string | null) {
+  const d = dStr ? new Date(dStr) : new Date();
+  if (Number.isNaN(d.getTime())) return new Date().toLocaleDateString("en-GB").replace(/\//g, ".");
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+}
+
 export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, onSuccess }: Props) {
   const isInvi = worker.companyUnit === "INVI_CREATION";
   const orgName = isInvi ? "INVI CREATION" : "STANDARD ROOFS";
@@ -50,11 +75,16 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
       ? Number(worker.monthlySalary || 0)
       : Number(worker.dailyWage || 0);
 
-  // Offer Letter State
-  const [terms, setTerms] = useState(
-    "Standard 1-Month (30 Days) Notice Period applies on either side. Subject to statutory KYC verification and site safety compliance."
+  // Offer Letter Editable Fields (matches Offer Letter_Kaviya E.pdf)
+  const [letterDate, setLetterDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [salutation, setSalutation] = useState<"Mr." | "Ms.">("Ms.");
+  const [designation, setDesignation] = useState(worker.designation || "Executive");
+  const [department, setDepartment] = useState(isInvi ? "Digital & Creative" : "Operations & Accounts");
+  const [joiningDate, setJoiningDate] = useState(
+    worker.dateOfJoining ? worker.dateOfJoining.split("T")[0] : new Date().toISOString().slice(0, 10)
   );
   const [savingOffer, setSavingOffer] = useState(false);
+  const [savedNotice, setSavedNotice] = useState(false);
 
   // Exit / FnF State
   const [resignationDate, setResignationDate] = useState(
@@ -90,15 +120,17 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
   );
   const netFnf = Math.round(proratedSalary + pendingBalance + incentives - unrecoveredAdvances - toolDeduction);
 
-  const handleIssueOffer = async () => {
+  const handleSaveOfferToVault = async () => {
     setSavingOffer(true);
     try {
+      const termsSummary = `Offer Letter (${orgName}) | Date: ${letterDate} | Role: ${designation} (${department}) | Joining: ${formatDotDate(joiningDate)} | 1-month mandatory notice period.`;
       const res = await fetch(`/api/labour/${worker.id}/offer-letter`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ terms }),
+        body: JSON.stringify({ terms: termsSummary }),
       });
       if (res.ok) {
+        setSavedNotice(true);
         onSuccess();
       }
     } finally {
@@ -128,10 +160,17 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
     }
   };
 
+  const formattedLetterDate = new Date(letterDate).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
   return (
     <ViewportPortal onBackdropClick={onClose}>
       <div
         className="w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden print:max-h-none print:shadow-none print:border-0"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Pinned Header */}
@@ -143,11 +182,11 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
             <div>
               <div className="text-sm font-bold text-slate-900">
                 {mode === "OFFER_LETTER"
-                  ? `Digital Offer Letter — ${worker.name}`
+                  ? `Official Offer Letter — ${worker.name}`
                   : `1-Month Notice Exit & FnF Settlement — ${worker.name}`}
               </div>
               <div className="text-[11px] text-slate-500 font-mono">
-                {worker.employeeCode} • {worker.designation || worker.category}
+                {worker.employeeCode} • {designation}
               </div>
             </div>
           </div>
@@ -156,10 +195,10 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
             <button
               type="button"
               onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer"
             >
               <Printer size={14} />
-              <span>Print / PDF</span>
+              <span>Print / Save Official PDF</span>
             </button>
             <button
               type="button"
@@ -172,244 +211,258 @@ export function OfferLetterAndExitModal({ mode, worker, salaryVisible, onClose, 
         </div>
 
         {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs print:overflow-visible">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs print:overflow-visible">
           {mode === "OFFER_LETTER" ? (
-            <div className="border border-slate-200 rounded-xl p-6 space-y-4 bg-white">
-              <div className="flex items-start justify-between border-b-2 border-indigo-600 pb-4">
-                <div className="flex items-center gap-3">
-                  <img
-                    src="/images/standard-roofs-logo.png"
-                    onError={(e) => ((e.target as HTMLImageElement).src = "/logo.png")}
-                    alt={orgName}
-                    className="w-12 h-12 object-contain"
-                  />
+            <>
+              {/* Inline Quick-Edit Controls (hidden on print) */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 print:hidden">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Letter Date</label>
+                  <input type="date" value={letterDate} onChange={(e) => setLetterDate(e.target.value)} className="w-full px-2 py-1 rounded border border-slate-200 bg-white text-xs" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Title</label>
+                  <select value={salutation} onChange={(e) => setSalutation(e.target.value as any)} className="w-full px-2 py-1 rounded border border-slate-200 bg-white text-xs font-semibold">
+                    <option value="Ms.">Ms.</option>
+                    <option value="Mr.">Mr.</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Designation</label>
+                  <input type="text" value={designation} onChange={(e) => setDesignation(e.target.value)} className="w-full px-2 py-1 rounded border border-slate-200 bg-white text-xs font-semibold" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Department</label>
+                  <input type="text" value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full px-2 py-1 rounded border border-slate-200 bg-white text-xs font-semibold" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Joining Date</label>
+                  <input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className="w-full px-2 py-1 rounded border border-slate-200 bg-white text-xs" />
+                </div>
+              </div>
+
+              {/* OFFICIAL A4 LETTERHEAD REPLICA (Offer Letter_Kaviya E.pdf) */}
+              <div className="border border-slate-300 rounded-xl p-8 space-y-5 bg-white text-slate-900">
+                <div className="flex items-start justify-between gap-4 border-b-2 border-slate-900 pb-4">
+                  <div className="flex items-start gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/logo.png" alt={orgName} className="w-12 h-12 object-contain shrink-0" />
+                    <div>
+                      <div className="text-lg font-black tracking-tight text-slate-900 leading-tight">
+                        {orgName}{" "}
+                        <span className="text-xs font-bold text-slate-600">
+                          {isInvi ? "- DIGITAL & TECH SOLUTIONS" : "- HIGH QUALITY ROOFING SOLUTIONS"}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-600 mt-1 max-w-sm leading-snug">
+                        <strong>Address:</strong> D144/A, Vellakkal Medu, Infront of Manjal Vaniga Valagam Nasiyanur post, Erode-638107
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right text-[10.5px] text-slate-700 font-mono leading-relaxed shrink-0">
+                    <div><strong>GSTIN:</strong> 33AEWFS5187G1ZD</div>
+                    <div><strong>PAN:</strong> AEWFS5187</div>
+                    <div>8608475767</div>
+                    <div>info@standardroofs.in</div>
+                  </div>
+                </div>
+
+                <div className="text-xs font-bold text-slate-800">Date: {formattedLetterDate}</div>
+
+                <div className="text-[13px] leading-relaxed space-y-4">
+                  <p className="font-bold">
+                    Dear {salutation} {worker.name},
+                  </p>
+                  <p>
+                    We are pleased to offer you the position of <strong>{designation}</strong> in the{" "}
+                    <strong>{department}</strong> Department at <strong>{orgName}</strong>. We are confident that your
+                    skills, dedication, and abilities will contribute positively to the growth and success of our
+                    organization.
+                  </p>
+
                   <div>
-                    <div className="text-lg font-extrabold text-slate-900">{orgName}</div>
-                    <div className="text-[11px] text-slate-600">
-                      144/A, Vellakkal Medu, Villarasampatti, Nasiyanur (Post), Erode – 638107, Tamil Nadu
+                    <div className="font-extrabold text-slate-900 underline mb-2">Terms of Employment:</div>
+                    <ul className="list-disc pl-5 space-y-2">
+                      <li>
+                        <strong>Joining Date:</strong> Your official date of joining will be{" "}
+                        <strong>{formatDotDate(joiningDate)}</strong>.
+                      </li>
+                      <li>
+                        <strong>{worker.category === "OFFICE_STAFF" ? "Monthly Salary:" : "Daily Compensation:"}</strong>{" "}
+                        {salaryVisible && !worker.salaryMasked ? (
+                          <>
+                            You will receive a {worker.category === "OFFICE_STAFF" ? "monthly salary" : "daily wage"} of{" "}
+                            <strong>
+                              {formatINR(basePay)}/- (Rupees {numberToIndianWords(basePay)})
+                            </strong>
+                            .
+                            {(isDriver || Number(worker.defaultVehicleAllowance || 0) > 0) &&
+                              ` Plus Vehicle Allowance of ${formatINR(Number(worker.defaultVehicleAllowance || 0))}/month.`}
+                          </>
+                        ) : (
+                          "Confidential compensation as agreed (Super Admin view required to unmask)."
+                        )}
+                      </li>
+                      <li>
+                        <strong>Notice Period:</strong> As per company policy, a one-month notice period is mandatory
+                        if you wish to resign from your position.
+                      </li>
+                      <li>
+                        <strong>Acceptance:</strong> Please confirm your acceptance of this offer by signing and
+                        returning a copy of this letter.
+                      </li>
+                    </ul>
+                  </div>
+
+                  <p>
+                    We look forward to welcoming you to the {orgName} family and wish you a successful and rewarding
+                    career with us.
+                  </p>
+                </div>
+
+                <div className="pt-4 flex items-end justify-between text-[13px]">
+                  <div>
+                    <div>Best Regards,</div>
+                    <div className="font-extrabold text-slate-900 mt-8">{orgName}.</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-48 border-t border-slate-500 pt-1 text-xs font-semibold text-slate-700">
+                      Candidate Acceptance ({worker.name})
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="px-2.5 py-1 rounded bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider">
-                    OFFER OF EMPLOYMENT
-                  </span>
-                  <div className="text-[11px] font-mono text-slate-600 mt-1">
-                    Date: {new Date().toLocaleDateString("en-IN")}
-                  </div>
-                </div>
               </div>
 
-              <div className="space-y-2 leading-relaxed text-slate-800 text-[13px]">
-                <p>
-                  Dear <strong>{worker.name}</strong> ({worker.employeeCode}),
-                </p>
-                <p>
-                  We are pleased to offer you the position of{" "}
-                  <strong>{worker.designation || worker.category.replace("_", " ")}</strong> at{" "}
-                  <strong>{orgName}</strong>, based at{" "}
-                  <strong>
-                    {worker.location || "Erode"}, {worker.state || "Tamil Nadu"}
-                  </strong>
-                  , effective{" "}
-                  <strong>
-                    {worker.dateOfJoining
-                      ? new Date(worker.dateOfJoining).toLocaleDateString("en-IN")
-                      : new Date().toLocaleDateString("en-IN")}
-                  </strong>
-                  .
-                </p>
+              <div className="flex items-center justify-between pt-1 print:hidden">
+                <span className="text-[11px] text-emerald-700 font-semibold">
+                  {savedNotice ? "Saved to Employee Document Vault!" : ""}
+                </span>
+                <button
+                  type="button"
+                  disabled={savingOffer}
+                  onClick={handleSaveOfferToVault}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  <Save size={14} />
+                  <span>{savingOffer ? "Saving..." : "Save Copy to Employee Document Vault"}</span>
+                </button>
               </div>
-
-              <table className="w-full border-collapse border border-slate-300 text-xs">
-                <tbody>
-                  <tr className="border-b border-slate-300">
-                    <td className="py-2 px-3 bg-slate-50 font-bold text-slate-600 w-1/3">Designation</td>
-                    <td className="py-2 px-3 font-semibold text-slate-900">{worker.designation || "Staff / Crew"}</td>
-                  </tr>
-                  <tr className="border-b border-slate-300">
-                    <td className="py-2 px-3 bg-slate-50 font-bold text-slate-600">Compensation</td>
-                    <td className="py-2 px-3 font-bold text-indigo-700 tabular-nums">
-                      {salaryVisible && !worker.salaryMasked
-                        ? worker.category === "OFFICE_STAFF"
-                          ? `${formatINR(basePay)} / Month`
-                          : `${formatINR(basePay)} / Day`
-                        : "•••••• (Confidential — Super Admin Only)"}
-                    </td>
-                  </tr>
-                  {(isDriver || Number(worker.defaultVehicleAllowance || 0) > 0) && (
-                    <tr className="border-b border-slate-300">
-                      <td className="py-2 px-3 bg-slate-50 font-bold text-slate-600">Vehicle Allowance</td>
-                      <td className="py-2 px-3 font-semibold text-slate-900 tabular-nums">
-                        {salaryVisible && !worker.salaryMasked
-                          ? `${formatINR(Number(worker.defaultVehicleAllowance || 0))} / Month`
-                          : "••••••"}
-                      </td>
-                    </tr>
-                  )}
-                  <tr>
-                    <td className="py-2 px-3 bg-slate-50 font-bold text-slate-600">Notice Period</td>
-                    <td className="py-2 px-3 font-semibold text-slate-900">1 Month (30 Calendar Days)</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div className="print:hidden">
-                <label className="block font-semibold text-slate-700 mb-1">Offer Terms &amp; Clauses</label>
-                <textarea
-                  rows={2}
-                  value={terms}
-                  onChange={(e) => setTerms(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs"
-                />
-              </div>
-              <p className="text-[11px] text-slate-600 italic">{terms}</p>
-
-              <div className="pt-4 border-t border-slate-200 text-center text-[11px] text-slate-500">
-                System-generated digital offer letter from SR-Books ERP • {orgName}
-              </div>
-            </div>
+            </>
           ) : (
             <div className="space-y-4">
-              {/* Notice Period Countdown Banner */}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <Calendar size={18} className="text-amber-600" />
+              {/* 1-Month Notice Period Tracker */}
+              <div className="p-4 rounded-xl bg-rose-50/70 border border-rose-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-rose-900 flex items-center gap-1.5">
+                    <Calendar size={15} />
+                    <span>1-Month (30 Days) Notice Period Tracker</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold">
+                    {daysElapsed} / 30 Days Served
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="font-bold text-amber-900">
-                      1-Month Notice Period ({worker.exitStatus === "EXITED" ? "Completed" : `Day ${daysElapsed} of 30`})
-                    </div>
-                    <div className="text-[11px] text-amber-700">
-                      Last Working Date: <strong>{lwdDateObj.toLocaleDateString("en-IN")}</strong>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Resignation Date</label>
+                    <input
+                      type="date"
+                      value={resignationDate}
+                      onChange={(e) => setResignationDate(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Auto Last Working Day (+30 Days)</label>
+                    <div className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-bold text-slate-900">
+                      {lwdDateObj.toLocaleDateString("en-IN")}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 print:hidden">
-                  <label className="font-semibold text-slate-700">Resignation Date:</label>
-                  <input
-                    type="date"
-                    value={resignationDate}
-                    onChange={(e) => setResignationDate(e.target.value)}
-                    className="px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-xs font-semibold"
-                  />
-                  <button
-                    type="button"
-                    disabled={savingExit}
-                    onClick={() => handleExitAction("INITIATE_EXIT")}
-                    className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold cursor-pointer"
-                  >
-                    Start 30-Day Notice
-                  </button>
+                <div className="w-full bg-rose-200/60 rounded-full h-2 overflow-hidden">
+                  <div className="bg-rose-600 h-2 rounded-full transition-all" style={{ width: `${(daysElapsed / 30) * 100}%` }} />
                 </div>
               </div>
 
               {/* Handover Checklist */}
-              <div className="border border-slate-200 rounded-xl p-4 space-y-2.5">
-                <div className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">
-                  Exit Handover Clearance Checklist
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2.5">
+                <div className="font-bold text-slate-800">Asset &amp; Site Handover Checklist</div>
+                <div className="grid grid-cols-2 gap-2">
                   {[
-                    { key: "toolsReturned", label: "Site Tools Returned" },
-                    { key: "idCardReturned", label: "ID Card Returned" },
-                    { key: "siteKeysReturned", label: "Site Keys Returned" },
-                    { key: "advanceCleared", label: "Advances Cleared" },
+                    { key: "toolsReturned", label: "Company Tools & PPE Returned" },
+                    { key: "idCardReturned", label: "ID Card & Uniform Returned" },
+                    { key: "siteKeysReturned", label: "Site Keys / Vehicle Keys Returned" },
+                    { key: "advanceCleared", label: "Cash Advances Reconciled" },
                   ].map((item) => (
-                    <label key={item.key} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer">
+                    <label key={item.key} className="flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={(checklist as any)[item.key]}
+                        checked={Boolean((checklist as any)[item.key])}
                         onChange={(e) => setChecklist({ ...checklist, [item.key]: e.target.checked })}
                         className="rounded border-slate-300 text-indigo-600"
                       />
-                      <span className="font-semibold text-slate-700">{item.label}</span>
+                      <span className="font-medium text-slate-700">{item.label}</span>
                     </label>
                   ))}
                 </div>
               </div>
 
-              {/* FnF Calculator */}
-              <div className="border border-slate-200 rounded-xl p-4 space-y-3">
-                <div className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">
-                  Full &amp; Final (FnF) Settlement Statement
+              {/* Full & Final Settlement Calculator */}
+              <div className="p-4 rounded-xl border border-slate-200 space-y-3">
+                <div className="font-bold text-slate-800 flex items-center justify-between">
+                  <span>Full &amp; Final (FnF) Settlement Calculator</span>
+                  {!salaryVisible && (
+                    <span className="text-[10px] text-amber-700 flex items-center gap-1">
+                      <AlertTriangle size={12} /> Salaries masked in overview
+                    </span>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 print:hidden">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   <div>
-                    <label className="block font-semibold text-slate-600 mb-1">Notice Salary (₹)</label>
-                    <input type="number" value={proratedSalary} onChange={(e) => setProratedSalary(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-bold" />
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">Pro-rated Salary (₹)</label>
+                    <input type="number" value={proratedSalary} onChange={(e) => setProratedSalary(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-semibold tabular-nums" />
                   </div>
                   <div>
-                    <label className="block font-semibold text-slate-600 mb-1">Pending Bal (₹)</label>
-                    <input type="number" value={pendingBalance} onChange={(e) => setPendingBalance(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-bold" />
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">Pending Bal (₹)</label>
+                    <input type="number" value={pendingBalance} onChange={(e) => setPendingBalance(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-semibold tabular-nums" />
                   </div>
                   <div>
-                    <label className="block font-semibold text-slate-600 mb-1">Incentives (₹)</label>
-                    <input type="number" value={incentives} onChange={(e) => setIncentives(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-bold" />
+                    <label className="block text-[10px] font-semibold text-emerald-700 mb-1">Incentives (₹)</label>
+                    <input type="number" value={incentives} onChange={(e) => setIncentives(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-semibold tabular-nums" />
                   </div>
                   <div>
-                    <label className="block font-semibold text-rose-600 mb-1">Adv Recovery (₹)</label>
-                    <input type="number" value={unrecoveredAdvances} onChange={(e) => setUnrecoveredAdvances(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-bold text-rose-600" />
+                    <label className="block text-[10px] font-semibold text-rose-700 mb-1">Advances Ded (₹)</label>
+                    <input type="number" value={unrecoveredAdvances} onChange={(e) => setUnrecoveredAdvances(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-semibold tabular-nums" />
                   </div>
                   <div>
-                    <label className="block font-semibold text-rose-600 mb-1">Tool Recovery (₹)</label>
-                    <input type="number" value={toolDeduction} onChange={(e) => setToolDeduction(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-bold text-rose-600" />
+                    <label className="block text-[10px] font-semibold text-rose-700 mb-1">Tool Ded (₹)</label>
+                    <input type="number" value={toolDeduction} onChange={(e) => setToolDeduction(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-semibold tabular-nums" />
                   </div>
                 </div>
-
-                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center justify-between">
-                  <div>
-                    <div className="text-[11px] font-bold uppercase text-indigo-700">
-                      Net FnF {netFnf >= 0 ? "Payable to Employee" : "Recoverable from Employee"}
-                    </div>
-                    <div className="text-2xl font-extrabold text-slate-900 tabular-nums mt-0.5">
-                      {formatINR(netFnf)}
-                    </div>
-                  </div>
-                  <AlertTriangle className="text-indigo-500" size={24} />
+                <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-between">
+                  <span className="font-bold text-indigo-900">Net FnF Settlement Payable</span>
+                  <span className="text-lg font-extrabold text-indigo-700 tabular-nums">{formatINR(netFnf)}</span>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
 
-        {/* Sticky Footer */}
-        <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-4 flex items-center justify-between gap-2 print:hidden">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 cursor-pointer"
-          >
-            Close
-          </button>
-          {mode === "OFFER_LETTER" ? (
-            <button
-              type="button"
-              disabled={savingOffer}
-              onClick={handleIssueOffer}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
-            >
-              <CheckCircle2 size={14} />
-              <span>{savingOffer ? "Saving..." : "Save Offer Letter to Vault"}</span>
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={savingExit}
-                onClick={() => handleExitAction("UPDATE_HANDOVER")}
-                className="px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
-              >
-                Save Checklist
-              </button>
-              <button
-                type="button"
-                disabled={savingExit}
-                onClick={() => handleExitAction("COMPLETE_FNF")}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
-              >
-                <CheckCircle2 size={14} />
-                <span>{savingExit ? "Settling..." : "Complete FnF & Archive"}</span>
-              </button>
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={savingExit}
+                  onClick={() => handleExitAction("INITIATE_EXIT")}
+                  className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold cursor-pointer"
+                >
+                  Save Notice Period
+                </button>
+                <button
+                  type="button"
+                  disabled={savingExit}
+                  onClick={() => handleExitAction("COMPLETE_FNF")}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold cursor-pointer"
+                >
+                  <CheckCircle2 size={14} />
+                  <span>Complete FnF &amp; Archive Employee</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

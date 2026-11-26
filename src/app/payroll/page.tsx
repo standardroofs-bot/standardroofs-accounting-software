@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
 import { BrandedPayslip, BrandedPayslipItem } from "@/components/payroll/BrandedPayslip";
+import EmployeeSalaryHistoryModal from "@/components/payroll/EmployeeSalaryHistoryModal";
 import { ModuleHeroBanner } from "@/components/ui/ModuleHeroBanner";
 import { TactileKpiCard, InitialsAvatar, ChannelBadge, BalanceBadge } from "@/components/ui/ErpPrimitives";
 import { ViewportPortal } from "@/components/ui/ViewportPortal";
@@ -123,6 +124,11 @@ export default function StandardPayrollPage() {
 
   // Modals & Drawers
   const [payslipItem, setPayslipItem] = useState<PayrollItem | null>(null);
+  const [historyTarget, setHistoryTarget] = useState<{
+    employeeId?: string | null;
+    employeeCode?: string | null;
+    employeeName: string;
+  } | null>(null);
   const [markPaidItem, setMarkPaidItem] = useState<PayrollItem | null>(null);
   const [markingPaid, setMarkingPaid] = useState(false);
   const [markPaidForm, setMarkPaidForm] = useState({
@@ -1114,6 +1120,13 @@ export default function StandardPayrollPage() {
                     onPatch={handleInlinePatch}
                     onDelete={() => handleDeleteRow(item)}
                     onPrint={() => setPayslipItem(item)}
+                    onSalaryHistory={() =>
+                      setHistoryTarget({
+                        employeeId: item.employeeId,
+                        employeeCode: item.employeeCode,
+                        employeeName: item.employeeName,
+                      })
+                    }
                     onMarkPaid={() => {
                       const alreadyPaid = (item.paidCash || 0) + (item.paidBankOrGpay || 0) + (item.paidGpay || 0);
                       setMarkPaidForm({
@@ -1613,6 +1626,16 @@ export default function StandardPayrollPage() {
           <span>{toast.msg}</span>
         </div>
       )}
+
+      {historyTarget && (
+        <EmployeeSalaryHistoryModal
+          isOpen={true}
+          onClose={() => setHistoryTarget(null)}
+          employeeId={historyTarget.employeeId}
+          employeeCode={historyTarget.employeeCode}
+          employeeName={historyTarget.employeeName}
+        />
+      )}
     </div>
   );
 }
@@ -1883,6 +1906,7 @@ function PayrollTableRow({
   onDelete,
   onPrint,
   onMarkPaid,
+  onSalaryHistory,
 }: {
   item: PayrollItem;
   selected: boolean;
@@ -1893,6 +1917,7 @@ function PayrollTableRow({
   onDelete: () => void;
   onPrint: () => void;
   onMarkPaid: () => void;
+  onSalaryHistory: () => void;
 }) {
   const [daysPresent, setDaysPresent] = useState(String(item.daysPresent));
   const [baseRate, setBaseRate] = useState(String(item.baseRate));
@@ -2150,6 +2175,14 @@ function PayrollTableRow({
             title="Edit in Drawer"
           >
             <Pencil size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={onSalaryHistory}
+            className="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-[10px] font-bold transition cursor-pointer"
+            title="View Lifetime & Yearly Salary Report"
+          >
+            History
           </button>
           <button
             type="button"

@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
 import { ViewportPortal } from "@/components/ui/ViewportPortal";
+import EmployeeSalaryHistoryModal from "@/components/payroll/EmployeeSalaryHistoryModal";
 
 export interface WorkerKycData {
   id: string;
@@ -94,6 +95,17 @@ export default function WorkerKycProfileDrawer({
 }: Props) {
   const [activeTab, setActiveTab] = useState<"DOCS" | "BANK" | "EDUCATION" | "EXPERIENCE" | "WAGE">("DOCS");
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [showSalaryHistory, setShowSalaryHistory] = useState(false);
+  const [customDocLabel, setCustomDocLabel] = useState("");
+  const [vaultDocs, setVaultDocs] = useState<Array<{ label: string; url: string }>>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem(`sr_vault_${worker?.id || ""}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
 
   if (!isOpen || !worker) return null;
 
@@ -427,11 +439,29 @@ export default function WorkerKycProfileDrawer({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowSalaryHistory(true)}
+              className="px-2.5 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition cursor-pointer flex items-center gap-1"
+              title="View Lifetime & Yearly Salary Ledger"
+            >
+              <FileText size={13} />
+              <span>Salary History</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleDownload360Dossier}
+              className="px-2.5 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs transition cursor-pointer flex items-center gap-1"
+              title="Download Master Profile + Soft-Copy Dossier"
+            >
+              <Download size={13} />
+              <span>Download All Soft Copies</span>
+            </button>
             <button
               type="button"
               onClick={handlePrintDossier}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 font-bold text-xs transition cursor-pointer flex items-center gap-1 shadow-2xs"
               title="Print Official A4 KYC Dossier"
             >
               <Printer size={13} className="text-blue-600" />
@@ -706,6 +736,132 @@ export default function WorkerKycProfileDrawer({
                   </div>
                 </div>
               </div>
+
+              {/* SOFT-COPY DOCUMENT VAULT (ALL 9 SLOTS + ADDITIONAL FILES) */}
+              <div className="space-y-2.5 pt-2 border-t border-slate-200">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                    Soft-Copy Document Vault (PDF / JPG / PNG / DOCX)
+                  </h4>
+                  <span className="text-[10px] text-slate-500 font-semibold">
+                    {vaultDocs.length} Extra Vault Files
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {[
+                    "Signed Offer Letter (PDF)",
+                    "Educational Certificates (Degree / 10th / 12th)",
+                    "Resume & Experience Letters",
+                    "Bank Passbook / Cancelled Cheque",
+                  ].map((slotLabel) => {
+                    const existing = vaultDocs.find((v) => v.label === slotLabel);
+                    return (
+                      <div key={slotLabel} className="p-3 rounded-xl border border-slate-200 bg-slate-50/70 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-800 truncate">{slotLabel}</div>
+                          <div className="text-[10px] text-slate-500">
+                            {existing ? "Uploaded & Archived" : "Not Uploaded"}
+                          </div>
+                        </div>
+                        {existing ? (
+                          <a
+                            href={existing.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-bold text-[11px] shrink-0"
+                          >
+                            View
+                          </a>
+                        ) : (
+                          <label className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold text-[11px] cursor-pointer shrink-0 hover:bg-slate-100">
+                            Upload
+                            <input
+                              type="file"
+                              accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const f = e.target.files?.[0];
+                                if (!f) return;
+                                setUploadingDoc(slotLabel);
+                                try {
+                                  const fd = new FormData();
+                                  fd.append("file", f);
+                                  fd.append("workerId", worker.id);
+                                  fd.append("docType", slotLabel);
+                                  const res = await fetch("/api/upload/kyc", { method: "POST", body: fd });
+                                  const data = await res.json();
+                                  const nextUrl = data.url || data.fileUrl || URL.createObjectURL(f);
+                                  const next = [...vaultDocs.filter((v) => v.label !== slotLabel), { label: slotLabel, url: nextUrl }];
+                                  setVaultDocs(next);
+                                  try {
+                                    localStorage.setItem(`sr_vault_${worker.id}`, JSON.stringify(next));
+                                  } catch {}
+                                } finally {
+                                  setUploadingDoc(null);
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    placeholder="Custom document label (e.g. Police Verification, Fitness Cert)..."
+                    value={customDocLabel}
+                    onChange={(e) => setCustomDocLabel(e.target.value)}
+                    className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-white"
+                  />
+                  <label className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold cursor-pointer flex items-center gap-1 shrink-0">
+                    <Upload size={12} />
+                    <span>{uploadingDoc ? "Uploading..." : "Add Soft Copy"}</span>
+                    <input
+                      type="file"
+                      accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        const label = customDocLabel.trim() || f.name;
+                        setUploadingDoc(label);
+                        try {
+                          const fd = new FormData();
+                          fd.append("file", f);
+                          fd.append("workerId", worker.id);
+                          fd.append("docType", label);
+                          const res = await fetch("/api/upload/kyc", { method: "POST", body: fd });
+                          const data = await res.json();
+                          const nextUrl = data.url || data.fileUrl || URL.createObjectURL(f);
+                          const next = [...vaultDocs, { label, url: nextUrl }];
+                          setVaultDocs(next);
+                          setCustomDocLabel("");
+                          try {
+                            localStorage.setItem(`sr_vault_${worker.id}`, JSON.stringify(next));
+                          } catch {}
+                        } finally {
+                          setUploadingDoc(null);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                {vaultDocs.filter((v) => ![
+                  "Signed Offer Letter (PDF)",
+                  "Educational Certificates (Degree / 10th / 12th)",
+                  "Resume & Experience Letters",
+                  "Bank Passbook / Cancelled Cheque",
+                ].includes(v.label)).map((doc, idx) => (
+                  <div key={idx} className="px-3 py-2 rounded-xl border border-slate-200 bg-white flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-800">{doc.label}</span>
+                    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline">
+                      Open File
+                    </a>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -917,6 +1073,15 @@ export default function WorkerKycProfileDrawer({
           )}
         </div>
       </div>
+      {showSalaryHistory && (
+        <EmployeeSalaryHistoryModal
+          isOpen={true}
+          onClose={() => setShowSalaryHistory(false)}
+          employeeId={worker.id}
+          employeeCode={worker.employeeCode}
+          employeeName={worker.name}
+        />
+      )}
     </ViewportPortal>
   );
 }
