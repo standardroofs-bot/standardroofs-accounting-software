@@ -5,6 +5,7 @@ import {
   computeGrossForCycle,
   computeHourlyOtAmount,
   computeMonthWorkingDaysInfo,
+  computePreviousCycleBalanceMap,
   getCycleDateRange,
 } from "../src/lib/payrollAttendanceSync";
 import { recalculatePayrollRunTotals } from "../src/lib/payrollTotals";
@@ -85,9 +86,10 @@ async function main() {
       orderBy: { employeeCode: "asc" },
     });
     const empById = new Map(emps.map((e) => [e.id, e]));
-    const [attMap, monthInfo, cbAdvances] = await Promise.all([
+    const [attMap, monthInfo, prevBalMap, cbAdvances] = await Promise.all([
       computeAttendanceBreakdownMap(emps.map((e) => e.id), "2026-11", "FULL", run.companyId),
       computeMonthWorkingDaysInfo("2026-11", "FULL", run.companyId),
+      computePreviousCycleBalanceMap(run.companyId, "MONTHLY_OFFICE", "2026-11", "FULL"),
       prisma.cashBookEntry.findMany({
         where: {
           companyId: run.companyId,
@@ -113,7 +115,10 @@ async function main() {
       const vehicleAllowance = isDriver ? Number(emp.defaultVehicleAllowance || 0) : 0;
       const performanceIncentive = item.performanceIncentive || 0;
       const nightDutyAmount = 0;
-      const lastMonthBalance = 0; // Zero out all stray Oct decimal carry-forward artifacts
+      const lastMonthBalance =
+        prevBalMap.get(emp.id) ??
+        (emp.employeeCode ? prevBalMap.get(`CODE:${emp.employeeCode}`) : undefined) ??
+        0;
       const advanceDeduction = Math.round((summary?.dailyAdvanceSum || 0) + matchAdvanceAmount(emp.name, cbAdvances));
       const expenseBalanceDeduction = 0;
 

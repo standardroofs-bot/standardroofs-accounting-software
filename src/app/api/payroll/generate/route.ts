@@ -5,6 +5,7 @@ import {
   computeGrossForCycle,
   computeHourlyOtAmount,
   computeMonthWorkingDaysInfo,
+  computePreviousCycleBalanceMap,
   getCycleDateRange,
   syncLinkedCashBookForPaidRun,
 } from "@/lib/payrollAttendanceSync";
@@ -92,50 +93,38 @@ export async function POST(req: NextRequest) {
       attByEmp.set(rec.employeeId, list);
     }
 
-    const prev = getPreviousCycle(month, halfPeriod);
-    const prevRun = await prisma.payrollRun.findUnique({
-      where: {
-        cycleType_month_halfPeriod_companyFilter_companyId: {
-          cycleType,
-          month: prev.month,
-          halfPeriod: prev.halfPeriod,
-          companyFilter: "ALL",
-          companyId: tenant.companyId,
+    const advanceCategory = cycleType === "MONTHLY_OFFICE" ? "Employee Advance" : "Labour Advance";
+    const [existingRun, prevBalMap, attBreakdownMap, cbAdvances] = await Promise.all([
+      prisma.payrollRun.findUnique({
+        where: {
+          cycleType_month_halfPeriod_companyFilter_companyId: {
+            cycleType,
+            month,
+            halfPeriod,
+            companyFilter: "ALL",
+            companyId: tenant.companyId,
+          },
         },
-      },
-      include: { items: true },
-    });
-
-    const prevBalanceMap = new Map<string, number>();
-    if (prevRun) {
-      for (const it of prevRun.items) {
-        if (it.carryForwardBalance !== 0) {
-          prevBalanceMap.set(it.employeeId, it.carryForwardBalance);
-          prevBalanceMap.set(it.employeeName.toLowerCase().trim(), it.carryForwardBalance);
-        }
-      }
-    }
-
-    const existingRun = await prisma.payrollRun.findUnique({
-      where: {
-        cycleType_month_halfPeriod_companyFilter_companyId: {
-          cycleType,
-          month,
-          halfPeriod,
-          companyFilter: "ALL",
+        include: { items: true },
+      }),
+      computePreviousCycleBalanceMap(tenant.companyId, cycleType, month, halfPeriod),
+      computeAttendanceBreakdownMap(
+        employees.map((e) => e.id),
+        month,
+        halfPeriod,
+        tenant.companyId
+      ),
+      prisma.cashBookEntry.findMany({
+        where: {
           companyId: tenant.companyId,
+          date: { gte: start, lte: new Date(end.getTime() + 86399999) },
+          category: advanceCategory,
         },
-      },
-      include: { items: true },
-    });
+        select: { amount: true, counterpartyName: true, purpose: true },
+      }),
+    ]);
 
     const existingByEmp = new Map(existingRun?.items.map((it) => [it.employeeId, it]) || []);
-    const attBreakdownMap = await computeAttendanceBreakdownMap(
-      employees.map((e) => e.id),
-      month,
-      halfPeriod,
-      tenant.companyId
-    );
 
     const newItems = employees.map((emp) => {
       const recs = attByEmp.get(emp.id) || [];
@@ -179,8 +168,24 @@ export async function POST(req: NextRequest) {
       const vehicleAllowance = isDriver || Number(emp.defaultVehicleAllowance || 0) > 0
         ? (prevIt ? prevIt.vehicleAllowance : Number(emp.defaultVehicleAllowance || 0))
         : 0;
-      const lastMonthBalance = 0;
-      const advanceDeduction = prevIt ? prevIt.advanceDeduction : Math.round(dailyAdvSum);
+      const lastMonthBalance =
+        prevBalMap.get(emp.id) ??
+        (emp.employeeCode ? prevBalMap.get(`CODE:${emp.employeeCode}`) : undefined) ??
+        0;
+      const firstWord = emp.name.toLowerCase().trim().split(/[\s.]+/)[0];
+      const escapedFirst = firstWord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const wordRe = firstWord.length >= 3 ? new RegExp(`\\b${escapedFirst}\\b`, "i") : null;
+      const specRe = firstWord.length >= 3 ? new RegExp(`\\b${escapedFirst}[^0-9]{0,6}(\\d+)`, "i") : null;
+      const cashBookAdv = wordRe
+        ? cbAdvances.reduce((s, a) => {
+            const text = `${a.counterpartyName || ""} ${a.purpose || ""}`;
+            if (!wordRe.test(text)) return s;
+            const m = specRe ? text.match(specRe) : null;
+            if (m) return s + Number(m[1]);
+            return text.includes(",") ? s : s + Number(a.amount || 0);
+          }, 0)
+        : 0;
+      const advanceDeduction = prevIt ? prevIt.advanceDeduction : Math.round(dailyAdvSum + cashBookAdv);
       const expenseBalanceDeduction = prevIt?.expenseBalanceDeduction || 0;
 
       const netSalary = Math.round(

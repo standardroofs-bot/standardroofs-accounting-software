@@ -35,6 +35,57 @@ export function computeHourlyOtAmount(
   return Math.round(otHours * hourlyRate);
 }
 
+export function getPreviousCycleInfo(month: string, halfPeriod: string): { month: string; halfPeriod: string } {
+  const [yStr, mStr] = month.split("-");
+  let y = Number(yStr);
+  let m = Number(mStr);
+  if (halfPeriod === "SECOND_HALF") return { month, halfPeriod: "FIRST_HALF" };
+  m -= 1;
+  if (m < 1) {
+    m = 12;
+    y -= 1;
+  }
+  return {
+    month: `${y}-${String(m).padStart(2, "0")}`,
+    halfPeriod: halfPeriod === "FIRST_HALF" ? "SECOND_HALF" : "FULL",
+  };
+}
+
+/**
+ * Computes rounded integer unpaid (+) or overpaid (-) carry-forward balance
+ * from the immediately preceding month/cycle in the same organization & cycleType.
+ */
+export async function computePreviousCycleBalanceMap(
+  companyId: string,
+  cycleType: string,
+  month: string,
+  halfPeriod: string
+): Promise<Map<string, number>> {
+  const balMap = new Map<string, number>();
+  const prev = getPreviousCycleInfo(month, halfPeriod);
+  const prevRun = await prisma.payrollRun.findUnique({
+    where: {
+      cycleType_month_halfPeriod_companyFilter_companyId: {
+        cycleType,
+        month: prev.month,
+        halfPeriod: prev.halfPeriod,
+        companyFilter: "ALL",
+        companyId,
+      },
+    },
+    include: { items: true },
+  });
+  if (!prevRun) return balMap;
+
+  for (const prevItem of prevRun.items) {
+    const prevPaid = (prevItem.paidCash || 0) + (prevItem.paidBankOrGpay || 0) + (prevItem.paidGpay || 0);
+    const prevMonthUnpaidBalance = Math.round(prevItem.netSalary - prevPaid);
+    if (prevItem.employeeId) balMap.set(prevItem.employeeId, prevMonthUnpaidBalance);
+    if (prevItem.employeeCode) balMap.set(`CODE:${prevItem.employeeCode}`, prevMonthUnpaidBalance);
+  }
+  return balMap;
+}
+
 export function getCycleDateRange(month: string, halfPeriod: string) {
   const [yStr, mStr] = month.split("-");
   const year = Number(yStr);
@@ -384,9 +435,10 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string, targetComp
     for (const run of draftRuns) {
       const empIds = Array.from(new Set(run.items.map((it) => it.employeeId).filter(Boolean)));
       const isOfficeCycle = run.cycleType === "MONTHLY_OFFICE";
-      const [attMap, monthInfo] = await Promise.all([
+      const [attMap, monthInfo, prevBalMap] = await Promise.all([
         computeAttendanceBreakdownMap(empIds, run.month, run.halfPeriod, run.companyId),
         isOfficeCycle ? computeMonthWorkingDaysInfo(run.month, run.halfPeriod, run.companyId) : Promise.resolve(null),
+        computePreviousCycleBalanceMap(run.companyId, run.cycleType, run.month, run.halfPeriod),
       ]);
 
       for (const item of run.items) {
@@ -407,6 +459,10 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string, targetComp
         const otAndIncentive = hasRecords
           ? computeHourlyOtAmount(isOfficeCycle, item.baseRate, summary!.otHours, totalWorkingDays)
           : item.otAndIncentive;
+        const lastMonthBalance =
+          prevBalMap.get(item.employeeId) ??
+          (item.employeeCode ? prevBalMap.get(`CODE:${item.employeeCode}`) : undefined) ??
+          item.lastMonthBalance;
 
         const netSalary = Math.round(
           grossSalary +
@@ -414,7 +470,7 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string, targetComp
             (item.performanceIncentive || 0) +
             item.nightDutyAmount +
             (item.vehicleAllowance || 0) +
-            item.lastMonthBalance -
+            lastMonthBalance -
             item.advanceDeduction -
             item.expenseBalanceDeduction
         );
@@ -437,6 +493,7 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string, targetComp
             leaveDays,
             grossSalary,
             otAndIncentive,
+            lastMonthBalance,
             netSalary,
             carryForwardBalance,
             paymentStatus,
@@ -499,12 +556,15 @@ export async function syncEmployeeToOpenDraftRuns(targetCompanyId?: string) {
         isOfficeCycle ? computeMonthWorkingDaysInfo(run.month, run.halfPeriod, runCompanyId) : Promise.resolve(null),
       ]);
 
-      const attMap = await computeAttendanceBreakdownMap(
-        employees.map((e) => e.id),
-        run.month,
-        run.halfPeriod,
-        runCompanyId
-      );
+      const [attMap, prevBalMap] = await Promise.all([
+        computeAttendanceBreakdownMap(
+          employees.map((e) => e.id),
+          run.month,
+          run.halfPeriod,
+          runCompanyId
+        ),
+        computePreviousCycleBalanceMap(runCompanyId, run.cycleType, run.month, run.halfPeriod),
+      ]);
       const existingByEmp = new Map(run.items.map((it) => [it.employeeId, it]));
       const activeEmpIds = new Set(employees.map((e) => e.id));
 
@@ -555,7 +615,11 @@ export async function syncEmployeeToOpenDraftRuns(targetCompanyId?: string) {
           isDriver || Number(emp.defaultVehicleAllowance || 0) > 0
             ? (prevIt && prevIt.vehicleAllowance > 0 ? prevIt.vehicleAllowance : Number(emp.defaultVehicleAllowance || 0))
             : 0;
-        const lastMonthBalance = prevIt?.lastMonthBalance ?? 0;
+        const lastMonthBalance =
+          prevBalMap.get(emp.id) ??
+          (emp.employeeCode ? prevBalMap.get(`CODE:${emp.employeeCode}`) : undefined) ??
+          prevIt?.lastMonthBalance ??
+          0;
         const advanceDeduction = prevIt?.advanceDeduction ?? Math.round(summary?.dailyAdvanceSum || 0);
         const expenseBalanceDeduction = prevIt?.expenseBalanceDeduction ?? 0;
 
@@ -595,6 +659,7 @@ export async function syncEmployeeToOpenDraftRuns(targetCompanyId?: string) {
           baseRate,
           grossSalary,
           vehicleAllowance,
+          lastMonthBalance,
           netSalary,
           carryForwardBalance,
           paymentStatus,

@@ -6,6 +6,7 @@ import {
   syncPayrollItemCashBookLegs,
 } from "@/lib/payrollTotals";
 import { getActiveTenantContext } from "@/lib/tenant";
+import { syncEmployeeToOpenDraftRuns } from "@/lib/payrollAttendanceSync";
 
 export async function POST(
   req: NextRequest,
@@ -108,6 +109,7 @@ export async function POST(
     });
 
     const updatedRun = await recalculatePayrollRunTotals(existing.payrollRunId, prisma as any);
+    await syncEmployeeToOpenDraftRuns(tenant.companyId);
 
     return NextResponse.json({
       success: true,

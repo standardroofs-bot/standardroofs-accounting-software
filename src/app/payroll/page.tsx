@@ -1133,7 +1133,7 @@ export default function StandardPayrollPage() {
                   <th className="py-3.5 px-4">Employee</th>
                   <th className="py-3.5 px-4 text-right whitespace-nowrap">Payable Days</th>
                   <th className="py-3.5 px-4 text-right whitespace-nowrap">Rate &amp; Gross</th>
-                  <th className="py-3.5 px-4 text-right whitespace-nowrap">+OT / −Adv</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">+OT / Prev / −Adv</th>
                   <th className="py-3.5 px-4 text-right text-[#4F46E5] whitespace-nowrap">Net Payable</th>
                   <th className="py-3.5 px-4 whitespace-nowrap">Paid Breakdown</th>
                   <th className="py-3.5 px-4 text-right whitespace-nowrap">Payment Status</th>
@@ -1986,7 +1986,10 @@ function PayrollDetailDrawer({
               <input type="number" value={form.vehicleAllowance} onChange={(e) => setForm({ ...form, vehicleAllowance: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Last Month Bal (₹)</label>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Prev Month Balance (₹){" "}
+                <span className="text-[10px] font-normal text-slate-500">(+Unpaid / −Overpaid)</span>
+              </label>
               <input type="number" value={form.lastMonthBalance} onChange={(e) => setForm({ ...form, lastMonthBalance: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold tabular-nums focus:outline-none focus:border-[#4F46E5]" />
             </div>
             <div>
@@ -2064,7 +2067,9 @@ function PayrollDetailDrawer({
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5 space-y-2">
             <div className="grid grid-cols-2 gap-1.5 text-[11px] font-semibold">
               <div className="bg-white/80 rounded-lg px-2 py-1 text-slate-700">1. Earned: {formatINR(gross)}</div>
-              <div className="bg-white/80 rounded-lg px-2 py-1 text-emerald-700">2. +Additions: {formatINR(form.otAndIncentive + form.nightDutyAmount + form.vehicleAllowance + form.lastMonthBalance)}</div>
+              <div className="bg-white/80 rounded-lg px-2 py-1 text-emerald-700">
+                2. +OT/Veh/Prev: {formatINR(form.otAndIncentive + form.nightDutyAmount + form.vehicleAllowance)} / {form.lastMonthBalance >= 0 ? `+${formatINR(form.lastMonthBalance)}` : `−${formatINR(Math.abs(form.lastMonthBalance))}`}
+              </div>
               <div className="bg-white/80 rounded-lg px-2 py-1 text-rose-700">3. -Deductions: {formatINR(form.advanceDeduction + form.expenseBalanceDeduction)}</div>
               <div className="bg-slate-900 rounded-lg px-2 py-1 text-white font-bold">4. =Net: {formatINR(net)}</div>
             </div>
@@ -2158,17 +2163,13 @@ function PayrollTableRow({
 }) {
   const [daysPresent, setDaysPresent] = useState(String(item.daysPresent));
   const [baseRate, setBaseRate] = useState(String(item.baseRate));
-  const [otPlus, setOtPlus] = useState(
-    String(item.otAndIncentive + item.nightDutyAmount + (item.vehicleAllowance || 0) + item.lastMonthBalance)
-  );
+  const [otOnly, setOtOnly] = useState(String(item.otAndIncentive));
   const [advDed, setAdvDed] = useState(String(item.advanceDeduction + item.expenseBalanceDeduction));
 
   useEffect(() => {
     setDaysPresent(String(item.daysPresent));
     setBaseRate(String(item.baseRate));
-    setOtPlus(
-      String(item.otAndIncentive + item.nightDutyAmount + (item.vehicleAllowance || 0) + item.lastMonthBalance)
-    );
+    setOtOnly(String(item.otAndIncentive));
     setAdvDed(String(item.advanceDeduction + item.expenseBalanceDeduction));
   }, [item]);
 
@@ -2305,47 +2306,76 @@ function PayrollTableRow({
         </div>
       </td>
 
-      {/* 4. +OT / −ADV */}
+      {/* 4. +OT / PREV / −ADV */}
       <td className="py-3.5 px-4 text-right tabular-nums">
-        <div className="inline-flex items-center justify-end gap-1.5">
-          <label className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold">
-            <span>+₹</span>
-            <input
-              type="number"
-              value={otPlus}
-              onChange={(e) => setOtPlus(e.target.value)}
-              onKeyDown={handleEnterBlur}
-              onBlur={() => {
-                const val = Number(otPlus);
-                if (!Number.isFinite(val)) return;
-                const prevSum = item.otAndIncentive + item.nightDutyAmount + (item.vehicleAllowance || 0) + item.lastMonthBalance;
-                if (val !== prevSum) {
-                  onPatch(item.id, { otAndIncentive: val, nightDutyAmount: 0, vehicleAllowance: 0, lastMonthBalance: 0 });
-                }
-              }}
-              aria-label="Overtime and Incentives"
-              className="w-12 text-right bg-transparent focus:outline-none text-emerald-700 font-bold tabular-nums"
-            />
-          </label>
-          <label className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-bold">
-            <span>−₹</span>
-            <input
-              type="number"
-              value={advDed}
-              onChange={(e) => setAdvDed(e.target.value)}
-              onKeyDown={handleEnterBlur}
-              onBlur={() => {
-                const val = Number(advDed);
-                if (!Number.isFinite(val)) return;
-                const prevSum = item.advanceDeduction + item.expenseBalanceDeduction;
-                if (val !== prevSum) {
-                  onPatch(item.id, { advanceDeduction: val, expenseBalanceDeduction: 0 });
-                }
-              }}
-              aria-label="Advance and Expense Deductions"
-              className="w-12 text-right bg-transparent focus:outline-none text-rose-700 font-bold tabular-nums"
-            />
-          </label>
+        <div className="flex flex-col items-end gap-1">
+          <div className="inline-flex items-center justify-end gap-1.5">
+            <label className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold" title="Overtime Amount (₹)">
+              <span className="text-[9.5px] font-extrabold text-emerald-600 mr-0.5">OT</span>
+              <span>+₹</span>
+              <input
+                type="number"
+                value={otOnly}
+                onChange={(e) => setOtOnly(e.target.value)}
+                onKeyDown={handleEnterBlur}
+                onBlur={() => {
+                  const val = Number(otOnly);
+                  if (!Number.isFinite(val)) return;
+                  if (val !== item.otAndIncentive) {
+                    onPatch(item.id, { otAndIncentive: val });
+                  }
+                }}
+                aria-label="Overtime Amount"
+                className="w-11 text-right bg-transparent focus:outline-none text-emerald-700 font-bold tabular-nums"
+              />
+            </label>
+            <label className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-bold" title="Cash Book Advances & Expense Deductions (₹)">
+              <span className="text-[9.5px] font-extrabold text-rose-600 mr-0.5">Adv</span>
+              <span>−₹</span>
+              <input
+                type="number"
+                value={advDed}
+                onChange={(e) => setAdvDed(e.target.value)}
+                onKeyDown={handleEnterBlur}
+                onBlur={() => {
+                  const val = Number(advDed);
+                  if (!Number.isFinite(val)) return;
+                  const prevSum = item.advanceDeduction + item.expenseBalanceDeduction;
+                  if (val !== prevSum) {
+                    onPatch(item.id, { advanceDeduction: val, expenseBalanceDeduction: 0 });
+                  }
+                }}
+                aria-label="Advance and Expense Deductions"
+                className="w-11 text-right bg-transparent focus:outline-none text-rose-700 font-bold tabular-nums"
+              />
+            </label>
+          </div>
+          {(item.lastMonthBalance !== 0 || (item.vehicleAllowance || 0) > 0 || (item.performanceIncentive || 0) > 0) && (
+            <div className="flex flex-wrap items-center justify-end gap-1">
+              {item.lastMonthBalance !== 0 && (
+                <span
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                    item.lastMonthBalance > 0
+                      ? "bg-sky-50 text-sky-700 border-sky-200"
+                      : "bg-amber-50 text-amber-800 border-amber-200"
+                  }`}
+                  title="Previous Month Unpaid (+) or Overpaid (−) Balance Carry-Forward"
+                >
+                  Prev Bal {item.lastMonthBalance > 0 ? `+₹${item.lastMonthBalance.toLocaleString("en-IN")}` : `−₹${Math.abs(item.lastMonthBalance).toLocaleString("en-IN")}`}
+                </span>
+              )}
+              {(item.performanceIncentive || 0) > 0 && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  KPI +₹{item.performanceIncentive?.toLocaleString("en-IN")}
+                </span>
+              )}
+              {(item.vehicleAllowance || 0) > 0 && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                  Veh +₹{item.vehicleAllowance?.toLocaleString("en-IN")}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </td>
 
