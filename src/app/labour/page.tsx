@@ -35,6 +35,10 @@ import {
   List,
   Eye,
   EyeOff,
+  Copy,
+  Check,
+  FileText,
+  MessageCircle,
 } from "lucide-react";
 import { formatINR } from "@/lib/decimal";
 import ModuleHeaderWithAnalytics from "@/components/common/ModuleHeaderWithAnalytics";
@@ -59,6 +63,7 @@ export default function LabourWorkforceMasterPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [activeOrgId, setActiveOrgId] = useState<string>("standard-roofs");
   const [showSalaries, setShowSalaries] = useState(false);
+  const [copiedPhoneId, setCopiedPhoneId] = useState<string | null>(null);
   const [offerExitModal, setOfferExitModal] = useState<{
     mode: "OFFER_LETTER" | "EXIT_FNF";
     worker: any;
@@ -864,45 +869,32 @@ export default function LabourWorkforceMasterPage() {
         {viewMode === "table" ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-gradient-to-r from-indigo-50 via-sky-50 to-teal-50 text-slate-800 font-bold uppercase text-xs tracking-wider border-b border-indigo-200/80">
+              <thead className="bg-slate-50/90 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-bold uppercase text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-700">
                 <tr>
-                  <th className="py-3.5 px-4 text-slate-700">Personnel Profile</th>
-                  <th className="py-3.5 px-4 text-slate-700">
-                    {activeSegment === "CONTRACTOR" ? "Trade Specialty" : "Designation / Role"}
-                  </th>
-                  <th className="py-3.5 px-4 text-right text-slate-700">
-                    {activeSegment === "SR_OFFICE" || activeSegment === "INVI_OFFICE"
-                      ? "Monthly Salary"
-                      : activeSegment === "CONTRACTOR"
-                      ? "Contract / Rate"
-                      : "Daily Wage"}
-                  </th>
-                  <th className="py-3.5 px-4 text-slate-700">Contact & Location</th>
-                  <th className="py-3.5 px-4 text-slate-700">Aadhaar & PAN / DL</th>
-                  <th className="py-3.5 px-4 text-slate-700">Bank Remittance</th>
-                  <th className="py-3.5 px-4 text-center text-slate-700">KYC Status</th>
-                  <th className="py-3.5 px-4 text-right text-slate-700">Actions</th>
+                  <th className="py-3.5 px-5 min-w-[250px]">Employee &amp; Role</th>
+                  <th className="py-3.5 px-5 min-w-[190px]">Contact &amp; Emergency</th>
+                  <th className="py-3.5 px-5 min-w-[220px]">KYC &amp; Bank Readiness</th>
+                  <th className="py-3.5 px-5 min-w-[155px] text-right">Compensation</th>
+                  <th className="py-3.5 px-5 min-w-[140px] text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <td colSpan={5} className="py-12 text-center text-slate-400">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
                       Loading workforce directory...
                     </td>
                   </tr>
                 ) : workers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <td colSpan={5} className="py-12 text-center text-slate-400">
                       No workforce profiles found matching current filters.
                     </td>
                   </tr>
                 ) : (
                   workers.map((w) => {
-                    const kyc = getKycBadge(w);
                     const isContractor = activeSegment === "CONTRACTOR" || w.category === "CONTRACTOR_TEAM";
-
                     const initials = (w.name || "SR")
                       .split(" ")
                       .filter(Boolean)
@@ -913,206 +905,275 @@ export default function LabourWorkforceMasterPage() {
 
                     const avatarGrad =
                       w.companyUnit === "INVI_CREATION"
-                        ? "from-purple-600 to-fuchsia-600 text-white"
+                        ? "from-purple-500 to-fuchsia-600 text-white"
                         : w.category === "OFFICE_STAFF"
-                        ? "from-blue-600 to-indigo-600 text-white"
+                        ? "from-indigo-500 to-blue-600 text-white"
                         : w.category === "TAMIL_LABOUR"
-                        ? "from-emerald-600 to-teal-600 text-white"
+                        ? "from-emerald-500 to-teal-600 text-white"
                         : w.category === "HINDI_LABOUR"
                         ? "from-amber-500 to-orange-500 text-white"
-                        : "from-cyan-600 to-blue-600 text-white";
+                        : "from-cyan-500 to-blue-600 text-white";
+
+                    const roleLabel = isContractor
+                      ? w.tradeSpecialty || w.specialty || "Roofing & Fabrication"
+                      : activeSegment === "INVI_OFFICE"
+                      ? w.designation || w.role || "Digital Hub"
+                      : w.designation || w.role || "Staff";
+
+                    const categoryBadge =
+                      w.category === "OFFICE_STAFF"
+                        ? "Office Staff"
+                        : w.category === "TAMIL_LABOUR"
+                        ? "Tamil Crew"
+                        : w.category === "HINDI_LABOUR"
+                        ? "Hindi Crew"
+                        : "Sub-Contractor";
+
+                    const bankAcct = w.bankAccountNo || w.bankAccountNumber || "";
+                    const bankIfsc = w.bankIfsc || w.ifscCode || "";
+                    const hasId = Boolean(w.aadhaarNumber || w.panNumber || w.drivingLicenseNumber);
+                    const hasBank = Boolean(bankAcct && bankIfsc);
+                    const hasSoftCopy = Boolean(
+                      w.aadhaarDocUrl || w.panDocUrl || w.drivingLicenseDocUrl || w.photoUrl
+                    );
+                    const completedSteps = [hasId, hasBank, hasSoftCopy].filter(Boolean).length;
+                    const isActiveWorker = w.status !== "ARCHIVED" && w.active !== false;
+
+                    const isSalaryVisible = isSuperAdmin && showSalaries && !w.salaryMasked;
+                    const hasMonthly = Boolean(w.monthlySalary && Number(w.monthlySalary) > 0);
+                    const hasDaily = Boolean(w.dailyWage || w.dailyRate);
 
                     return (
                       <tr
                         key={w.id}
-                        className="hover:bg-blue-50/60 dark:hover:bg-slate-800/80 transition-all group"
+                        className="hover:bg-slate-50/90 dark:hover:bg-slate-800/70 transition-colors group"
                       >
-                        {/* Column 1: Personnel Profile with Gradient Avatar */}
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
+                        {/* 1. EMPLOYEE & ROLE */}
+                        <td className="py-3.5 px-5 align-middle">
+                          <div className="flex items-center gap-3.5">
                             <button
                               type="button"
                               onClick={() => setSelectedWorkerForKyc(w)}
-                              className="shrink-0 cursor-pointer transition-transform group-hover:scale-105"
-                              title="Open Worker KYC Dossier"
+                              className="relative shrink-0 cursor-pointer transition-transform group-hover:scale-105"
+                              title="Open Employee 360° Profile & KYC Vault Drawer"
                             >
                               {w.photoUrl ? (
                                 <img
                                   src={w.photoUrl}
                                   alt={w.name}
-                                  className="w-9 h-9 rounded-xl object-cover border border-slate-200"
+                                  className="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-2xs"
                                 />
                               ) : (
-                                <InitialsAvatar name={w.name || "SR"} />
+                                <div
+                                  className={`w-10 h-10 rounded-xl bg-gradient-to-br ${avatarGrad} flex items-center justify-center font-bold text-xs shadow-2xs`}
+                                >
+                                  {initials}
+                                </div>
                               )}
+                              <span
+                                className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${
+                                  isActiveWorker ? "bg-emerald-500" : "bg-slate-400"
+                                }`}
+                                title={isActiveWorker ? "Active" : "Archived"}
+                              />
                             </button>
 
-                            <div>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedWorkerForKyc(w)}
-                                className="font-bold text-slate-900 dark:text-slate-100 text-left hover:text-blue-600 transition flex items-center gap-1.5 cursor-pointer text-[14px]"
-                              >
-                                <span>{w.name}</span>
-                                <FileCheck className="w-3.5 h-3.5 text-blue-500 opacity-60 group-hover:opacity-100 transition-opacity" />
-                              </button>
-                              <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mt-0.5">
-                                <span className="font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px]">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedWorkerForKyc(w)}
+                                  className="font-semibold text-[14px] text-slate-900 dark:text-slate-100 hover:text-indigo-600 transition text-left cursor-pointer truncate"
+                                >
+                                  {w.name}
+                                </button>
+                                <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 shrink-0">
                                   {w.employeeCode || w.code || "—"}
                                 </span>
-                                {(w.fatherName || w.contractorLeadName) && (
-                                  <span className="truncate max-w-[140px]">
-                                    • {isContractor ? `Lead: ${w.contractorLeadName || w.fatherName}` : `S/O ${w.fatherName}`}
-                                  </span>
-                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                <span
+                                  className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                                    isContractor
+                                      ? "bg-cyan-50 text-cyan-800 border-cyan-200/80"
+                                      : activeSegment === "INVI_OFFICE"
+                                      ? "bg-purple-50 text-purple-700 border-purple-200/80"
+                                      : "bg-slate-100 text-slate-700 border-slate-200/80 dark:bg-slate-800 dark:text-slate-200"
+                                  }`}
+                                >
+                                  {roleLabel} • {categoryBadge}
+                                </span>
                               </div>
                             </div>
                           </div>
                         </td>
 
-                        {/* Column 2: Designation / Specialty Badge */}
-                        <td className="py-3.5 px-4">
-                          {isContractor ? (
-                            <div>
-                              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-50 text-cyan-800 border border-cyan-200/80 inline-block">
-                                {w.tradeSpecialty || w.specialty || "Roofing & Fabrication"}
-                              </span>
-                              <span className="text-[11px] text-slate-400 block mt-0.5">
-                                Default Headcount: {w.defaultHeadcount || 1} Labours
-                              </span>
-                            </div>
-                          ) : activeSegment === "INVI_OFFICE" ? (
-                            <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 inline-block">
-                              {w.designation || w.role || "Digital Hub"}
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200/80 dark:bg-slate-800 dark:text-slate-200 inline-block">
-                              {w.designation || w.role || "Staff"}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Column 3: Wage / Salary (Masked unless SUPER_ADMIN + Show Salaries) */}
-                        <td className="py-3.5 px-4 text-right font-mono tabular-nums">
-                          {!isSuperAdmin || !showSalaries || w.salaryMasked ? (
-                            <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 font-bold text-xs tracking-widest">
-                              ••••••
-                            </span>
-                          ) : w.monthlySalary && Number(w.monthlySalary) > 0 ? (
-                            <div className="inline-block">
-                              <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold px-2.5 py-0.5 rounded-lg text-[13px] block">
-                                {formatINR(Number(w.monthlySalary))}
-                              </span>
-                              <span className="text-[10px] text-slate-500 block font-sans mt-0.5">/ month</span>
-                            </div>
-                          ) : w.dailyWage || w.dailyRate ? (
-                            <div className="inline-block">
-                              <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold px-2.5 py-0.5 rounded-lg text-[13px] block">
-                                ₹{Number(w.dailyWage || w.dailyRate).toLocaleString("en-IN")}
-                              </span>
-                              <span className="text-[10px] text-slate-500 block font-sans mt-0.5">/ day</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-500">—</span>
-                          )}
-                        </td>
-
-                        {/* Column 4: Contact & Location */}
-                        <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                          <div className="flex items-center gap-1 font-mono text-xs font-semibold text-slate-700 dark:text-slate-200">
-                            <Phone className="w-3 h-3 text-slate-400" />
-                            <span>{w.phone || "—"}</span>
-                          </div>
-                          {w.address && (
-                            <span className="text-[11px] text-slate-400 block truncate max-w-[160px] mt-0.5" title={w.address}>
-                              {w.address}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Column 5: Statutory Identity Micro-Badges */}
-                        <td className="py-3.5 px-4">
-                          <div className="flex flex-wrap gap-1 max-w-[180px]">
-                            {w.aadhaarNumber ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 inline-flex items-center gap-0.5">
-                                ✓ UID ..{w.aadhaarNumber.slice(-4)}
-                              </span>
+                        {/* 2. CONTACT & EMERGENCY */}
+                        <td className="py-3.5 px-5 align-middle">
+                          <div className="flex items-center gap-1.5">
+                            {w.phone ? (
+                              <>
+                                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                  {w.phone}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard?.writeText(String(w.phone));
+                                    setCopiedPhoneId(w.id);
+                                    setTimeout(() => setCopiedPhoneId((prev) => (prev === w.id ? null : prev)), 1500);
+                                  }}
+                                  className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
+                                  title="Copy phone number"
+                                >
+                                  {copiedPhoneId === w.id ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </>
                             ) : (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-400 border border-slate-200/60">
-                                No Aadhaar
-                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(w)}
+                                className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer"
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>Add phone</span>
+                              </button>
                             )}
-                            {w.panNumber ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200/80 inline-flex items-center gap-0.5">
-                                ✓ PAN
-                              </span>
-                            ) : null}
-                            {w.drivingLicenseNumber ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 inline-flex items-center gap-0.5">
-                                ✓ DL
-                              </span>
-                            ) : null}
                           </div>
-                        </td>
-
-                        {/* Column 6: Bank Remittance */}
-                        <td className="py-3.5 px-4 text-xs">
-                          {w.bankAccountNo || w.bankAccountNumber ? (
-                            <div>
-                              <span className="font-bold text-slate-900 dark:text-slate-100 block">
-                                {w.bankName || "Bank"} ..{(w.bankAccountNo || w.bankAccountNumber).slice(-4)}
-                              </span>
-                              <span className="text-[11px] text-slate-400 font-mono block">
-                                {w.bankIfsc || w.ifscCode || "—"}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80 inline-block">
-                              No Bank on File
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Column 7: KYC Status Badge */}
-                        <td className="py-3.5 px-4 text-center">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border shadow-2xs ${kyc.color}`}
+                          <div
+                            className="text-[11px] text-slate-500 truncate max-w-[195px] mt-1"
+                            title={w.address || w.location || w.fatherName || ""}
                           >
-                            {kyc.label === "Verified" ? (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                            )}
-                            <span>{kyc.label}</span>
-                          </span>
+                            {w.location || w.address
+                              ? w.location || w.address
+                              : w.fatherName
+                              ? isContractor
+                                ? `Lead: ${w.contractorLeadName || w.fatherName}`
+                                : `Emergency / S/O: ${w.fatherName}`
+                              : "Site: Erode HQ"}
+                          </div>
                         </td>
 
-                        {/* Column 8: Actions */}
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                        {/* 3. KYC & BANK READINESS */}
+                        <td className="py-3.5 px-5 align-middle">
+                          <div className="flex flex-col items-start gap-1.5 max-w-[220px]">
+                            <div className="w-full grid grid-cols-3 gap-1">
+                              {[
+                                { label: "ID", ok: hasId },
+                                { label: "Bank", ok: hasBank },
+                                { label: "Soft Copy", ok: hasSoftCopy },
+                              ].map((step) => (
+                                <div key={step.label} className="flex flex-col gap-0.5">
+                                  <div
+                                    className={`h-1.5 rounded-full transition-colors ${
+                                      step.ok ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700"
+                                    }`}
+                                  />
+                                  <span
+                                    className={`text-[9.5px] font-semibold ${
+                                      step.ok ? "text-emerald-700" : "text-slate-400"
+                                    }`}
+                                  >
+                                    {step.label}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            {completedSteps === 3 ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedWorkerForKyc(w)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10.5px] font-bold hover:bg-emerald-100 transition cursor-pointer whitespace-nowrap"
+                              >
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>
+                                  Verified • {w.bankName || "Bank"} ..{bankAcct.slice(-4)}
+                                </span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedWorkerForKyc(w)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/90 text-[10.5px] font-bold hover:bg-amber-100 transition cursor-pointer whitespace-nowrap"
+                              >
+                                <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                <span>{completedSteps}/3 Complete • + Complete KYC</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 4. COMPENSATION */}
+                        <td className="py-3.5 px-5 text-right align-middle tabular-nums">
+                          {!isSalaryVisible ? (
+                            <div className="inline-flex flex-col items-end gap-1">
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 font-bold text-xs tracking-widest">
+                                <span>••••••</span>
+                                {isSuperAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowSalaries(true)}
+                                    className="text-slate-500 hover:text-indigo-600 transition cursor-pointer"
+                                    title="Reveal Salaries (Super Admin)"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                              <span className="text-[10.5px] font-medium text-slate-400">
+                                {w.payCycle === "BI_MONTHLY" || hasDaily ? "15-Day" : "Monthly"}
+                              </span>
+                            </div>
+                          ) : hasMonthly ? (
+                            <div className="inline-flex flex-col items-end gap-1">
+                              <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[12.5px] whitespace-nowrap">
+                                {formatINR(Number(w.monthlySalary))} / mo
+                              </span>
+                              <span className="text-[10.5px] font-medium text-slate-500">Monthly</span>
+                            </div>
+                          ) : hasDaily ? (
+                            <div className="inline-flex flex-col items-end gap-1">
+                              <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[12.5px] whitespace-nowrap">
+                                ₹{Number(w.dailyWage || w.dailyRate).toLocaleString("en-IN")} / day
+                              </span>
+                              <span className="text-[10.5px] font-medium text-slate-500">15-Day</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+
+                        {/* 5. ACTIONS */}
+                        <td className="py-3.5 px-5 text-right align-middle">
+                          <div className="flex items-center justify-end gap-1">
                             <button
                               type="button"
                               onClick={() => setSelectedWorkerForKyc(w)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
-                              title="View Full KYC Profile Drawer & Print Dossier"
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition cursor-pointer"
+                              title="KYC Vault"
                             >
                               <FileCheck className="w-4 h-4" />
                             </button>
 
                             <button
                               type="button"
-                              onClick={() => setSelectedWorkerForDossier(w)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition cursor-pointer"
-                              title="View Lifetime Multi-Year Attendance Dossier"
+                              onClick={() => setOfferExitModal({ mode: "OFFER_LETTER", worker: w })}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+                              title="Offer / Exit Letter"
                             >
-                              <History className="w-4 h-4" />
+                              <FileText className="w-4 h-4" />
                             </button>
 
                             <button
                               type="button"
                               onClick={() => handleOpenEdit(w)}
                               className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
-                              title="Edit Workforce Details"
+                              title="Edit Profile"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
@@ -1124,7 +1185,7 @@ export default function LabourWorkforceMasterPage() {
                                 setShowDeleteModal(true);
                               }}
                               className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
-                              title="Soft-Delete to Recycle Bin"
+                              title="Archive"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1150,11 +1211,9 @@ export default function LabourWorkforceMasterPage() {
                 No workforce profiles found matching current filters.
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {workers.map((w) => {
-                  const kyc = getKycBadge(w);
                   const isContractor = activeSegment === "CONTRACTOR" || w.category === "CONTRACTOR_TEAM";
-
                   const initials = (w.name || "SR")
                     .split(" ")
                     .filter(Boolean)
@@ -1165,189 +1224,189 @@ export default function LabourWorkforceMasterPage() {
 
                   const avatarGrad =
                     w.companyUnit === "INVI_CREATION"
-                      ? "from-purple-600 to-fuchsia-600 text-white"
+                      ? "from-purple-500 to-fuchsia-600 text-white"
                       : w.category === "OFFICE_STAFF"
-                      ? "from-blue-600 to-indigo-600 text-white"
+                      ? "from-indigo-500 to-blue-600 text-white"
                       : w.category === "TAMIL_LABOUR"
-                      ? "from-emerald-600 to-teal-600 text-white"
+                      ? "from-emerald-500 to-teal-600 text-white"
                       : w.category === "HINDI_LABOUR"
                       ? "from-amber-500 to-orange-500 text-white"
-                      : "from-cyan-600 to-blue-600 text-white";
+                      : "from-cyan-500 to-blue-600 text-white";
 
-                  // KYC completion calculation
-                  let kycPoints = 0;
-                  if (w.aadhaarNumber) kycPoints += 25;
-                  if (w.panNumber || w.drivingLicenseNumber) kycPoints += 25;
-                  if (w.bankAccountNo || w.bankAccountNumber) kycPoints += 25;
-                  if (w.phone && w.address) kycPoints += 25;
-                  const kycPercent = Math.max(25, kycPoints);
+                  const bankAcct = w.bankAccountNo || w.bankAccountNumber || "";
+                  const bankIfsc = w.bankIfsc || w.ifscCode || "";
+                  const hasId = Boolean(w.aadhaarNumber || w.panNumber || w.drivingLicenseNumber);
+                  const hasBank = Boolean(bankAcct && bankIfsc);
+                  const hasSoftCopy = Boolean(
+                    w.aadhaarDocUrl || w.panDocUrl || w.drivingLicenseDocUrl || w.photoUrl
+                  );
+                  const completedSteps = [hasId, hasBank, hasSoftCopy].filter(Boolean).length;
+                  const kycPercent = Math.round((completedSteps / 3) * 100);
+                  const isActiveWorker = w.status !== "ARCHIVED" && w.active !== false;
+                  const isSalaryVisible = isSuperAdmin && showSalaries && !w.salaryMasked;
+                  const phoneDigits = String(w.phone || "").replace(/\D/g, "");
+                  const waNumber = phoneDigits.length === 10 ? `91${phoneDigits}` : phoneDigits;
 
                   return (
                     <div
                       key={w.id}
-                      className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between group relative overflow-hidden"
+                      className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between group relative overflow-hidden"
                     >
-                      {/* Top accent light bar */}
-                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-500 opacity-80 group-hover:opacity-100 transition-opacity" />
+                      {/* Top status bar */}
+                      <div
+                        className={`absolute top-0 left-0 right-0 h-1 ${
+                          completedSteps === 3
+                            ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                            : "bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500"
+                        }`}
+                      />
 
                       <div>
-                        {/* Header: Avatar, Name, Code & Actions */}
+                        {/* Header: Avatar, Name, Code & Quick Contact */}
                         <div className="flex items-start justify-between gap-3 pt-1">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
                             <button
                               type="button"
                               onClick={() => setSelectedWorkerForKyc(w)}
-                              className="shrink-0 cursor-pointer transition-transform group-hover:scale-105"
-                              title="Open Worker KYC Dossier"
+                              className="relative shrink-0 cursor-pointer"
+                              title="Open KYC Vault"
                             >
                               {w.photoUrl ? (
                                 <img
                                   src={w.photoUrl}
                                   alt={w.name}
-                                  className="w-9 h-9 rounded-xl object-cover border border-slate-200"
+                                  className="w-10 h-10 rounded-xl object-cover border border-slate-200"
                                 />
                               ) : (
-                                <InitialsAvatar name={w.name || "SR"} />
+                                <div
+                                  className={`w-10 h-10 rounded-xl bg-gradient-to-br ${avatarGrad} flex items-center justify-center font-bold text-xs shadow-2xs`}
+                                >
+                                  {initials}
+                                </div>
                               )}
+                              <span
+                                className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
+                                  isActiveWorker ? "bg-emerald-500" : "bg-slate-400"
+                                }`}
+                              />
                             </button>
 
-                            <div>
+                            <div className="min-w-0">
                               <button
                                 type="button"
                                 onClick={() => setSelectedWorkerForKyc(w)}
-                                className="font-bold text-slate-900 dark:text-slate-100 text-left hover:text-blue-600 transition flex items-center gap-1.5 cursor-pointer text-[15px]"
+                                className="font-semibold text-slate-900 dark:text-slate-100 hover:text-indigo-600 transition text-left cursor-pointer text-[14.5px] truncate block max-w-[175px]"
                               >
-                                <span>{w.name}</span>
-                                <FileCheck className="w-3.5 h-3.5 text-blue-500 opacity-60 group-hover:opacity-100 transition-opacity" />
+                                {w.name}
                               </button>
-                              <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mt-0.5">
-                                <span className="font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px]">
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10.5px]">
                                   {w.employeeCode || w.code || "—"}
                                 </span>
-                                {(w.fatherName || w.contractorLeadName) && (
-                                  <span className="truncate max-w-[130px]">
-                                    • {isContractor ? `Lead: ${w.contractorLeadName || w.fatherName}` : `S/O ${w.fatherName}`}
-                                  </span>
-                                )}
+                                <span className="text-[11px] text-slate-500 truncate max-w-[120px]">
+                                  {isContractor
+                                    ? w.tradeSpecialty || w.specialty || "Contractor"
+                                    : w.designation || w.role || "Staff"}
+                                </span>
                               </div>
                             </div>
                           </div>
 
-                          {/* Quick Action Buttons */}
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedWorkerForKyc(w)}
-                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition cursor-pointer"
-                              title="KYC Dossier"
-                            >
-                              <FileCheck className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(w)}
-                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 transition cursor-pointer"
-                              title="Edit Worker"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
+                          {/* Quick Call & WhatsApp */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {w.phone && (
+                              <>
+                                <a
+                                  href={`tel:${w.phone}`}
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                                  title={`Call ${w.phone}`}
+                                >
+                                  <Phone className="w-3.5 h-3.5" />
+                                </a>
+                                <a
+                                  href={`https://wa.me/${waNumber}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition"
+                                  title="WhatsApp"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                </a>
+                              </>
+                            )}
                           </div>
                         </div>
 
-                        {/* Middle Info: Role Badge & Salary Pill */}
+                        {/* Compensation & Bank */}
                         <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                          <div>
-                            {isContractor ? (
-                              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-50 text-cyan-800 border border-cyan-200/80 inline-block">
-                                {w.tradeSpecialty || w.specialty || "Roofing & Fabrication"}
-                              </span>
-                            ) : activeSegment === "INVI_OFFICE" ? (
-                              <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 inline-block">
-                                {w.designation || w.role || "Digital Hub"}
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200/80 dark:bg-slate-800 dark:text-slate-200 inline-block">
-                                {w.designation || w.role || "Staff"}
-                              </span>
-                            )}
+                          <div className="text-xs text-slate-600 truncate">
+                            {bankAcct
+                              ? `${w.bankName || "Bank"} ••${bankAcct.slice(-4)}`
+                              : "No Bank on File"}
                           </div>
-
                           <div>
-                            {w.monthlySalary && Number(w.monthlySalary) > 0 ? (
-                              <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold px-2.5 py-0.5 rounded-lg text-xs font-mono inline-block">
-                                {formatINR(Number(w.monthlySalary))}/mo
+                            {!isSalaryVisible ? (
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[11px] tracking-widest">
+                                ••••••
+                              </span>
+                            ) : w.monthlySalary && Number(w.monthlySalary) > 0 ? (
+                              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-2.5 py-0.5 rounded-lg text-xs tabular-nums">
+                                {formatINR(Number(w.monthlySalary))} / mo
                               </span>
                             ) : w.dailyWage || w.dailyRate ? (
-                              <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold px-2.5 py-0.5 rounded-lg text-xs font-mono inline-block">
-                                ₹{Number(w.dailyWage || w.dailyRate).toLocaleString("en-IN")}/day
+                              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-2.5 py-0.5 rounded-lg text-xs tabular-nums">
+                                ₹{Number(w.dailyWage || w.dailyRate).toLocaleString("en-IN")} / day
                               </span>
                             ) : (
                               <span className="text-slate-400 text-xs">—</span>
                             )}
                           </div>
                         </div>
-
-                        {/* Contact & Banking preview */}
-                        <div className="mt-2.5 space-y-1 text-xs text-slate-500">
-                          <div className="flex items-center gap-1.5 font-mono">
-                            <Phone className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{w.phone || "No Phone recorded"}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                            <span className="truncate">
-                              {w.bankAccountNo || w.bankAccountNumber
-                                ? `${w.bankName || "Bank"} ••${(w.bankAccountNo || w.bankAccountNumber).slice(-4)}`
-                                : "No Bank details"}
-                            </span>
-                          </div>
-                        </div>
                       </div>
 
-                      {/* Bottom: KYC Health Progress Bar & Status Pill */}
+                      {/* KYC Readiness Meter & 1-click Footer */}
                       <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800">
-                        <div className="flex items-center justify-between text-xs mb-1.5">
-                          <span className="text-slate-400 font-semibold">KYC Verification</span>
+                        <div className="flex items-center justify-between text-[11px] mb-1.5">
+                          <span className="text-slate-500 font-semibold">KYC Readiness ({completedSteps}/3)</span>
                           <span
-                            className={`font-bold text-[11px] ${
-                              kycPercent === 100 ? "text-emerald-600" : "text-blue-600"
+                            className={`font-bold ${
+                              completedSteps === 3 ? "text-emerald-600" : "text-amber-600"
                             }`}
                           >
-                            {kycPercent}% Complete
+                            {kycPercent}%
                           </span>
                         </div>
-                        <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-500 ${
-                              kycPercent === 100
-                                ? "bg-emerald-500"
-                                : kycPercent >= 75
-                                ? "bg-blue-600"
-                                : "bg-amber-500"
-                            }`}
-                            style={{ width: `${kycPercent}%` }}
-                          />
+                        <div className="grid grid-cols-3 gap-1 mb-3">
+                          {[
+                            { label: "ID", ok: hasId },
+                            { label: "Bank", ok: hasBank },
+                            { label: "Soft Copy", ok: hasSoftCopy },
+                          ].map((s) => (
+                            <div key={s.label} className="flex flex-col gap-0.5">
+                              <div className={`h-1.5 rounded-full ${s.ok ? "bg-emerald-500" : "bg-slate-200"}`} />
+                              <span className={`text-[9.5px] font-medium ${s.ok ? "text-emerald-700" : "text-slate-400"}`}>
+                                {s.label}
+                              </span>
+                            </div>
+                          ))}
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold border shadow-2xs ${kyc.color}`}
-                          >
-                            {kyc.label === "Verified" ? (
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            ) : (
-                              <AlertTriangle className="w-3 h-3 text-amber-600" />
-                            )}
-                            <span>{kyc.label}</span>
-                          </span>
-
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                           <button
                             type="button"
-                            onClick={() => setSelectedWorkerForDossier(w)}
-                            className="flex items-center gap-1 text-[11px] font-bold text-slate-500 hover:text-blue-600 transition"
+                            onClick={() => setSelectedWorkerForKyc(w)}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-[11.5px] font-semibold transition cursor-pointer"
                           >
-                            <History className="w-3.5 h-3.5" />
-                            <span>Muster Dossier &rarr;</span>
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Dossier (.zip)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(w)}
+                            className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11.5px] font-semibold transition cursor-pointer"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>Edit</span>
                           </button>
                         </div>
                       </div>

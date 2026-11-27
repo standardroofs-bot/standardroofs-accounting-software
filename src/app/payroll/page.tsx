@@ -160,6 +160,7 @@ export default function StandardPayrollPage() {
     reviewerNotes: "",
   });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [registerMode, setRegisterMode] = useState<"projected" | "accrued">("projected");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showNewCycleModal, setShowNewCycleModal] = useState(false);
   const [newCycleForm, setNewCycleForm] = useState({
@@ -986,6 +987,32 @@ export default function StandardPayrollPage() {
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {viewTab === "register" && cycleType === "MONTHLY_OFFICE" && (
+              <div className="flex items-center p-0.5 rounded-lg bg-indigo-50/90 border border-indigo-200/80 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setRegisterMode("projected")}
+                  className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
+                    registerMode === "projected"
+                      ? "bg-white text-indigo-700 shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Payday Projected (Full Month)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegisterMode("accrued")}
+                  className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
+                    registerMode === "accrued"
+                      ? "bg-white text-indigo-700 shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Earned Till Today (Live Accrual)
+                </button>
+              </div>
+            )}
             <div className="flex items-center p-0.5 rounded-lg bg-slate-200/75 border border-slate-200 text-xs">
               <button
                 type="button"
@@ -1130,13 +1157,16 @@ export default function StandardPayrollPage() {
                       className="rounded border-slate-300 text-[#4F46E5] focus:ring-[#4F46E5] cursor-pointer"
                     />
                   </th>
-                  <th className="py-3.5 px-4 min-w-[220px] whitespace-nowrap">Employee &amp; Fixed Salary</th>
-                  <th className="py-3.5 px-4 min-w-[125px] whitespace-nowrap">Attendance</th>
-                  <th className="py-3.5 px-4 min-w-[235px] whitespace-nowrap">Earned Gross &amp; LOP Breakdown</th>
-                  <th className="py-3.5 px-4 min-w-[175px] whitespace-nowrap">Adjustments (OT / Prev / Adv)</th>
+                  <th className="py-3.5 px-4 min-w-[215px] whitespace-nowrap">Employee</th>
+                  <th className="py-3.5 px-4 min-w-[140px] whitespace-nowrap">Base &amp; Days</th>
+                  <th className="py-3.5 px-4 min-w-[175px] whitespace-nowrap">
+                    {registerMode === "accrued" && cycleType === "MONTHLY_OFFICE"
+                      ? "Earned Till Today"
+                      : "Earned Gross"}
+                  </th>
+                  <th className="py-3.5 px-4 min-w-[175px] whitespace-nowrap">Adjustments</th>
                   <th className="py-3.5 px-4 min-w-[155px] text-right text-[#4F46E5] whitespace-nowrap">Net Payable</th>
-                  <th className="py-3.5 px-4 min-w-[175px] whitespace-nowrap">Payment &amp; Status</th>
-                  <th className="py-3.5 px-4 min-w-[155px] text-right whitespace-nowrap">Actions</th>
+                  <th className="py-3.5 px-4 min-w-[310px] whitespace-nowrap">Status &amp; Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1144,6 +1174,7 @@ export default function StandardPayrollPage() {
                   <PayrollTableRow
                     key={item.id}
                     item={item}
+                    registerMode={registerMode}
                     selected={selectedIds.includes(item.id)}
                     onToggleSelect={() =>
                       setSelectedIds((prev) =>
@@ -2139,6 +2170,7 @@ function PayrollDetailDrawer({
 
 function PayrollTableRow({
   item,
+  registerMode,
   selected,
   onToggleSelect,
   onOpenDrawer,
@@ -2150,6 +2182,7 @@ function PayrollTableRow({
   onSalaryHistory,
 }: {
   item: PayrollItem;
+  registerMode: "projected" | "accrued";
   selected: boolean;
   onToggleSelect: () => void;
   onOpenDrawer: () => void;
@@ -2218,6 +2251,10 @@ function PayrollTableRow({
       ? "Agent Acct"
       : item.paymentChannel || "Bank";
 
+  const isAccruedMode = registerMode === "accrued" && item.category === "OFFICE";
+  const displayGross = isAccruedMode ? earnedTillToday : item.grossSalary;
+  const displayNet = isAccruedMode ? earnedNetToday : item.netSalary;
+
   return (
     <tr
       className={`transition ${
@@ -2228,7 +2265,7 @@ function PayrollTableRow({
           : "hover:bg-slate-50/80"
       }`}
     >
-      <td className="py-4 px-4 align-middle">
+      <td className="py-3.5 px-4 align-middle">
         <input
           type="checkbox"
           checked={selected}
@@ -2237,9 +2274,9 @@ function PayrollTableRow({
         />
       </td>
 
-      {/* 1. EMPLOYEE & FIXED SALARY */}
-      <td className="py-4 px-4 min-w-[220px] align-middle">
-        <div className="flex items-start gap-3">
+      {/* 1. EMPLOYEE */}
+      <td className="py-3.5 px-4 min-w-[215px] align-middle">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onOpenDrawer}
@@ -2260,7 +2297,7 @@ function PayrollTableRow({
                   className={`px-1.5 py-0.5 rounded-full text-[9.5px] font-bold border cursor-pointer whitespace-nowrap ${
                     (item.performanceReview?.overallRating ?? item.performanceScore)
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700"
+                      : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700"
                   }`}
                   title="Score Performance KPI & Apply Incentive"
                 >
@@ -2269,77 +2306,65 @@ function PayrollTableRow({
                     : "+ KPI"}
                 </button>
               </div>
-              <div className="text-[11px] text-slate-500 font-mono truncate max-w-[190px] mt-0.5">
+              <div className="text-[11px] text-slate-500 font-mono truncate max-w-[185px] mt-0.5">
                 {item.employeeCode} • {item.designation || (item.company === "INVI_CREATION" ? "Invi" : "SR")}
-              </div>
-              <div className="mt-1">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-[11px] font-bold tabular-nums whitespace-nowrap">
-                  {item.category === "OFFICE" ? `Fixed Salary: ${rateLabel}` : `Daily Rate: ${rateLabel}`}
-                </span>
               </div>
             </div>
           </button>
         </div>
       </td>
 
-      {/* 2. ATTENDANCE */}
-      <td className="py-4 px-4 min-w-[125px] align-middle tabular-nums">
-        <div className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
-          {actualMarked} / {item.totalWorkingDays} days
-        </div>
-        <div className="mt-1">
+      {/* 2. BASE & DAYS */}
+      <td className="py-3.5 px-4 min-w-[140px] align-middle tabular-nums">
+        <div className="text-[13px] font-semibold text-slate-900 whitespace-nowrap">{rateLabel}</div>
+        <div className="text-[11px] text-slate-500 mt-0.5 whitespace-nowrap">
+          <span className="font-semibold text-slate-700">
+            {actualMarked} / {item.totalWorkingDays} days
+          </span>{" "}
           {item.category === "OFFICE" && remainingLeft > 0 ? (
-            <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium whitespace-nowrap">
-              +{remainingLeft} working {remainingLeft === 1 ? "day" : "days"} left
-            </span>
+            <span className="text-slate-400">(+{remainingLeft} left)</span>
           ) : (
-            <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium whitespace-nowrap">
-              Full cycle closed
-            </span>
+            <span className="text-slate-400">(Full cycle)</span>
           )}
         </div>
       </td>
 
-      {/* 3. EARNED GROSS & LOP BREAKDOWN */}
-      <td className="py-4 px-4 min-w-[235px] align-middle tabular-nums">
-        {item.category === "OFFICE" ? (
-          <div className="flex flex-col items-start gap-1">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-indigo-50/80 border border-indigo-100 text-[13px] font-bold text-indigo-700 whitespace-nowrap">
-              Gross Earned (After LOP): {formatINR(item.grossSalary)}
-            </span>
-            {lopDays > 0 || lopAmount > 0 ? (
-              <span className="text-[11.5px] font-semibold text-rose-700 pl-0.5 whitespace-nowrap">
-                Base {formatINR(item.baseRate)} − {formatINR(lopAmount)} LOP ({lopDays}d)
-              </span>
-            ) : (
-              <span className="text-[11.5px] font-semibold text-emerald-700 pl-0.5 whitespace-nowrap">
-                Full Salary (0 LOP)
-              </span>
-            )}
-            {remainingLeft > 0 && (
-              <span className="text-[11px] font-medium text-slate-500 pl-0.5 whitespace-nowrap">
-                Accrued Till Today ({todayLabel}): <strong className="text-slate-700">{formatINR(earnedTillToday)}</strong> ({actualMarked}/{item.totalWorkingDays}d)
-              </span>
-            )}
+      {/* 3. EARNED GROSS */}
+      <td className="py-3.5 px-4 min-w-[175px] align-middle tabular-nums">
+        <div
+          className={`text-[15px] font-bold whitespace-nowrap ${
+            isAccruedMode ? "text-indigo-700" : "text-slate-950"
+          }`}
+        >
+          {formatINR(displayGross)}
+        </div>
+        {isAccruedMode ? (
+          <div className="text-[11px] font-medium text-slate-500 mt-0.5 whitespace-nowrap">
+            Accrued ({todayLabel} • {actualMarked}/{item.totalWorkingDays}d)
           </div>
+        ) : item.category === "OFFICE" ? (
+          lopDays > 0 || lopAmount > 0 ? (
+            <div className="text-[11px] font-semibold text-rose-600 mt-0.5 whitespace-nowrap">
+              −{formatINR(lopAmount)} LOP ({lopDays}d)
+            </div>
+          ) : (
+            <div className="text-[11px] font-semibold text-emerald-700 mt-0.5 whitespace-nowrap">
+              Full Salary (0 LOP)
+            </div>
+          )
         ) : (
-          <div className="flex flex-col items-start gap-1">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-indigo-50/80 border border-indigo-100 text-[13px] font-bold text-indigo-700 whitespace-nowrap">
-              Gross Earned: {formatINR(item.grossSalary)}
-            </span>
-            <span className="text-[11px] font-medium text-slate-500 pl-0.5 whitespace-nowrap">
-              {item.daysPresent}d × {formatINR(item.baseRate)}/day
-            </span>
+          <div className="text-[11px] font-medium text-slate-500 mt-0.5 whitespace-nowrap">
+            {item.daysPresent}d × {formatINR(item.baseRate)}/day
           </div>
         )}
       </td>
 
-      {/* 4. ADJUSTMENTS (OT / PREV / ADV) */}
-      <td className="py-4 px-4 min-w-[175px] align-middle tabular-nums">
+      {/* 4. ADJUSTMENTS */}
+      <td className="py-3.5 px-4 min-w-[175px] align-middle tabular-nums">
         <button
           type="button"
           onClick={onOpenDrawer}
-          className="flex flex-wrap items-center gap-1.5 text-left group cursor-pointer"
+          className="flex flex-wrap items-center gap-1 text-left group cursor-pointer"
           title="Click to edit OT, Prev Bal, or Advances"
         >
           {hasAnyAdjustment ? (
@@ -2360,7 +2385,7 @@ function PayrollTableRow({
                   {item.lastMonthBalance > 0
                     ? `+${formatINR(item.lastMonthBalance)}`
                     : `−${formatINR(Math.abs(item.lastMonthBalance))}`}{" "}
-                  Prev Bal
+                  Prev
                 </span>
               )}
               {totalAdvDed > 0 && (
@@ -2380,152 +2405,120 @@ function PayrollTableRow({
               )}
             </>
           ) : (
-            <span className="px-2 py-0.5 rounded-md bg-slate-50 group-hover:bg-indigo-50 text-slate-400 group-hover:text-indigo-600 border border-slate-200/80 text-[11px] font-medium transition whitespace-nowrap">
-              No adjustments (+ Add)
+            <span className="text-[11.5px] font-medium text-slate-400 group-hover:text-indigo-600 transition whitespace-nowrap">
+              + Add
             </span>
           )}
         </button>
       </td>
 
       {/* 5. NET PAYABLE */}
-      <td className="py-4 px-4 min-w-[165px] text-right align-middle tabular-nums">
-        <div className="text-base font-bold text-slate-950 whitespace-nowrap">{formatINR(item.netSalary)}</div>
-        <div
-          className={`text-[11px] font-semibold whitespace-nowrap mt-0.5 ${
-            totalAdvDed > 0 ? "text-rose-600" : "text-slate-500"
-          }`}
-          title="Net Payable = Gross Earned + OT / Incentive + Prev Bal - Advance Taken - Expenses"
-        >
-          {totalAdvDed > 0 ? `After −${formatINR(totalAdvDed)} Adv` : "Gross + Adjustments (No Adv)"}
+      <td className="py-3.5 px-4 min-w-[155px] text-right align-middle tabular-nums">
+        <div className="text-[15px] font-bold text-slate-950 whitespace-nowrap">{formatINR(displayNet)}</div>
+        <div className="mt-1 flex justify-end">
+          <select
+            value={item.paymentChannel}
+            onChange={(e) => onPatch(item.id, { paymentChannel: e.target.value })}
+            aria-label="Active Payment Wallet"
+            className="px-2 py-0.5 rounded-md border border-slate-200 bg-slate-50 hover:bg-white text-[10.5px] font-semibold text-slate-700 focus:outline-none focus:border-[#4F46E5] cursor-pointer"
+          >
+            <option value="CASH">Office Cash</option>
+            <option value="ICICI">ICICI</option>
+            <option value="RBL">RBL</option>
+            <option value="OFFICE_GPAY">{item.gpayWallet || "GPay"}</option>
+            <option value="AGENT_ACCOUNT">Agent Acct</option>
+          </select>
         </div>
-        {item.category === "OFFICE" && remainingLeft > 0 ? (
-          <div className="text-[10.5px] font-medium text-emerald-700 whitespace-nowrap mt-0.5">
-            Earned Net Today: {formatINR(earnedNetToday)}
-          </div>
-        ) : item.notes ? (
-          <div className="text-[10.5px] text-slate-500 max-w-[155px] truncate ml-auto mt-0.5" title={item.notes}>
-            {item.notes}
-          </div>
-        ) : null}
       </td>
 
-      {/* 6. PAYMENT & STATUS */}
-      <td className="py-4 px-4 min-w-[185px] align-middle tabular-nums">
-        <div className="flex flex-col items-start gap-1.5">
-          {isPaidInFull ? (
-            <>
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-600 text-white shadow-xs whitespace-nowrap">
-                <CheckCircle2 size={12} className="text-white shrink-0" />
-                <span>PAID • {formatINR(totalPaid > 0 ? totalPaid : item.netSalary)}</span>
+      {/* 6. STATUS & ACTION */}
+      <td className="py-3.5 px-4 min-w-[310px] align-middle tabular-nums">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col items-start gap-0.5 min-w-0">
+            {isPaidInFull ? (
+              <>
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-xs whitespace-nowrap">
+                  <CheckCircle2 size={11} className="text-white shrink-0" />
+                  <span>PAID • {formatINR(totalPaid > 0 ? totalPaid : item.netSalary)}</span>
+                </span>
+                <span
+                  className="text-[10.5px] font-medium text-slate-600 max-w-[140px] truncate pl-0.5"
+                  title={item.paymentRef ? `${channelLabel} • UTR: ${item.paymentRef}` : `${channelLabel} • Paid`}
+                >
+                  {channelLabel} • {item.paymentRef ? `UTR: ${item.paymentRef}` : "Paid"}
+                </span>
+              </>
+            ) : isHold ? (
+              <span className="inline-flex items-center text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                ON HOLD
               </span>
-              <span
-                className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/80 text-[10.5px] font-semibold max-w-[185px] truncate"
-                title={item.paymentRef ? `${channelLabel} • UTR: ${item.paymentRef}` : `${channelLabel} • Paid`}
-              >
-                {channelLabel} • {item.paymentRef ? `UTR: ${item.paymentRef}` : "Paid"}
+            ) : isPartial ? (
+              <>
+                <span className="inline-flex items-center text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
+                  PARTIAL • {formatINR(balanceDue)}
+                </span>
+                <span className="text-[10px] text-slate-500 pl-0.5 whitespace-nowrap">
+                  Paid {formatINR(totalPaid)}
+                </span>
+              </>
+            ) : (
+              <span className="inline-flex items-center text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50/80 text-rose-700 border border-rose-200/80 whitespace-nowrap">
+                UNPAID
               </span>
-            </>
-          ) : isHold ? (
-            <span className="inline-flex items-center text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
-              ON HOLD • {formatINR(balanceDue)}
-            </span>
-          ) : isPartial ? (
-            <span className="inline-flex items-center text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
-              PARTIAL • {formatINR(balanceDue)} Due
-            </span>
-          ) : (
-            <span
-              className={`inline-flex items-center text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
-                balanceDue > 0
-                  ? "bg-rose-50/70 text-rose-700 border-rose-200"
-                  : "bg-slate-100 text-slate-600 border-slate-200"
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 whitespace-nowrap shrink-0">
+            <button
+              type="button"
+              onClick={onMarkPaid}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] transition cursor-pointer ${
+                isPaidInFull
+                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-semibold"
+                  : "bg-emerald-600 text-white hover:bg-emerald-700 font-bold shadow-2xs"
               }`}
+              title={
+                isPaidInFull
+                  ? "View or edit Cash/Bank/GPay split, UTR reference & paid date"
+                  : "Record Salary Payment"
+              }
             >
-              UNPAID • {formatINR(balanceDue)}
-            </span>
-          )}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <select
-              value={item.paymentChannel}
-              onChange={(e) => onPatch(item.id, { paymentChannel: e.target.value })}
-              aria-label="Active Payment Wallet"
-              className="px-2 py-0.5 rounded-md border border-slate-200 bg-slate-50 hover:bg-white text-[10.5px] font-semibold text-slate-700 focus:outline-none focus:border-[#4F46E5] cursor-pointer"
+              {isPaidInFull && <Receipt size={12} className="text-emerald-700" />}
+              <span>{isPaidInFull ? "Receipt / UTR" : "Pay Now"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={onOpenDrawer}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-[#4F46E5] hover:bg-indigo-50 transition cursor-pointer"
+              title="Edit Salary, OT & Deductions"
             >
-              <option value="CASH">Office Cash</option>
-              <option value="ICICI">ICICI</option>
-              <option value="RBL">RBL</option>
-              <option value="OFFICE_GPAY">{item.gpayWallet || "GPay"}</option>
-              <option value="AGENT_ACCOUNT">Agent Acct</option>
-            </select>
-            <span className="text-[10.5px] font-medium text-slate-500 whitespace-nowrap">
-              {totalPaid > 0 ? `Cash ${formatINR(totalCash)} • Bank ${formatINR(totalBankGpay)}` : "₹0 paid"}
-            </span>
+              <Pencil size={13.5} />
+            </button>
+            <button
+              type="button"
+              onClick={onSalaryHistory}
+              className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
+              title="View Lifetime & Yearly Salary Report"
+            >
+              <History size={13.5} />
+            </button>
+            <button
+              type="button"
+              onClick={onPrint}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-[#4F46E5] hover:bg-indigo-50 transition cursor-pointer"
+              title="View & Print Official Payslip"
+            >
+              <Printer size={13.5} />
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-[#E11D48] hover:bg-rose-50 transition cursor-pointer"
+              title="Delete Row"
+            >
+              <Trash2 size={13.5} />
+            </button>
           </div>
-          {!isPaidInFull && item.paymentRef && (
-            <span className="text-[10px] font-mono text-slate-500 max-w-[165px] truncate" title={item.paymentRef}>
-              UTR: {item.paymentRef}
-            </span>
-          )}
-          {isPaidInFull && advanceCredit > 0 && (
-            <span className="text-[10px] font-semibold text-indigo-600 whitespace-nowrap">
-              Adv C/F: {formatINR(advanceCredit)}
-            </span>
-          )}
-        </div>
-      </td>
-
-      {/* 7. ACTIONS */}
-      <td className="py-4 px-4 min-w-[165px] text-right align-middle">
-        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-          <button
-            type="button"
-            onClick={onMarkPaid}
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] transition cursor-pointer ${
-              isPaidInFull
-                ? "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-semibold"
-                : "bg-emerald-600 text-white hover:bg-emerald-700 font-bold shadow-2xs"
-            }`}
-            title={
-              isPaidInFull
-                ? "View or edit Cash/Bank/GPay split, UTR reference & paid date"
-                : "Record Salary Payment"
-            }
-          >
-            {isPaidInFull && <Receipt size={12} className="text-emerald-700" />}
-            <span>{isPaidInFull ? "Receipt / UTR" : "Pay Now"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={onOpenDrawer}
-            className="p-1.5 rounded-lg text-slate-600 hover:text-[#4F46E5] hover:bg-indigo-50 transition cursor-pointer"
-            title="Edit Salary, OT & Deductions"
-          >
-            <Pencil size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={onSalaryHistory}
-            className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
-            title="View Lifetime & Yearly Salary Report"
-          >
-            <History size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={onPrint}
-            className="p-1.5 rounded-lg text-slate-600 hover:text-[#4F46E5] hover:bg-indigo-50 transition cursor-pointer"
-            title="View & Print Official Payslip"
-          >
-            <Printer size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            className="p-1.5 rounded-lg text-slate-600 hover:text-[#E11D48] hover:bg-rose-50 transition cursor-pointer"
-            title="Delete Row"
-          >
-            <Trash2 size={14} />
-          </button>
         </div>
       </td>
     </tr>
