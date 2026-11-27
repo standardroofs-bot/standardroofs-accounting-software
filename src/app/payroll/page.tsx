@@ -2209,8 +2209,25 @@ function PayrollTableRow({
     (item.performanceIncentive || 0) > 0 ||
     (item.vehicleAllowance || 0) > 0;
 
+  const channelLabel =
+    item.paymentChannel === "CASH"
+      ? "Office Cash"
+      : item.paymentChannel === "OFFICE_GPAY"
+      ? item.gpayWallet || "GPay"
+      : item.paymentChannel === "AGENT_ACCOUNT"
+      ? "Agent Acct"
+      : item.paymentChannel || "Bank";
+
   return (
-    <tr className={`hover:bg-slate-50/80 transition ${selected ? "bg-indigo-50/40" : ""}`}>
+    <tr
+      className={`transition ${
+        selected
+          ? "bg-indigo-50/40 hover:bg-indigo-50/60"
+          : isPaidInFull
+          ? "bg-emerald-50/35 hover:bg-emerald-50/60"
+          : "hover:bg-slate-50/80"
+      }`}
+    >
       <td className="py-4 px-4 align-middle">
         <input
           type="checkbox"
@@ -2393,13 +2410,21 @@ function PayrollTableRow({
       </td>
 
       {/* 6. PAYMENT & STATUS */}
-      <td className="py-4 px-4 min-w-[175px] align-middle tabular-nums">
+      <td className="py-4 px-4 min-w-[185px] align-middle tabular-nums">
         <div className="flex flex-col items-start gap-1.5">
           {isPaidInFull ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-              <CheckCircle2 size={12} />
-              <span>PAID IN FULL</span>
-            </span>
+            <>
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-600 text-white shadow-xs whitespace-nowrap">
+                <CheckCircle2 size={12} className="text-white shrink-0" />
+                <span>PAID • {formatINR(totalPaid > 0 ? totalPaid : item.netSalary)}</span>
+              </span>
+              <span
+                className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/80 text-[10.5px] font-semibold max-w-[185px] truncate"
+                title={item.paymentRef ? `${channelLabel} • UTR: ${item.paymentRef}` : `${channelLabel} • Paid`}
+              >
+                {channelLabel} • {item.paymentRef ? `UTR: ${item.paymentRef}` : "Paid"}
+              </span>
+            </>
           ) : isHold ? (
             <span className="inline-flex items-center text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
               ON HOLD • {formatINR(balanceDue)}
@@ -2436,7 +2461,7 @@ function PayrollTableRow({
               {totalPaid > 0 ? `Cash ${formatINR(totalCash)} • Bank ${formatINR(totalBankGpay)}` : "₹0 paid"}
             </span>
           </div>
-          {item.paymentRef && (
+          {!isPaidInFull && item.paymentRef && (
             <span className="text-[10px] font-mono text-slate-500 max-w-[165px] truncate" title={item.paymentRef}>
               UTR: {item.paymentRef}
             </span>
@@ -2450,20 +2475,24 @@ function PayrollTableRow({
       </td>
 
       {/* 7. ACTIONS */}
-      <td className="py-4 px-4 min-w-[155px] text-right align-middle">
+      <td className="py-4 px-4 min-w-[165px] text-right align-middle">
         <div className="flex items-center justify-end gap-1 whitespace-nowrap">
           <button
             type="button"
             onClick={onMarkPaid}
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] transition cursor-pointer ${
               isPaidInFull
-                ? "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
-                : "bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs"
+                ? "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-semibold"
+                : "bg-emerald-600 text-white hover:bg-emerald-700 font-bold shadow-2xs"
             }`}
-            title={isPaidInFull ? "View or Edit Payment Proof & Split" : "Record Salary Payment"}
+            title={
+              isPaidInFull
+                ? "View or edit Cash/Bank/GPay split, UTR reference & paid date"
+                : "Record Salary Payment"
+            }
           >
-            {isPaidInFull && <Receipt size={12} className="text-emerald-600" />}
-            <span>{isPaidInFull ? "Paid · Proof" : "Pay Now"}</span>
+            {isPaidInFull && <Receipt size={12} className="text-emerald-700" />}
+            <span>{isPaidInFull ? "Receipt / UTR" : "Pay Now"}</span>
           </button>
           <button
             type="button"
