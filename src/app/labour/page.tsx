@@ -54,6 +54,24 @@ import { InitialsAvatar } from "@/components/ui/ErpPrimitives";
 
 type SegmentType = "SR_OFFICE" | "INVI_OFFICE" | "TAMIL" | "HINDI" | "CONTRACTOR";
 
+const EDITORIAL_AVATARS = [
+  "bg-indigo-50 text-indigo-700 border border-indigo-200/70",
+  "bg-emerald-50 text-emerald-700 border border-emerald-200/70",
+  "bg-amber-50 text-amber-700 border border-amber-200/70",
+  "bg-sky-50 text-sky-700 border border-sky-200/70",
+  "bg-violet-50 text-violet-700 border border-violet-200/70",
+  "bg-rose-50 text-rose-700 border border-rose-200/70",
+  "bg-teal-50 text-teal-700 border border-teal-200/70",
+];
+
+function getEditorialAvatarClass(name: string, idx: number) {
+  let hash = idx;
+  for (let i = 0; i < name.length; i++) {
+    hash += name.charCodeAt(i);
+  }
+  return EDITORIAL_AVATARS[Math.abs(hash) % EDITORIAL_AVATARS.length];
+}
+
 export default function LabourWorkforceMasterPage() {
   const [activeSegment, setActiveSegment] = useState<SegmentType>("SR_OFFICE");
   const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
@@ -873,9 +891,9 @@ export default function LabourWorkforceMasterPage() {
                 <tr>
                   <th className="py-3.5 px-5 min-w-[250px]">Employee &amp; Role</th>
                   <th className="py-3.5 px-5 min-w-[190px]">Contact &amp; Emergency</th>
-                  <th className="py-3.5 px-5 min-w-[220px]">KYC &amp; Bank Readiness</th>
+                  <th className="py-3.5 px-5 min-w-[230px]">KYC &amp; Bank Readiness</th>
                   <th className="py-3.5 px-5 min-w-[155px] text-right">Compensation</th>
-                  <th className="py-3.5 px-5 min-w-[140px] text-right">Actions</th>
+                  <th className="py-3.5 px-5 min-w-[215px] text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -893,7 +911,7 @@ export default function LabourWorkforceMasterPage() {
                     </td>
                   </tr>
                 ) : (
-                  workers.map((w) => {
+                  workers.map((w, idx) => {
                     const isContractor = activeSegment === "CONTRACTOR" || w.category === "CONTRACTOR_TEAM";
                     const initials = (w.name || "SR")
                       .split(" ")
@@ -903,16 +921,7 @@ export default function LabourWorkforceMasterPage() {
                       .join("")
                       .toUpperCase();
 
-                    const avatarGrad =
-                      w.companyUnit === "INVI_CREATION"
-                        ? "from-purple-500 to-fuchsia-600 text-white"
-                        : w.category === "OFFICE_STAFF"
-                        ? "from-indigo-500 to-blue-600 text-white"
-                        : w.category === "TAMIL_LABOUR"
-                        ? "from-emerald-500 to-teal-600 text-white"
-                        : w.category === "HINDI_LABOUR"
-                        ? "from-amber-500 to-orange-500 text-white"
-                        : "from-cyan-500 to-blue-600 text-white";
+                    const avatarTone = getEditorialAvatarClass(w.name || "SR", idx);
 
                     const roleLabel = isContractor
                       ? w.tradeSpecialty || w.specialty || "Roofing & Fabrication"
@@ -921,11 +930,11 @@ export default function LabourWorkforceMasterPage() {
                       : w.designation || w.role || "Staff";
 
                     const categoryBadge =
-                      w.category === "OFFICE_STAFF"
+                      w.category === "OFFICE_STAFF" || w.category === "OFFICE"
                         ? "Office Staff"
                         : w.category === "TAMIL_LABOUR"
                         ? "Tamil Crew"
-                        : w.category === "HINDI_LABOUR"
+                        : w.category === "HINDI_LABOUR" || w.category === "HINDI_CREW"
                         ? "Hindi Crew"
                         : "Sub-Contractor";
 
@@ -940,23 +949,23 @@ export default function LabourWorkforceMasterPage() {
                     const isActiveWorker = w.status !== "ARCHIVED" && w.active !== false;
 
                     const isSalaryVisible = isSuperAdmin && showSalaries && !w.salaryMasked;
-                    const hasMonthly = Boolean(w.monthlySalary && Number(w.monthlySalary) > 0);
-                    const hasDaily = Boolean(w.dailyWage || w.dailyRate);
+                    const hasMonthly = Boolean(Number(w.monthlySalary || 0) > 0);
+                    const hasDaily = Boolean(Number(w.dailyWage || w.dailyRate || 0) > 0);
+                    const isMonthlyCycle =
+                      w.category === "OFFICE" ||
+                      w.category === "OFFICE_STAFF" ||
+                      w.payCycle === "MONTHLY";
 
                     return (
                       <tr
                         key={w.id}
-                        className="hover:bg-slate-50/90 dark:hover:bg-slate-800/70 transition-colors group"
+                        onClick={() => setSelectedWorkerForKyc(w)}
+                        className="cursor-pointer hover:bg-slate-50/90 dark:hover:bg-slate-800/70 transition-colors group"
                       >
                         {/* 1. EMPLOYEE & ROLE */}
                         <td className="py-3.5 px-5 align-middle">
                           <div className="flex items-center gap-3.5">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedWorkerForKyc(w)}
-                              className="relative shrink-0 cursor-pointer transition-transform group-hover:scale-105"
-                              title="Open Employee 360° Profile & KYC Vault Drawer"
-                            >
+                            <div className="relative shrink-0 transition-transform group-hover:scale-105">
                               {w.photoUrl ? (
                                 <img
                                   src={w.photoUrl}
@@ -965,7 +974,7 @@ export default function LabourWorkforceMasterPage() {
                                 />
                               ) : (
                                 <div
-                                  className={`w-10 h-10 rounded-xl bg-gradient-to-br ${avatarGrad} flex items-center justify-center font-bold text-xs shadow-2xs`}
+                                  className={`w-10 h-10 rounded-xl ${avatarTone} flex items-center justify-center font-bold text-xs shadow-2xs`}
                                 >
                                   {initials}
                                 </div>
@@ -976,29 +985,25 @@ export default function LabourWorkforceMasterPage() {
                                 }`}
                                 title={isActiveWorker ? "Active" : "Archived"}
                               />
-                            </button>
+                            </div>
 
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedWorkerForKyc(w)}
-                                  className="font-semibold text-[14px] text-slate-900 dark:text-slate-100 hover:text-indigo-600 transition text-left cursor-pointer truncate"
-                                >
+                                <span className="font-semibold text-[14px] text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 transition truncate">
                                   {w.name}
-                                </button>
+                                </span>
                                 <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 shrink-0">
                                   {w.employeeCode || w.code || "—"}
                                 </span>
                               </div>
                               <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                 <span
-                                  className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                                  className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${
                                     isContractor
-                                      ? "bg-cyan-50 text-cyan-800 border-cyan-200/80"
+                                      ? "bg-cyan-50 text-cyan-800 border-cyan-200/70"
                                       : activeSegment === "INVI_OFFICE"
-                                      ? "bg-purple-50 text-purple-700 border-purple-200/80"
-                                      : "bg-slate-100 text-slate-700 border-slate-200/80 dark:bg-slate-800 dark:text-slate-200"
+                                      ? "bg-purple-50 text-purple-700 border-purple-200/70"
+                                      : "bg-slate-100/80 text-slate-600 border-slate-200/70 dark:bg-slate-800 dark:text-slate-200"
                                   }`}
                                 >
                                   {roleLabel} • {categoryBadge}
@@ -1019,7 +1024,8 @@ export default function LabourWorkforceMasterPage() {
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     navigator.clipboard?.writeText(String(w.phone));
                                     setCopiedPhoneId(w.id);
                                     setTimeout(() => setCopiedPhoneId((prev) => (prev === w.id ? null : prev)), 1500);
@@ -1037,7 +1043,10 @@ export default function LabourWorkforceMasterPage() {
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => handleOpenEdit(w)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEdit(w);
+                                }}
                                 className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-indigo-600 hover:text-indigo-700 hover:underline cursor-pointer"
                               >
                                 <Plus className="w-3 h-3" />
@@ -1061,49 +1070,54 @@ export default function LabourWorkforceMasterPage() {
 
                         {/* 3. KYC & BANK READINESS */}
                         <td className="py-3.5 px-5 align-middle">
-                          <div className="flex flex-col items-start gap-1.5 max-w-[220px]">
-                            <div className="w-full grid grid-cols-3 gap-1">
+                          <div className="flex flex-col items-start gap-1.5 max-w-[230px]">
+                            <div className="flex items-center gap-1.5 w-full max-w-[160px]">
                               {[
                                 { label: "ID", ok: hasId },
                                 { label: "Bank", ok: hasBank },
                                 { label: "Soft Copy", ok: hasSoftCopy },
                               ].map((step) => (
-                                <div key={step.label} className="flex flex-col gap-0.5">
-                                  <div
-                                    className={`h-1.5 rounded-full transition-colors ${
+                                <div key={step.label} className="flex-1 flex items-center gap-1" title={step.label}>
+                                  <span
+                                    className={`h-1.5 w-full rounded-full transition-colors ${
                                       step.ok ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700"
                                     }`}
                                   />
-                                  <span
-                                    className={`text-[9.5px] font-semibold ${
-                                      step.ok ? "text-emerald-700" : "text-slate-400"
-                                    }`}
-                                  >
-                                    {step.label}
-                                  </span>
                                 </div>
                               ))}
                             </div>
+
                             {completedSteps === 3 ? (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedWorkerForKyc(w)}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10.5px] font-bold hover:bg-emerald-100 transition cursor-pointer whitespace-nowrap"
-                              >
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                <span>
-                                  Verified • {w.bankName || "Bank"} ..{bankAcct.slice(-4)}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[10.5px] font-semibold whitespace-nowrap">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>Verified</span>
                                 </span>
-                              </button>
+                                <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">
+                                  {w.bankName || "Bank"} ••{bankAcct.slice(-4)}
+                                </span>
+                              </div>
+                            ) : completedSteps > 0 ? (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200/80 text-[10.5px] font-semibold whitespace-nowrap">
+                                  {completedSteps} of 3 docs
+                                </span>
+                                <span className="text-[11px] text-slate-500 whitespace-nowrap">
+                                  {hasId ? "ID verified" : "ID pending"} •{" "}
+                                  <span className="text-indigo-600 font-medium group-hover:underline">
+                                    {hasBank ? "+ Soft copy" : "+ Add bank"}
+                                  </span>
+                                </span>
+                              </div>
                             ) : (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedWorkerForKyc(w)}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/90 text-[10.5px] font-bold hover:bg-amber-100 transition cursor-pointer whitespace-nowrap"
-                              >
-                                <AlertTriangle className="w-3 h-3 text-amber-600" />
-                                <span>{completedSteps}/3 Complete • + Complete KYC</span>
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11.5px] font-medium text-slate-500 whitespace-nowrap">
+                                  Pending setup
+                                </span>
+                                <span className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 text-[10.5px] font-semibold whitespace-nowrap">
+                                  + Upload KYC
+                                </span>
+                              </div>
                             )}
                           </div>
                         </td>
@@ -1117,7 +1131,10 @@ export default function LabourWorkforceMasterPage() {
                                 {isSuperAdmin && (
                                   <button
                                     type="button"
-                                    onClick={() => setShowSalaries(true)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowSalaries(true);
+                                    }}
                                     className="text-slate-500 hover:text-indigo-600 transition cursor-pointer"
                                     title="Reveal Salaries (Super Admin)"
                                   >
@@ -1125,23 +1142,33 @@ export default function LabourWorkforceMasterPage() {
                                   </button>
                                 )}
                               </div>
-                              <span className="text-[10.5px] font-medium text-slate-400">
-                                {w.payCycle === "BI_MONTHLY" || hasDaily ? "15-Day" : "Monthly"}
-                              </span>
+                              {isMonthlyCycle ? (
+                                <span className="text-[10.5px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded font-medium">
+                                  Monthly
+                                </span>
+                              ) : (
+                                <span className="text-[10.5px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-medium">
+                                  15-Day Cycle
+                                </span>
+                              )}
                             </div>
                           ) : hasMonthly ? (
                             <div className="inline-flex flex-col items-end gap-1">
                               <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[12.5px] whitespace-nowrap">
                                 {formatINR(Number(w.monthlySalary))} / mo
                               </span>
-                              <span className="text-[10.5px] font-medium text-slate-500">Monthly</span>
+                              <span className="text-[10.5px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded font-medium">
+                                Monthly
+                              </span>
                             </div>
                           ) : hasDaily ? (
                             <div className="inline-flex flex-col items-end gap-1">
                               <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[12.5px] whitespace-nowrap">
                                 ₹{Number(w.dailyWage || w.dailyRate).toLocaleString("en-IN")} / day
                               </span>
-                              <span className="text-[10.5px] font-medium text-slate-500">15-Day</span>
+                              <span className="text-[10.5px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-medium">
+                                {isMonthlyCycle ? "Monthly" : "15-Day Cycle"}
+                              </span>
                             </div>
                           ) : (
                             <span className="text-slate-400">—</span>
@@ -1150,44 +1177,55 @@ export default function LabourWorkforceMasterPage() {
 
                         {/* 5. ACTIONS */}
                         <td className="py-3.5 px-5 text-right align-middle">
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                             <button
                               type="button"
-                              onClick={() => setSelectedWorkerForKyc(w)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition cursor-pointer"
-                              title="KYC Vault"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedWorkerForKyc(w);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 text-[11px] font-semibold transition cursor-pointer"
+                              title="Open Employee 360° Profile & KYC Vault"
                             >
-                              <FileCheck className="w-4 h-4" />
+                              <FileCheck className="w-3.5 h-3.5" />
+                              <span>Profile / KYC</span>
                             </button>
 
                             <button
                               type="button"
-                              onClick={() => setOfferExitModal({ mode: "OFFER_LETTER", worker: w })}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOfferExitModal({ mode: "OFFER_LETTER", worker: w });
+                              }}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
                               title="Offer / Exit Letter"
                             >
-                              <FileText className="w-4 h-4" />
+                              <FileText className="w-3.5 h-3.5" />
                             </button>
 
                             <button
                               type="button"
-                              onClick={() => handleOpenEdit(w)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEdit(w);
+                              }}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
                               title="Edit Profile"
                             >
-                              <Edit2 className="w-4 h-4" />
+                              <Edit2 className="w-3.5 h-3.5" />
                             </button>
 
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setSelectedWorkerForAction(w);
                                 setShowDeleteModal(true);
                               }}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
                               title="Archive"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </td>
@@ -1212,7 +1250,7 @@ export default function LabourWorkforceMasterPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {workers.map((w) => {
+                {workers.map((w, idx) => {
                   const isContractor = activeSegment === "CONTRACTOR" || w.category === "CONTRACTOR_TEAM";
                   const initials = (w.name || "SR")
                     .split(" ")
@@ -1222,16 +1260,7 @@ export default function LabourWorkforceMasterPage() {
                     .join("")
                     .toUpperCase();
 
-                  const avatarGrad =
-                    w.companyUnit === "INVI_CREATION"
-                      ? "from-purple-500 to-fuchsia-600 text-white"
-                      : w.category === "OFFICE_STAFF"
-                      ? "from-indigo-500 to-blue-600 text-white"
-                      : w.category === "TAMIL_LABOUR"
-                      ? "from-emerald-500 to-teal-600 text-white"
-                      : w.category === "HINDI_LABOUR"
-                      ? "from-amber-500 to-orange-500 text-white"
-                      : "from-cyan-500 to-blue-600 text-white";
+                  const avatarTone = getEditorialAvatarClass(w.name || "SR", idx);
 
                   const bankAcct = w.bankAccountNo || w.bankAccountNumber || "";
                   const bankIfsc = w.bankIfsc || w.ifscCode || "";
@@ -1279,7 +1308,7 @@ export default function LabourWorkforceMasterPage() {
                                 />
                               ) : (
                                 <div
-                                  className={`w-10 h-10 rounded-xl bg-gradient-to-br ${avatarGrad} flex items-center justify-center font-bold text-xs shadow-2xs`}
+                                  className={`w-10 h-10 rounded-xl ${avatarTone} flex items-center justify-center font-bold text-xs shadow-2xs`}
                                 >
                                   {initials}
                                 </div>
