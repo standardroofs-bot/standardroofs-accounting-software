@@ -1130,9 +1130,9 @@ export default function StandardPayrollPage() {
                       className="rounded border-slate-300 text-[#4F46E5] focus:ring-[#4F46E5] cursor-pointer"
                     />
                   </th>
-                  <th className="py-3.5 px-4 min-w-[210px] whitespace-nowrap">Employee &amp; Base Rate</th>
+                  <th className="py-3.5 px-4 min-w-[220px] whitespace-nowrap">Employee &amp; Fixed Salary</th>
                   <th className="py-3.5 px-4 min-w-[125px] whitespace-nowrap">Attendance</th>
-                  <th className="py-3.5 px-4 min-w-[205px] whitespace-nowrap">Earned So Far vs Full Month</th>
+                  <th className="py-3.5 px-4 min-w-[235px] whitespace-nowrap">Earned Gross &amp; LOP Breakdown</th>
                   <th className="py-3.5 px-4 min-w-[175px] whitespace-nowrap">Adjustments (OT / Prev / Adv)</th>
                   <th className="py-3.5 px-4 min-w-[155px] text-right text-[#4F46E5] whitespace-nowrap">Net Payable</th>
                   <th className="py-3.5 px-4 min-w-[175px] whitespace-nowrap">Payment &amp; Status</th>
@@ -2191,6 +2191,17 @@ function PayrollTableRow({
       item.lastMonthBalance -
       totalAdvDed
   );
+  const lopDays =
+    item.category === "OFFICE"
+      ? Math.max(0, Math.round((item.totalWorkingDays - item.daysPresent) * 100) / 100)
+      : 0;
+  const lopAmount =
+    item.category === "OFFICE" ? Math.max(0, Math.round(item.baseRate - item.grossSalary)) : 0;
+  const todayLabel = new Date().toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "Asia/Kolkata",
+  });
   const hasAnyAdjustment =
     item.otAndIncentive > 0 ||
     item.lastMonthBalance !== 0 ||
@@ -2209,8 +2220,8 @@ function PayrollTableRow({
         />
       </td>
 
-      {/* 1. EMPLOYEE & BASE RATE */}
-      <td className="py-4 px-4 min-w-[210px] align-middle">
+      {/* 1. EMPLOYEE & FIXED SALARY */}
+      <td className="py-4 px-4 min-w-[220px] align-middle">
         <div className="flex items-start gap-3">
           <button
             type="button"
@@ -2241,12 +2252,12 @@ function PayrollTableRow({
                     : "+ KPI"}
                 </button>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                <span className="text-[11px] text-slate-500 font-mono truncate max-w-[155px]">
-                  {item.employeeCode} • {item.designation || (item.company === "INVI_CREATION" ? "Invi" : "SR")}
-                </span>
-                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200/80 text-[10px] font-semibold tabular-nums whitespace-nowrap">
-                  {rateLabel}
+              <div className="text-[11px] text-slate-500 font-mono truncate max-w-[190px] mt-0.5">
+                {item.employeeCode} • {item.designation || (item.company === "INVI_CREATION" ? "Invi" : "SR")}
+              </div>
+              <div className="mt-1">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-[11px] font-bold tabular-nums whitespace-nowrap">
+                  {item.category === "OFFICE" ? `Fixed Salary: ${rateLabel}` : `Daily Rate: ${rateLabel}`}
                 </span>
               </div>
             </div>
@@ -2272,21 +2283,37 @@ function PayrollTableRow({
         </div>
       </td>
 
-      {/* 3. EARNED SO FAR vs FULL MONTH */}
-      <td className="py-4 px-4 min-w-[205px] align-middle tabular-nums">
-        {item.category === "OFFICE" && remainingLeft > 0 ? (
+      {/* 3. EARNED GROSS & LOP BREAKDOWN */}
+      <td className="py-4 px-4 min-w-[235px] align-middle tabular-nums">
+        {item.category === "OFFICE" ? (
           <div className="flex flex-col items-start gap-1">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-indigo-50/80 border border-indigo-100 text-sm font-bold text-indigo-700 whitespace-nowrap">
-              Earned So Far: {formatINR(earnedTillToday)}
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-indigo-50/80 border border-indigo-100 text-[13px] font-bold text-indigo-700 whitespace-nowrap">
+              Gross Earned (After LOP): {formatINR(item.grossSalary)}
             </span>
-            <span className="text-xs text-slate-500 pl-0.5 whitespace-nowrap">
-              Full-Month Gross: <strong className="text-slate-700">{formatINR(item.grossSalary)}</strong>
-            </span>
+            {lopDays > 0 || lopAmount > 0 ? (
+              <span className="text-[11.5px] font-semibold text-rose-700 pl-0.5 whitespace-nowrap">
+                Base {formatINR(item.baseRate)} − {formatINR(lopAmount)} LOP ({lopDays}d)
+              </span>
+            ) : (
+              <span className="text-[11.5px] font-semibold text-emerald-700 pl-0.5 whitespace-nowrap">
+                Full Salary (0 LOP)
+              </span>
+            )}
+            {remainingLeft > 0 && (
+              <span className="text-[11px] font-medium text-slate-500 pl-0.5 whitespace-nowrap">
+                Accrued Till Today ({todayLabel}): <strong className="text-slate-700">{formatINR(earnedTillToday)}</strong> ({actualMarked}/{item.totalWorkingDays}d)
+              </span>
+            )}
           </div>
         ) : (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-indigo-50/80 border border-indigo-100 text-sm font-bold text-indigo-700 whitespace-nowrap">
-            Earned: {formatINR(item.grossSalary)}
-          </span>
+          <div className="flex flex-col items-start gap-1">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-indigo-50/80 border border-indigo-100 text-[13px] font-bold text-indigo-700 whitespace-nowrap">
+              Gross Earned: {formatINR(item.grossSalary)}
+            </span>
+            <span className="text-[11px] font-medium text-slate-500 pl-0.5 whitespace-nowrap">
+              {item.daysPresent}d × {formatINR(item.baseRate)}/day
+            </span>
+          </div>
         )}
       </td>
 
@@ -2344,14 +2371,22 @@ function PayrollTableRow({
       </td>
 
       {/* 5. NET PAYABLE */}
-      <td className="py-4 px-4 min-w-[155px] text-right align-middle tabular-nums">
+      <td className="py-4 px-4 min-w-[165px] text-right align-middle tabular-nums">
         <div className="text-base font-bold text-slate-950 whitespace-nowrap">{formatINR(item.netSalary)}</div>
+        <div
+          className={`text-[11px] font-semibold whitespace-nowrap mt-0.5 ${
+            totalAdvDed > 0 ? "text-rose-600" : "text-slate-500"
+          }`}
+          title="Net Payable = Gross Earned + OT / Incentive + Prev Bal - Advance Taken - Expenses"
+        >
+          {totalAdvDed > 0 ? `After −${formatINR(totalAdvDed)} Adv` : "Gross + Adjustments (No Adv)"}
+        </div>
         {item.category === "OFFICE" && remainingLeft > 0 ? (
-          <div className="text-[11px] font-medium text-emerald-700 whitespace-nowrap mt-0.5">
+          <div className="text-[10.5px] font-medium text-emerald-700 whitespace-nowrap mt-0.5">
             Earned Net Today: {formatINR(earnedNetToday)}
           </div>
         ) : item.notes ? (
-          <div className="text-[10.5px] text-slate-500 max-w-[150px] truncate ml-auto mt-0.5" title={item.notes}>
+          <div className="text-[10.5px] text-slate-500 max-w-[155px] truncate ml-auto mt-0.5" title={item.notes}>
             {item.notes}
           </div>
         ) : null}
