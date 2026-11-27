@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { toDecimal } from "@/lib/decimal";
+import { syncEmployeeToOpenDraftRuns } from "@/lib/payrollAttendanceSync";
 
 export const dynamic = "force-dynamic";
 
@@ -114,6 +115,7 @@ export async function PUT(
       },
     });
 
+    await syncEmployeeToOpenDraftRuns();
     return NextResponse.json({ success: true, labourer });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -145,6 +147,7 @@ export async function PATCH(
       data: { status: newStatus, active: newActive },
     });
 
+    await syncEmployeeToOpenDraftRuns();
     return NextResponse.json({ success: true, labourer });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -172,6 +175,7 @@ export async function DELETE(
       where: { id },
       data: { status: "ARCHIVED", active: false },
     });
+    await syncEmployeeToOpenDraftRuns();
     return NextResponse.json({ success: true, message: "Worker safely archived." });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

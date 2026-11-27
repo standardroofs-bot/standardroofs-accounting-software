@@ -597,7 +597,12 @@ export async function POST(request: Request) {
         curr.setUTCDate(curr.getUTCDate() + 1);
       }
 
-      await syncOpenDraftPayrollRunsForMonth(start.toISOString().substring(0, 7));
+      const startMonth = start.toISOString().substring(0, 7);
+      const endMonth = end.toISOString().substring(0, 7);
+      await syncOpenDraftPayrollRunsForMonth(startMonth);
+      if (endMonth !== startMonth) {
+        await syncOpenDraftPayrollRunsForMonth(endMonth);
+      }
 
       return NextResponse.json({ success: true, message: "Leave approved and attendance matrix updated." });
     }

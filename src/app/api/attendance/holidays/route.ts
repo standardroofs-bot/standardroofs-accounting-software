@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncOpenDraftPayrollRunsForMonth } from "@/lib/payrollAttendanceSync";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +90,11 @@ export async function POST(request: Request) {
         }
       }
 
+      const holidayMonths = Array.from(new Set(holidays.map((h) => h.date.toISOString().slice(0, 7))));
+      for (const hm of holidayMonths) {
+        await syncOpenDraftPayrollRunsForMonth(hm);
+      }
+
       return NextResponse.json({
         success: true,
         message: `Applied ${holidays.length} holidays to ${officeEmployees.length} office staff members.`,
@@ -162,6 +168,8 @@ export async function POST(request: Request) {
       staffMarkedCount = officeEmployees.length;
     }
 
+    await syncOpenDraftPayrollRunsForMonth(targetDate.toISOString().slice(0, 7));
+
     return NextResponse.json({ success: true, holiday, staffMarkedCount });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -174,14 +182,22 @@ export async function DELETE(request: Request) {
     const id = searchParams.get("id");
     const date = searchParams.get("date");
 
+    let affectedMonth: string | null = null;
     if (id) {
+      const existingHoliday = await prisma.companyHoliday.findUnique({ where: { id } });
+      affectedMonth = existingHoliday ? existingHoliday.date.toISOString().slice(0, 7) : null;
       await prisma.companyHoliday.delete({ where: { id } });
     } else if (date) {
+      affectedMonth = String(date).slice(0, 7);
       await prisma.companyHoliday.delete({
         where: { date: new Date(`${date}T00:00:00.000Z`) },
       });
     } else {
       return NextResponse.json({ success: false, error: "Holiday ID or Date required." }, { status: 400 });
+    }
+
+    if (affectedMonth) {
+      await syncOpenDraftPayrollRunsForMonth(affectedMonth);
     }
 
     return NextResponse.json({ success: true, message: "Holiday removed successfully." });

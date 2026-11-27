@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserSession } from "@/lib/auth";
+import { syncEmployeeToOpenDraftRuns, syncOpenDraftPayrollRunsForMonth } from "@/lib/payrollAttendanceSync";
 
 export const dynamic = "force-dynamic";
 
@@ -205,6 +206,16 @@ export async function POST(request: Request) {
     await prisma.recycleBinItem.delete({
       where: { id },
     });
+
+    if (item.entityType === "EMPLOYEE_LABOUR") {
+      await syncEmployeeToOpenDraftRuns();
+    } else if (item.entityType === "ATTENDANCE_RECORD" && payload?.date) {
+      await syncOpenDraftPayrollRunsForMonth(new Date(payload.date).toISOString().slice(0, 7));
+    } else if (item.entityType === "COMPANY_HOLIDAY" && payload?.date) {
+      await syncOpenDraftPayrollRunsForMonth(new Date(payload.date).toISOString().slice(0, 7));
+    } else if (item.entityType === "LEAVE_REQUEST" && payload?.startDate) {
+      await syncOpenDraftPayrollRunsForMonth(new Date(payload.startDate).toISOString().slice(0, 7));
+    }
 
     return NextResponse.json({
       success: true,

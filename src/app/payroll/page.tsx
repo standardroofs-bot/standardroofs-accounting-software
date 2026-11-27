@@ -21,12 +21,14 @@ import {
   Wallet,
   CalendarPlus,
   Pencil,
+  Receipt,
+  History,
 } from "lucide-react";
 import { exportToExcel } from "@/lib/exportUtils";
 import { BrandedPayslip, BrandedPayslipItem } from "@/components/payroll/BrandedPayslip";
 import EmployeeSalaryHistoryModal from "@/components/payroll/EmployeeSalaryHistoryModal";
 import { ModuleHeroBanner } from "@/components/ui/ModuleHeroBanner";
-import { TactileKpiCard, InitialsAvatar, ChannelBadge, BalanceBadge } from "@/components/ui/ErpPrimitives";
+import { TactileKpiCard, InitialsAvatar } from "@/components/ui/ErpPrimitives";
 import { ViewportPortal } from "@/components/ui/ViewportPortal";
 
 interface PayrollItem extends BrandedPayslipItem {
@@ -131,6 +133,7 @@ export default function StandardPayrollPage() {
   } | null>(null);
   const [markPaidItem, setMarkPaidItem] = useState<PayrollItem | null>(null);
   const [markingPaid, setMarkingPaid] = useState(false);
+  const [settleChannel, setSettleChannel] = useState<"ICICI" | "RBL" | "Office Gpay" | "Ravi Gpay" | "Prabha Gpay" | "Office Cash">("ICICI");
   const [markPaidForm, setMarkPaidForm] = useState({
     paidCash: 0,
     paidBankOrGpay: 0,
@@ -190,8 +193,8 @@ export default function StandardPayrollPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const loadPayroll = useCallback(async () => {
-    setLoading(true);
+  const loadPayroll = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const effectiveHalf = cycleType === "MONTHLY_OFFICE" ? "FULL" : halfPeriod === "FULL" ? "FIRST_HALF" : halfPeriod;
       const params = new URLSearchParams({
@@ -205,12 +208,12 @@ export default function StandardPayrollPage() {
       if (data.success) {
         setRun(data.run);
         setAvailableRuns(data.availableRuns || []);
-        setSelectedIds([]);
+        if (!silent) setSelectedIds([]);
       }
     } catch {
-      showToast("Failed to load payroll data", "error");
+      if (!silent) showToast("Failed to load payroll data", "error");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [cycleType, month, halfPeriod, companyFilter]);
 
@@ -1105,19 +1108,14 @@ export default function StandardPayrollPage() {
                       className="rounded border-slate-300 text-[#4F46E5] focus:ring-[#4F46E5] cursor-pointer"
                     />
                   </th>
-                  <th className="py-3.5 px-3">Employee</th>
-                  <th className="py-3.5 px-3 text-right">Days</th>
-                  <th className="py-3.5 px-3 text-right">Rate (₹)</th>
-                  <th className="py-3.5 px-3 text-right">Gross (₹)</th>
-                  <th className="py-3.5 px-3 text-right">+ OT / Veh / Prev</th>
-                  <th className="py-3.5 px-3 text-right">- Adv / Exp</th>
-                  <th className="py-3.5 px-3 text-right text-[#4F46E5]">Net Salary</th>
-                  <th className="py-3.5 px-3 text-right">Paid Cash</th>
-                  <th className="py-3.5 px-3 text-right">Bank / GPay</th>
-                  <th className="py-3.5 px-3">Channel</th>
-                  <th className="py-3.5 px-3 text-right">Balance</th>
-                  <th className="py-3.5 px-3">Notes</th>
-                  <th className="py-3.5 px-4 text-center">Actions</th>
+                  <th className="py-3.5 px-4">Employee</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Payable Days</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Rate &amp; Gross</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">+OT / −Adv</th>
+                  <th className="py-3.5 px-4 text-right text-[#4F46E5] whitespace-nowrap">Net Payable</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Paid Breakdown</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Payment Status</th>
+                  <th className="py-3.5 px-4 text-center whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1164,6 +1162,15 @@ export default function StandardPayrollPage() {
                           : rawGpay.toLowerCase() === "periyasamy gpay"
                           ? "Periyasamy Gpay"
                           : "Office Gpay";
+                      const defaultSettle =
+                        item.paymentChannel === "RBL"
+                          ? "RBL"
+                          : item.paymentChannel === "OFFICE_GPAY"
+                          ? (normGpay === "Ravi Gpay" || normGpay === "Prabha Gpay" ? normGpay : "Office Gpay")
+                          : item.paymentChannel === "CASH"
+                          ? "Office Cash"
+                          : "ICICI";
+                      setSettleChannel(defaultSettle);
                       setMarkPaidForm({
                         paidCash: item.paidCash || 0,
                         paidBankOrGpay: alreadyPaid > 0 ? (item.paidBankOrGpay || 0) : item.netSalary,
@@ -1541,46 +1548,81 @@ export default function StandardPayrollPage() {
         </ViewportPortal>
       )}
 
-      {/* 1-CLICK MARK PAID & RECORD BANK PROOF MODAL */}
-      {markPaidItem && (
+      {/* 1-CLICK RECORD SALARY PAYMENT & PROOF MODAL */}
+      {markPaidItem && (() => {
+        const currentPaid = (markPaidItem.paidCash || 0) + (markPaidItem.paidBankOrGpay || 0) + (markPaidItem.paidGpay || 0);
+        const balanceDue = Math.max(0, Math.round(markPaidItem.netSalary - currentPaid));
+        const isAlreadyPaid = currentPaid >= markPaidItem.netSalary && (markPaidItem.netSalary > 0 || currentPaid > 0);
+        const settleTargetAmount = balanceDue > 0 ? balanceDue : Math.max(0, Math.round(markPaidItem.netSalary));
+
+        const submitMarkPaid = async (payload: typeof markPaidForm) => {
+          setMarkingPaid(true);
+          try {
+            const res = await fetch(`/api/payroll/items/${markPaidItem.id}/mark-paid`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (data.success && data.item) {
+              applyUpdatedItemState(data.item, data.run);
+              showToast(
+                payload.syncToCashBook
+                  ? `Payment & CashBook proof saved for ${markPaidItem.employeeName}`
+                  : `Payment proof saved for ${markPaidItem.employeeName}`
+              );
+              setMarkPaidItem(null);
+              await loadPayroll(true);
+            } else {
+              showToast(data.error || "Failed to record payment", "error");
+            }
+          } catch {
+            showToast("Network error while saving payment proof", "error");
+          } finally {
+            setMarkingPaid(false);
+          }
+        };
+
+        const handleOneClickSettle = async () => {
+          const addAmt = balanceDue > 0 ? balanceDue : Math.max(0, Math.round(markPaidItem.netSalary));
+          const baseCash = balanceDue > 0 ? (markPaidItem.paidCash || 0) : 0;
+          const baseBank = balanceDue > 0 ? (markPaidItem.paidBankOrGpay || 0) : 0;
+          const baseGpay = balanceDue > 0 ? (markPaidItem.paidGpay || 0) : 0;
+
+          const isCash = settleChannel === "Office Cash";
+          const isBank = settleChannel === "ICICI" || settleChannel === "RBL";
+          const isGpay = !isCash && !isBank;
+
+          const nextPayload = {
+            ...markPaidForm,
+            paidCash: isCash ? baseCash + addAmt : baseCash,
+            paidBankOrGpay: isBank ? baseBank + addAmt : baseBank,
+            paidGpay: isGpay ? baseGpay + addAmt : baseGpay,
+            bankWallet: (settleChannel === "RBL" ? "RBL" : "ICICI") as "ICICI" | "RBL",
+            gpayWallet: isGpay ? settleChannel : markPaidForm.gpayWallet,
+          };
+          setMarkPaidForm(nextPayload);
+          await submitMarkPaid(nextPayload);
+        };
+
+        return (
         <ViewportPortal onBackdropClick={() => setMarkPaidItem(null)}>
           <form
             onSubmit={async (e) => {
               e.preventDefault();
-              setMarkingPaid(true);
-              try {
-                const res = await fetch(`/api/payroll/items/${markPaidItem.id}/mark-paid`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(markPaidForm),
-                });
-                const data = await res.json();
-                if (data.success && data.item) {
-                  applyUpdatedItemState(data.item, data.run);
-                  showToast(
-                    markPaidForm.syncToCashBook
-                      ? `Payment & CashBook proof saved for ${markPaidItem.employeeName}`
-                      : `Payment proof saved for ${markPaidItem.employeeName}`
-                  );
-                  setMarkPaidItem(null);
-                  await loadPayroll();
-                } else {
-                  showToast(data.error || "Failed to record payment", "error");
-                }
-              } catch {
-                showToast("Network error while saving payment proof", "error");
-              } finally {
-                setMarkingPaid(false);
-              }
+              await submitMarkPaid(markPaidForm);
             }}
             onClick={(e) => e.stopPropagation()}
             className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden"
           >
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div>
-                <div className="text-sm font-extrabold text-slate-900">Mark Paid &amp; Record Proof</div>
+                <div className="text-sm font-extrabold text-slate-900">
+                  {isAlreadyPaid ? "Paid · Payment Proof & Split" : "Record Salary Payment"}
+                </div>
                 <div className="text-[11px] text-slate-500">
                   {markPaidItem.employeeName} • Net Payable {formatINR(markPaidItem.netSalary)}
+                  {balanceDue > 0 ? ` • Balance Due ${formatINR(balanceDue)}` : " • Paid in Full"}
                 </div>
               </div>
               <button type="button" onClick={() => setMarkPaidItem(null)} className="text-slate-500 cursor-pointer">
@@ -1588,8 +1630,42 @@ export default function StandardPayrollPage() {
               </button>
             </div>
             <div className="p-5 space-y-3 text-xs">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mr-1">Quick Split:</span>
+              {/* 1-CLICK FULL SETTLEMENT BAR */}
+              <div className="rounded-xl bg-emerald-50/90 border border-emerald-200 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-800">
+                    1-Click Instant Settlement
+                  </span>
+                  <span className="text-[11px] font-bold text-emerald-700 tabular-nums">
+                    {balanceDue > 0 ? `${formatINR(balanceDue)} Due` : "Settled"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={settleChannel}
+                    onChange={(e) => setSettleChannel(e.target.value as any)}
+                    className="flex-1 px-2.5 py-2 rounded-lg border border-emerald-300 bg-white font-semibold text-slate-800 text-xs"
+                  >
+                    <option value="ICICI">ICICI Bank</option>
+                    <option value="RBL">RBL Bank</option>
+                    <option value="Office Gpay">Office GPay</option>
+                    <option value="Ravi Gpay">Ravi GPay</option>
+                    <option value="Prabha Gpay">Prabha GPay</option>
+                    <option value="Office Cash">Office Cash</option>
+                  </select>
+                  <button
+                    type="button"
+                    disabled={markingPaid || settleTargetAmount <= 0}
+                    onClick={handleOneClickSettle}
+                    className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {markingPaid ? "Posting..." : `Settle Full ${formatINR(settleTargetAmount)} Now`}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mr-1">Or Custom Split:</span>
                 <button
                   type="button"
                   onClick={() =>
@@ -1716,8 +1792,8 @@ export default function StandardPayrollPage() {
                 />
                 <span>Sync disbursement legs to 8-Wallet Cash Book &amp; Bank Statement</span>
               </label>
-              <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5 flex items-center justify-between">
-                <span className="font-semibold text-emerald-900">Total Paying Now</span>
+              <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5 flex items-center justify-between">
+                <span className="font-semibold text-slate-700">Total Disbursed (Split)</span>
                 <span className="text-sm font-black text-emerald-700 tabular-nums">
                   {formatINR((markPaidForm.paidCash || 0) + (markPaidForm.paidBankOrGpay || 0) + (markPaidForm.paidGpay || 0))}
                 </span>
@@ -1730,14 +1806,15 @@ export default function StandardPayrollPage() {
               <button
                 type="submit"
                 disabled={markingPaid}
-                className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+                className="px-4 py-1.5 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
               >
-                {markingPaid ? "Posting..." : "Save & Mark Paid"}
+                {markingPaid ? "Posting..." : "Save Custom Split & Proof"}
               </button>
             </div>
           </form>
         </ViewportPortal>
-      )}
+        );
+      })()}
 
       {toast && (
         <div className={`fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-xl text-xs font-bold text-white flex items-center gap-2 ${toast.type === "error" ? "bg-rose-600" : "bg-indigo-600"}`}>
@@ -2063,9 +2140,6 @@ function PayrollTableRow({
     String(item.otAndIncentive + item.nightDutyAmount + (item.vehicleAllowance || 0) + item.lastMonthBalance)
   );
   const [advDed, setAdvDed] = useState(String(item.advanceDeduction + item.expenseBalanceDeduction));
-  const [paidCash, setPaidCash] = useState(String(item.paidCash));
-  const [paidBank, setPaidBank] = useState(String(item.paidBankOrGpay));
-  const [notes, setNotes] = useState(item.notes || "");
 
   useEffect(() => {
     setDaysPresent(String(item.daysPresent));
@@ -2074,9 +2148,6 @@ function PayrollTableRow({
       String(item.otAndIncentive + item.nightDutyAmount + (item.vehicleAllowance || 0) + item.lastMonthBalance)
     );
     setAdvDed(String(item.advanceDeduction + item.expenseBalanceDeduction));
-    setPaidCash(String(item.paidCash));
-    setPaidBank(String(item.paidBankOrGpay));
-    setNotes(item.notes || "");
   }, [item]);
 
   const commitNum = (field: keyof PayrollItem, valStr: string, currentVal: number) => {
@@ -2089,6 +2160,19 @@ function PayrollTableRow({
     if (e.key === "Enter") e.currentTarget.blur();
   };
 
+  const totalCash = Number(item.paidCash || 0);
+  const totalBankGpay = Number(item.paidBankOrGpay || 0) + Number(item.paidGpay || 0);
+  const totalPaid = totalCash + totalBankGpay;
+  const balanceDue = Math.max(0, Math.round(item.netSalary - totalPaid));
+  const advanceCredit = Math.max(0, Math.round(totalPaid - item.netSalary));
+  const isHold = item.paymentStatus === "HOLD";
+  const isPaidInFull =
+    !isHold &&
+    ((totalPaid >= item.netSalary && (item.netSalary > 0 || totalPaid > 0)) ||
+      (item.paymentStatus === "PAID" && balanceDue === 0));
+  const isPartial = !isHold && !isPaidInFull && totalPaid > 0;
+  const rateSuffix = item.category === "OFFICE" && item.baseRate > 2500 ? "/mo" : "/d";
+
   return (
     <tr className={`hover:bg-indigo-50/40 transition ${selected ? "bg-indigo-50/50" : ""}`}>
       <td className="py-3.5 px-4">
@@ -2100,7 +2184,8 @@ function PayrollTableRow({
         />
       </td>
 
-      <td className="py-4 px-3">
+      {/* 1. EMPLOYEE */}
+      <td className="py-3.5 px-4">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -2112,7 +2197,7 @@ function PayrollTableRow({
               <div className="font-semibold text-slate-900 group-hover:text-[#4F46E5] transition whitespace-nowrap">
                 {item.employeeName}
               </div>
-              <div className="text-[11px] text-slate-600 font-mono truncate">
+              <div className="text-[11px] text-slate-500 font-mono truncate max-w-[180px]">
                 {item.employeeCode} • {item.designation || (item.company === "INVI_CREATION" ? "Invi" : "SR")}
               </div>
             </div>
@@ -2134,7 +2219,8 @@ function PayrollTableRow({
         </div>
       </td>
 
-      <td className="py-3.5 px-3 text-right tabular-nums">
+      {/* 2. PAYABLE DAYS */}
+      <td className="py-3.5 px-4 text-right tabular-nums">
         <div className="flex items-center justify-end gap-0.5">
           <input
             type="number"
@@ -2143,179 +2229,178 @@ function PayrollTableRow({
             onChange={(e) => setDaysPresent(e.target.value)}
             onKeyDown={handleEnterBlur}
             onBlur={() => commitNum("daysPresent", daysPresent, item.daysPresent)}
-            className="w-14 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent font-semibold text-slate-900 tabular-nums"
+            className="w-14 text-right px-1.5 py-0.5 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent font-bold text-slate-900 tabular-nums"
           />
-          <span className="text-[11px] text-slate-600">/{item.totalWorkingDays}</span>
+          <span className="text-[11px] font-semibold text-slate-500">/ {item.totalWorkingDays}d</span>
         </div>
         {item.attendanceSummary && item.attendanceSummary.totalRecords > 0 && (
-          <div className="text-[10px] font-semibold text-[#4F46E5] whitespace-nowrap mt-0.5">
+          <div className="text-[10.5px] font-medium text-indigo-600 whitespace-nowrap mt-0.5">
             {item.category === "OFFICE" && item.attendanceSummary.remainingScheduledDays && item.attendanceSummary.remainingScheduledDays > 0
-              ? `Proj: ${item.attendanceSummary.markedPayableSoFar ?? item.attendanceSummary.payableDays} marked + ${item.attendanceSummary.remainingScheduledDays} left`
+              ? `${item.attendanceSummary.markedPayableSoFar ?? item.attendanceSummary.payableDays} marked + ${item.attendanceSummary.remainingScheduledDays} left`
               : item.category !== "OFFICE"
-              ? `Worked: ${item.daysPresent}d × ${formatINR(item.baseRate)}`
-              : `Synced: ${item.attendanceSummary.presentCount}P · ${item.attendanceSummary.paidLeaveCount}PL · ${item.attendanceSummary.halfDayCount}H`}
+              ? `${item.attendanceSummary.presentCount}P · ${item.attendanceSummary.halfDayCount}H · ${item.attendanceSummary.paidLeaveCount}PL`
+              : `${item.attendanceSummary.presentCount}P · ${item.attendanceSummary.paidLeaveCount}PL · ${item.attendanceSummary.halfDayCount}H`}
           </div>
         )}
       </td>
 
-      <td className="py-3.5 px-3 text-right tabular-nums">
-        <input
-          type="number"
-          value={baseRate}
-          onChange={(e) => setBaseRate(e.target.value)}
-          onKeyDown={handleEnterBlur}
-          onBlur={() => commitNum("baseRate", baseRate, item.baseRate)}
-          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-slate-900 font-medium tabular-nums"
-        />
-      </td>
-
-      <td className="py-3.5 px-3 text-right font-semibold text-slate-900 tabular-nums">{formatINR(item.grossSalary)}</td>
-
-      <td className="py-3.5 px-3 text-right tabular-nums">
-        <input
-          type="number"
-          value={otPlus}
-          onChange={(e) => setOtPlus(e.target.value)}
-          onKeyDown={handleEnterBlur}
-          onBlur={() => {
-            const val = Number(otPlus);
-            if (!Number.isFinite(val)) return;
-            const prevSum = item.otAndIncentive + item.nightDutyAmount + (item.vehicleAllowance || 0) + item.lastMonthBalance;
-            if (val !== prevSum) {
-              onPatch(item.id, { otAndIncentive: val, nightDutyAmount: 0, vehicleAllowance: 0, lastMonthBalance: 0 });
-            }
-          }}
-          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-[#059669] font-semibold tabular-nums"
-        />
-      </td>
-
-      <td className="py-3.5 px-3 text-right tabular-nums">
-        <input
-          type="number"
-          value={advDed}
-          onChange={(e) => setAdvDed(e.target.value)}
-          onKeyDown={handleEnterBlur}
-          onBlur={() => {
-            const val = Number(advDed);
-            if (!Number.isFinite(val)) return;
-            const prevSum = item.advanceDeduction + item.expenseBalanceDeduction;
-            if (val !== prevSum) {
-              onPatch(item.id, { advanceDeduction: val, expenseBalanceDeduction: 0 });
-            }
-          }}
-          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-[#E11D48] font-semibold tabular-nums"
-        />
-      </td>
-
-      <td className="py-3.5 px-3 text-right font-bold text-slate-900 tabular-nums">{formatINR(item.netSalary)}</td>
-
-      <td className="py-3.5 px-3 text-right tabular-nums">
-        <input
-          type="number"
-          value={paidCash}
-          onChange={(e) => setPaidCash(e.target.value)}
-          onKeyDown={handleEnterBlur}
-          onBlur={() => commitNum("paidCash", paidCash, item.paidCash)}
-          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-slate-900 font-medium tabular-nums"
-        />
-      </td>
-
-      <td className="py-3.5 px-3 text-right tabular-nums">
-        <input
-          type="number"
-          value={paidBank}
-          onChange={(e) => setPaidBank(e.target.value)}
-          onKeyDown={handleEnterBlur}
-          onBlur={() => commitNum("paidBankOrGpay", paidBank, item.paidBankOrGpay)}
-          className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-slate-900 font-medium tabular-nums"
-        />
-        {(item.paidGpay || 0) > 0 && (
-          <div className="text-[10px] font-bold text-violet-700 whitespace-nowrap mt-0.5">
-            +{formatINR(item.paidGpay || 0)} {item.gpayWallet || "GPay"}
-          </div>
-        )}
-        {item.paymentRef && (
-          <div className="text-[9.5px] font-mono text-slate-500 whitespace-nowrap mt-0.5 truncate max-w-[100px] ml-auto" title={item.paymentRef}>
-            Ref: {item.paymentRef}
-          </div>
-        )}
-      </td>
-
-      <td className="py-4 px-3">
-        <div className="flex items-center gap-1.5">
-          <ChannelBadge channel={item.paymentChannel} />
-          <select
-            value={item.paymentChannel}
-            onChange={(e) => onPatch(item.id, { paymentChannel: e.target.value })}
-            aria-label="Payment Channel"
-            className="w-5 h-5 rounded border border-slate-200 bg-white text-[10px] text-slate-600 focus:outline-none cursor-pointer"
-          >
-            <option value="CASH">Cash</option>
-            <option value="ICICI">ICICI</option>
-            <option value="RBL">RBL</option>
-            <option value="OFFICE_GPAY">GPay</option>
-            <option value="AGENT_ACCOUNT">Agent</option>
-          </select>
+      {/* 3. RATE & GROSS */}
+      <td className="py-3.5 px-4 text-right tabular-nums">
+        <div className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
+          {formatINR(item.grossSalary)}
+        </div>
+        <div className="flex items-center justify-end gap-0.5 mt-0.5">
+          <span className="text-[10.5px] text-slate-500">₹</span>
+          <input
+            type="number"
+            value={baseRate}
+            onChange={(e) => setBaseRate(e.target.value)}
+            onKeyDown={handleEnterBlur}
+            onBlur={() => commitNum("baseRate", baseRate, item.baseRate)}
+            className="w-16 text-right px-1 py-0.5 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-[11px] text-slate-600 font-medium tabular-nums"
+          />
+          <span className="text-[10.5px] text-slate-500">{rateSuffix}</span>
         </div>
       </td>
 
-      <td className="py-4 px-3 text-right tabular-nums">
+      {/* 4. +OT / −ADV */}
+      <td className="py-3.5 px-4 text-right tabular-nums">
+        <div className="inline-flex items-center justify-end gap-1.5">
+          <label className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold">
+            <span>+₹</span>
+            <input
+              type="number"
+              value={otPlus}
+              onChange={(e) => setOtPlus(e.target.value)}
+              onKeyDown={handleEnterBlur}
+              onBlur={() => {
+                const val = Number(otPlus);
+                if (!Number.isFinite(val)) return;
+                const prevSum = item.otAndIncentive + item.nightDutyAmount + (item.vehicleAllowance || 0) + item.lastMonthBalance;
+                if (val !== prevSum) {
+                  onPatch(item.id, { otAndIncentive: val, nightDutyAmount: 0, vehicleAllowance: 0, lastMonthBalance: 0 });
+                }
+              }}
+              aria-label="Overtime and Incentives"
+              className="w-12 text-right bg-transparent focus:outline-none text-emerald-700 font-bold tabular-nums"
+            />
+          </label>
+          <label className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-bold">
+            <span>−₹</span>
+            <input
+              type="number"
+              value={advDed}
+              onChange={(e) => setAdvDed(e.target.value)}
+              onKeyDown={handleEnterBlur}
+              onBlur={() => {
+                const val = Number(advDed);
+                if (!Number.isFinite(val)) return;
+                const prevSum = item.advanceDeduction + item.expenseBalanceDeduction;
+                if (val !== prevSum) {
+                  onPatch(item.id, { advanceDeduction: val, expenseBalanceDeduction: 0 });
+                }
+              }}
+              aria-label="Advance and Expense Deductions"
+              className="w-12 text-right bg-transparent focus:outline-none text-rose-700 font-bold tabular-nums"
+            />
+          </label>
+        </div>
+      </td>
+
+      {/* 5. NET PAYABLE */}
+      <td className="py-3.5 px-4 text-right tabular-nums">
+        <div className="text-sm font-extrabold text-slate-900 whitespace-nowrap">{formatINR(item.netSalary)}</div>
+        {item.notes && (
+          <div className="text-[10.5px] text-slate-500 max-w-[140px] truncate ml-auto mt-0.5" title={item.notes}>
+            {item.notes}
+          </div>
+        )}
+      </td>
+
+      {/* 6. PAID BREAKDOWN */}
+      <td className="py-3.5 px-4 tabular-nums">
+        <div className="flex flex-col gap-1">
+          <div className="text-[11px] font-semibold text-slate-800 whitespace-nowrap">
+            {totalPaid > 0 ? (
+              <span>
+                Cash: <strong>{formatINR(totalCash)}</strong> · Bank/GPay: <strong>{formatINR(totalBankGpay)}</strong>
+              </span>
+            ) : (
+              <span className="text-slate-400 font-medium">₹0 Paid</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <select
+              value={item.paymentChannel}
+              onChange={(e) => onPatch(item.id, { paymentChannel: e.target.value })}
+              aria-label="Active Payment Wallet"
+              className="px-2 py-0.5 rounded-md border border-slate-200 bg-slate-50 hover:bg-white text-[10.5px] font-semibold text-slate-700 focus:outline-none focus:border-[#4F46E5] cursor-pointer"
+            >
+              <option value="CASH">Office Cash</option>
+              <option value="ICICI">ICICI Bank</option>
+              <option value="RBL">RBL Bank</option>
+              <option value="OFFICE_GPAY">{item.gpayWallet || "Office GPay"}</option>
+              <option value="AGENT_ACCOUNT">Agent Acct</option>
+            </select>
+          </div>
+        </div>
+      </td>
+
+      {/* 7. PAYMENT STATUS (SINGLE CLEAR PILL) */}
+      <td className="py-3.5 px-4 text-right tabular-nums">
         <div className="flex flex-col items-end gap-1">
-          <BalanceBadge amount={item.carryForwardBalance} />
-          <span
-            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-              item.paymentStatus === "PAID"
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                : item.paymentStatus === "PARTIAL"
-                ? "bg-amber-50 text-amber-800 border-amber-200"
-                : item.paymentStatus === "HOLD"
-                ? "bg-rose-50 text-rose-700 border-rose-200"
-                : "bg-slate-100 text-slate-600 border-slate-200"
-            }`}
-          >
-            {item.paymentStatus === "PAID"
-              ? "Paid in Full"
-              : item.paymentStatus === "PARTIAL"
-              ? "Partially Paid"
-              : item.paymentStatus === "HOLD"
-              ? "On Hold"
-              : "Unpaid"}
-          </span>
-          {item.paymentReason && (
-            <span className="text-[10px] text-slate-500 max-w-[130px] truncate" title={item.paymentReason}>
-              {item.paymentReason}
+          {isPaidInFull ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+              <CheckCircle2 size={12} />
+              <span>PAID IN FULL</span>
+            </span>
+          ) : isHold ? (
+            <span className="inline-flex items-center text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+              ON HOLD · {formatINR(balanceDue)}
+            </span>
+          ) : isPartial ? (
+            <span className="inline-flex items-center text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
+              PARTIAL · {formatINR(balanceDue)} Due
+            </span>
+          ) : (
+            <span
+              className={`inline-flex items-center text-[11px] font-extrabold px-2.5 py-1 rounded-full border whitespace-nowrap ${
+                balanceDue > 0
+                  ? "bg-rose-50/70 text-rose-700 border-rose-200"
+                  : "bg-slate-100 text-slate-600 border-slate-200"
+              }`}
+            >
+              UNPAID · {formatINR(balanceDue)}
+            </span>
+          )}
+          {item.paymentRef && (
+            <span className="text-[10px] font-mono text-slate-500 max-w-[150px] truncate" title={item.paymentRef}>
+              UTR: {item.paymentRef}
+            </span>
+          )}
+          {isPaidInFull && advanceCredit > 0 && (
+            <span className="text-[10px] font-semibold text-indigo-600 whitespace-nowrap">
+              Adv C/F: {formatINR(advanceCredit)}
             </span>
           )}
         </div>
       </td>
 
-      <td className="py-3.5 px-3">
-        <input
-          type="text"
-          value={notes}
-          placeholder="Add note..."
-          onChange={(e) => setNotes(e.target.value)}
-          onKeyDown={handleEnterBlur}
-          onBlur={() => {
-            if (notes !== (item.notes || "")) onPatch(item.id, { notes });
-          }}
-          className="w-28 px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-[11px] text-slate-600 truncate"
-        />
-      </td>
-
+      {/* 8. ACTIONS */}
       <td className="py-3.5 px-4 text-center">
-        <div className="flex items-center justify-center gap-1">
+        <div className="flex items-center justify-center gap-1 whitespace-nowrap">
           <button
             type="button"
             onClick={onMarkPaid}
-            className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
-              item.paymentStatus === "PAID"
-                ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+              isPaidInFull
+                ? "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
                 : "bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs"
             }`}
-            title="Mark Paid & Record Cash/Bank Proof"
+            title={isPaidInFull ? "View or Edit Payment Proof & Split" : "Record Salary Payment"}
           >
-            {item.paymentStatus === "PAID" ? "Proof" : "Mark Paid"}
+            {isPaidInFull && <Receipt size={12} className="text-emerald-600" />}
+            <span>{isPaidInFull ? "Paid · Proof" : "Pay Now"}</span>
           </button>
           <button
             type="button"
@@ -2328,10 +2413,10 @@ function PayrollTableRow({
           <button
             type="button"
             onClick={onSalaryHistory}
-            className="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-[10px] font-bold transition cursor-pointer"
+            className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition cursor-pointer"
             title="View Lifetime & Yearly Salary Report"
           >
-            History
+            <History size={14} />
           </button>
           <button
             type="button"

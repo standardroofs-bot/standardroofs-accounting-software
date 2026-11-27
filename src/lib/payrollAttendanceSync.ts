@@ -328,19 +328,25 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string) {
 
     for (const run of draftRuns) {
       const empIds = Array.from(new Set(run.items.map((it) => it.employeeId).filter(Boolean)));
-      const attMap = await computeAttendanceBreakdownMap(empIds, run.month, run.halfPeriod);
       const isOfficeCycle = run.cycleType === "MONTHLY_OFFICE";
+      const [attMap, monthInfo] = await Promise.all([
+        computeAttendanceBreakdownMap(empIds, run.month, run.halfPeriod),
+        isOfficeCycle ? computeMonthWorkingDaysInfo(run.month, run.halfPeriod) : Promise.resolve(null),
+      ]);
 
       for (const item of run.items) {
         const summary = attMap.get(item.employeeId);
-        if (!summary || summary.totalRecords < 5) continue;
+        const hasRecords = Boolean(summary && summary.totalRecords > 0);
+        if (!hasRecords && !isOfficeCycle) continue;
 
         const totalWorkingDays = isOfficeCycle
-          ? summary.scheduledWorkingDays
+          ? (summary?.scheduledWorkingDays ?? monthInfo?.scheduledWorkingDays ?? item.totalWorkingDays)
           : item.totalWorkingDays;
-        const daysPresent = isOfficeCycle
-          ? summary.projectedPayableDays
-          : summary.markedPayableSoFar;
+        const daysPresent = hasRecords
+          ? isOfficeCycle
+            ? summary!.projectedPayableDays
+            : summary!.markedPayableSoFar
+          : Math.min(totalWorkingDays, item.daysPresent || totalWorkingDays);
         const leaveDays = Math.max(0, Math.round((totalWorkingDays - daysPresent) * 100) / 100);
         const grossSalary =
           item.category === "OFFICE"
@@ -359,7 +365,16 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string) {
             item.advanceDeduction -
             item.expenseBalanceDeduction
         );
-        const carryForwardBalance = Math.round((netSalary - (item.paidCash + item.paidBankOrGpay + (item.paidGpay || 0))) * 100) / 100;
+        const totalPaid = (item.paidCash || 0) + (item.paidBankOrGpay || 0) + (item.paidGpay || 0);
+        const carryForwardBalance = Math.round((netSalary - totalPaid) * 100) / 100;
+        const paymentStatus =
+          item.paymentStatus === "HOLD"
+            ? "HOLD"
+            : totalPaid >= netSalary && (netSalary > 0 || totalPaid > 0)
+            ? "PAID"
+            : totalPaid > 0
+            ? "PARTIAL"
+            : "UNPAID";
 
         await prisma.payrollItem.update({
           where: { id: item.id },
@@ -370,6 +385,8 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string) {
             grossSalary,
             netSalary,
             carryForwardBalance,
+            paymentStatus,
+            isCleared: paymentStatus === "PAID",
           },
         });
       }
@@ -378,5 +395,190 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string) {
     }
   } catch (err) {
     console.warn("[syncOpenDraftPayrollRunsForMonth] warn:", err);
+  }
+}
+
+/**
+ * Propagates employee additions, salary/rate updates, restores, or archives
+ * from Standard People (/labour) into open DRAFT PayrollRuns (>= current month).
+ */
+export async function syncEmployeeToOpenDraftRuns() {
+  try {
+    const currentMonthIST = getTodayISTDateString().slice(0, 7);
+    const draftRuns = await prisma.payrollRun.findMany({
+      where: {
+        status: "DRAFT",
+        month: { gte: currentMonthIST },
+      },
+      include: { items: true },
+    });
+    if (draftRuns.length === 0) return;
+
+    for (const run of draftRuns) {
+      const empCategory =
+        run.cycleType === "MONTHLY_OFFICE"
+          ? "OFFICE_STAFF"
+          : run.cycleType === "BI_MONTHLY_TAMIL"
+          ? "TAMIL_LABOUR"
+          : "HINDI_LABOUR";
+      const itemCategory =
+        run.cycleType === "MONTHLY_OFFICE"
+          ? "OFFICE"
+          : run.cycleType === "BI_MONTHLY_TAMIL"
+          ? "TAMIL_LABOUR"
+          : "HINDI_CREW";
+
+      const isOfficeCycle = run.cycleType === "MONTHLY_OFFICE";
+      const { defaultWorkingDays } = getCycleDateRange(run.month, run.halfPeriod);
+      const [employees, monthInfo] = await Promise.all([
+        prisma.employeeOrLabour.findMany({
+          where: { active: true, status: "ACTIVE", category: empCategory },
+          orderBy: { name: "asc" },
+        }),
+        isOfficeCycle ? computeMonthWorkingDaysInfo(run.month, run.halfPeriod) : Promise.resolve(null),
+      ]);
+
+      const attMap = await computeAttendanceBreakdownMap(
+        employees.map((e) => e.id),
+        run.month,
+        run.halfPeriod
+      );
+      const existingByEmp = new Map(run.items.map((it) => [it.employeeId, it]));
+      const activeEmpIds = new Set(employees.map((e) => e.id));
+
+      // Remove archived/inactive unpaid non-adhoc items from open DRAFT runs
+      const staleUnpaidIds = run.items
+        .filter(
+          (it) =>
+            !activeEmpIds.has(it.employeeId) &&
+            !it.employeeId.startsWith("ADHOC_") &&
+            (it.paidCash || 0) + (it.paidBankOrGpay || 0) + (it.paidGpay || 0) === 0
+        )
+        .map((it) => it.id);
+      if (staleUnpaidIds.length > 0) {
+        await prisma.payrollItem.deleteMany({ where: { id: { in: staleUnpaidIds } } });
+      }
+
+      for (const emp of employees) {
+        const summary = attMap.get(emp.id);
+        const prevIt = existingByEmp.get(emp.id);
+        const totalWorkingDays = isOfficeCycle
+          ? (summary?.scheduledWorkingDays ?? monthInfo?.scheduledWorkingDays ?? defaultWorkingDays)
+          : (prevIt?.totalWorkingDays || defaultWorkingDays);
+
+        const daysPresent =
+          summary && summary.totalRecords > 0
+            ? isOfficeCycle
+              ? summary.projectedPayableDays
+              : summary.markedPayableSoFar
+            : prevIt
+            ? prevIt.daysPresent
+            : totalWorkingDays;
+
+        const leaveDays = Math.max(0, Math.round((totalWorkingDays - daysPresent) * 100) / 100);
+        const baseRate = isOfficeCycle
+          ? Number(emp.monthlySalary || emp.baseWage || 0)
+          : Number(emp.dailyWage || emp.baseWage || 0);
+
+        const grossSalary = isOfficeCycle
+          ? baseRate <= 2500
+            ? Math.round(baseRate * daysPresent)
+            : Math.round((baseRate / (totalWorkingDays || 24)) * daysPresent)
+          : Math.round(baseRate * daysPresent);
+
+        const otAndIncentive = prevIt?.otAndIncentive ?? 0;
+        const performanceIncentive = prevIt?.performanceIncentive ?? 0;
+        const nightDutyAmount = prevIt?.nightDutyAmount ?? 0;
+        const vehicleAllowance =
+          prevIt && prevIt.vehicleAllowance > 0
+            ? prevIt.vehicleAllowance
+            : Number(emp.defaultVehicleAllowance || 0);
+        const lastMonthBalance = prevIt?.lastMonthBalance ?? 0;
+        const advanceDeduction = prevIt?.advanceDeduction ?? Math.round(summary?.dailyAdvanceSum || 0);
+        const expenseBalanceDeduction = prevIt?.expenseBalanceDeduction ?? 0;
+
+        const netSalary = Math.round(
+          grossSalary +
+            otAndIncentive +
+            performanceIncentive +
+            nightDutyAmount +
+            vehicleAllowance +
+            lastMonthBalance -
+            advanceDeduction -
+            expenseBalanceDeduction
+        );
+
+        const paidCash = prevIt?.paidCash || 0;
+        const paidBankOrGpay = prevIt?.paidBankOrGpay || 0;
+        const paidGpay = prevIt?.paidGpay || 0;
+        const totalPaid = paidCash + paidBankOrGpay + paidGpay;
+        const carryForwardBalance = Math.round((netSalary - totalPaid) * 100) / 100;
+        const paymentStatus =
+          prevIt?.paymentStatus === "HOLD"
+            ? "HOLD"
+            : totalPaid >= netSalary && (netSalary > 0 || totalPaid > 0)
+            ? "PAID"
+            : totalPaid > 0
+            ? "PARTIAL"
+            : "UNPAID";
+
+        const commonData = {
+          employeeName: emp.name,
+          employeeCode: emp.employeeCode,
+          category: itemCategory,
+          company: emp.companyUnit === "INVI_CREATION" ? "INVI_CREATION" : "STANDARD_ROOFS",
+          totalWorkingDays,
+          daysPresent,
+          leaveDays,
+          baseRate,
+          grossSalary,
+          vehicleAllowance,
+          netSalary,
+          carryForwardBalance,
+          paymentStatus,
+          isCleared: paymentStatus === "PAID",
+          designation: emp.designation || emp.role || null,
+          location: emp.location || "ERODE",
+          state: emp.state || "TAMIL NADU",
+          mobileNo: emp.phone || null,
+          aadhaarNo: emp.aadhaarNumber || null,
+          bankName: emp.bankName || null,
+          accountNo: emp.bankAccountNo || emp.bankAccountNumber || null,
+        };
+
+        if (prevIt) {
+          await prisma.payrollItem.update({
+            where: { id: prevIt.id },
+            data: commonData,
+          });
+        } else {
+          await prisma.payrollItem.create({
+            data: {
+              ...commonData,
+              payrollRunId: run.id,
+              employeeId: emp.id,
+              otAndIncentive,
+              performanceIncentive,
+              nightDutyAmount,
+              lastMonthBalance,
+              advanceDeduction,
+              expenseBalanceDeduction,
+              paidCash: 0,
+              paidBankOrGpay: 0,
+              paidGpay: 0,
+              paymentChannel: "CASH",
+              notes:
+                summary && summary.totalRecords > 0
+                  ? `Synced from ${summary.totalRecords} attendance records`
+                  : "Planned / Default Working Days",
+            },
+          });
+        }
+      }
+
+      await recalculatePayrollRunTotals(run.id, prisma as any);
+    }
+  } catch (err) {
+    console.warn("[syncEmployeeToOpenDraftRuns] warn:", err);
   }
 }

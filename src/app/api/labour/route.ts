@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { toDecimal } from "@/lib/decimal";
 import { getCurrentUserSession } from "@/lib/auth";
 import { serverCache, invalidateRouteCache } from "@/lib/cache";
+import { syncEmployeeToOpenDraftRuns } from "@/lib/payrollAttendanceSync";
 
 export const dynamic = "force-dynamic";
 
@@ -338,6 +339,7 @@ export async function POST(request: Request) {
     });
 
     invalidateRouteCache("/api/labour");
+    await syncEmployeeToOpenDraftRuns();
     return NextResponse.json({ success: true, labourer });
   } catch (error: any) {
     console.error("Labour POST error:", error);
@@ -496,6 +498,7 @@ export async function PUT(request: Request) {
     });
 
     invalidateRouteCache("/api/labour");
+    await syncEmployeeToOpenDraftRuns();
     return NextResponse.json({ success: true, labourer });
   } catch (error: any) {
     console.error("Labour PUT error:", error);
@@ -531,6 +534,7 @@ export async function PATCH(request: Request) {
     });
 
     invalidateRouteCache("/api/labour");
+    await syncEmployeeToOpenDraftRuns();
     return NextResponse.json({ success: true, labourer });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -600,6 +604,7 @@ export async function DELETE(request: Request) {
     });
 
     invalidateRouteCache("/api/labour");
+    await syncEmployeeToOpenDraftRuns();
     return NextResponse.json({ success: true, message: "Worker safely moved to Recycle Bin." });
   } catch (error: any) {
     console.error("Labour DELETE error:", error);
