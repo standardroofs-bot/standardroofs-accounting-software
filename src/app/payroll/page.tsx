@@ -135,10 +135,12 @@ export default function StandardPayrollPage() {
     paidCash: 0,
     paidBankOrGpay: 0,
     paidGpay: 0,
+    bankWallet: "ICICI" as "ICICI" | "RBL",
     gpayWallet: "Office Gpay",
     paymentRef: "",
     paidDate: new Date().toISOString().slice(0, 10),
     paymentReason: "",
+    syncToCashBook: true,
   });
   const [drawerItem, setDrawerItem] = useState<PayrollItem | null>(null);
   const [kpiItem, setKpiItem] = useState<PayrollItem | null>(null);
@@ -510,6 +512,35 @@ export default function StandardPayrollPage() {
     }
   };
 
+  const applyUpdatedItemState = (updatedItem: PayrollItem, updatedRun?: Partial<PayrollRun> | null) => {
+    setRun((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        ...(updatedRun || {}),
+        items: prev.items.map((it) =>
+          it.id === updatedItem.id
+            ? {
+                ...updatedItem,
+                attendanceSummary: it.attendanceSummary,
+                performanceReview: it.performanceReview,
+              }
+            : it
+        ),
+      };
+    });
+    setDrawerItem((prev) =>
+      prev?.id === updatedItem.id
+        ? { ...updatedItem, attendanceSummary: prev.attendanceSummary, performanceReview: prev.performanceReview }
+        : prev
+    );
+    setPayslipItem((prev) =>
+      prev?.id === updatedItem.id
+        ? { ...updatedItem, attendanceSummary: prev.attendanceSummary, performanceReview: prev.performanceReview }
+        : prev
+    );
+  };
+
   const handleInlinePatch = async (itemId: string, patch: Partial<PayrollItem>) => {
     try {
       const res = await fetch(`/api/payroll/items/${itemId}`, {
@@ -518,13 +549,8 @@ export default function StandardPayrollPage() {
         body: JSON.stringify(patch),
       });
       const data = await res.json();
-      if (data.success && run) {
-        setRun({
-          ...run,
-          ...data.run,
-          items: run.items.map((it) => (it.id === itemId ? data.item : it)),
-        });
-        if (drawerItem?.id === itemId) setDrawerItem(data.item);
+      if (data.success && data.item) {
+        applyUpdatedItemState(data.item, data.run);
         showToast(`Updated ${data.item.employeeName}`);
       } else {
         showToast(data.error || "Update failed", "error");
@@ -595,9 +621,9 @@ export default function StandardPayrollPage() {
   const displayGross = visibleItems.reduce((s, it) => s + it.grossSalary, 0);
   const displayDeductions = visibleItems.reduce((s, it) => s + it.advanceDeduction + it.expenseBalanceDeduction, 0);
   const displayNet = visibleItems.reduce((s, it) => s + it.netSalary, 0);
-  const displayCash = visibleItems.reduce((s, it) => s + it.paidCash, 0);
-  const displayBank = visibleItems.reduce((s, it) => s + it.paidBankOrGpay, 0);
-  const displayCarryForward = visibleItems.reduce((s, it) => s + it.carryForwardBalance, 0);
+  const displayCash = visibleItems.reduce((s, it) => s + (it.paidCash || 0), 0);
+  const displayBank = visibleItems.reduce((s, it) => s + (it.paidBankOrGpay || 0) + (it.paidGpay || 0), 0);
+  const displayCarryForward = visibleItems.reduce((s, it) => s + (it.carryForwardBalance || 0), 0);
 
   const allSelected = visibleItems.length > 0 && visibleItems.every((it) => selectedIds.includes(it.id));
 
@@ -1129,14 +1155,25 @@ export default function StandardPayrollPage() {
                     }
                     onMarkPaid={() => {
                       const alreadyPaid = (item.paidCash || 0) + (item.paidBankOrGpay || 0) + (item.paidGpay || 0);
+                      const rawGpay = (item.gpayWallet || "").trim();
+                      const normGpay =
+                        rawGpay.toLowerCase() === "ravi gpay"
+                          ? "Ravi Gpay"
+                          : rawGpay.toLowerCase() === "prabha gpay"
+                          ? "Prabha Gpay"
+                          : rawGpay.toLowerCase() === "periyasamy gpay"
+                          ? "Periyasamy Gpay"
+                          : "Office Gpay";
                       setMarkPaidForm({
                         paidCash: item.paidCash || 0,
                         paidBankOrGpay: alreadyPaid > 0 ? (item.paidBankOrGpay || 0) : item.netSalary,
                         paidGpay: item.paidGpay || 0,
-                        gpayWallet: item.gpayWallet || "Office Gpay",
+                        bankWallet: item.paymentChannel === "RBL" ? "RBL" : "ICICI",
+                        gpayWallet: normGpay,
                         paymentRef: item.paymentRef || "",
                         paidDate: item.paidDate ? String(item.paidDate).slice(0, 10) : new Date().toISOString().slice(0, 10),
                         paymentReason: item.paymentReason || "",
+                        syncToCashBook: true,
                       });
                       setMarkPaidItem(item);
                     }}
@@ -1518,13 +1555,20 @@ export default function StandardPayrollPage() {
                   body: JSON.stringify(markPaidForm),
                 });
                 const data = await res.json();
-                if (data.success) {
-                  showToast(`Payment & CashBook proof recorded for ${markPaidItem.employeeName}`);
+                if (data.success && data.item) {
+                  applyUpdatedItemState(data.item, data.run);
+                  showToast(
+                    markPaidForm.syncToCashBook
+                      ? `Payment & CashBook proof saved for ${markPaidItem.employeeName}`
+                      : `Payment proof saved for ${markPaidItem.employeeName}`
+                  );
                   setMarkPaidItem(null);
-                  loadPayroll();
+                  await loadPayroll();
                 } else {
                   showToast(data.error || "Failed to record payment", "error");
                 }
+              } catch {
+                showToast("Network error while saving payment proof", "error");
               } finally {
                 setMarkingPaid(false);
               }
@@ -1544,22 +1588,53 @@ export default function StandardPayrollPage() {
               </button>
             </div>
             <div className="p-5 space-y-3 text-xs">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mr-1">Quick Split:</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMarkPaidForm({ ...markPaidForm, paidCash: 0, paidBankOrGpay: markPaidItem.netSalary, paidGpay: 0 })
+                  }
+                  className="px-2 py-1 rounded-md bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 text-[10px] font-bold cursor-pointer"
+                >
+                  Full {markPaidForm.bankWallet}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMarkPaidForm({ ...markPaidForm, paidCash: 0, paidBankOrGpay: 0, paidGpay: markPaidItem.netSalary })
+                  }
+                  className="px-2 py-1 rounded-md bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 text-[10px] font-bold cursor-pointer"
+                >
+                  Full GPay
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMarkPaidForm({ ...markPaidForm, paidCash: markPaidItem.netSalary, paidBankOrGpay: 0, paidGpay: 0 })
+                  }
+                  className="px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-bold cursor-pointer"
+                >
+                  Full Cash
+                </button>
+              </div>
+
               <div className="grid grid-cols-3 gap-2.5">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Cash (₹)</label>
                   <input
                     type="number"
                     value={markPaidForm.paidCash}
-                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, paidCash: Number(e.target.value) })}
+                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, paidCash: Number(e.target.value) || 0 })}
                     className="w-full px-2.5 py-2 rounded-lg border border-slate-200 font-semibold tabular-nums"
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Bank / ICICI (₹)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Bank ({markPaidForm.bankWallet}) (₹)</label>
                   <input
                     type="number"
                     value={markPaidForm.paidBankOrGpay}
-                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, paidBankOrGpay: Number(e.target.value) })}
+                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, paidBankOrGpay: Number(e.target.value) || 0 })}
                     className="w-full px-2.5 py-2 rounded-lg border border-slate-200 font-semibold tabular-nums"
                   />
                 </div>
@@ -1568,11 +1643,39 @@ export default function StandardPayrollPage() {
                   <input
                     type="number"
                     value={markPaidForm.paidGpay}
-                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, paidGpay: Number(e.target.value) })}
+                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, paidGpay: Number(e.target.value) || 0 })}
                     className="w-full px-2.5 py-2 rounded-lg border border-slate-200 font-semibold tabular-nums"
                   />
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Bank Account</label>
+                  <select
+                    value={markPaidForm.bankWallet}
+                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, bankWallet: e.target.value as "ICICI" | "RBL" })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white font-semibold text-slate-800"
+                  >
+                    <option value="ICICI">ICICI Current Acct</option>
+                    <option value="RBL">RBL Bank Acct</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-violet-700 mb-1">GPay / UPI Wallet</label>
+                  <select
+                    value={markPaidForm.gpayWallet}
+                    onChange={(e) => setMarkPaidForm({ ...markPaidForm, gpayWallet: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white font-semibold text-slate-800"
+                  >
+                    <option value="Office Gpay">Office Gpay</option>
+                    <option value="Ravi Gpay">Ravi Gpay</option>
+                    <option value="Prabha Gpay">Prabha Gpay</option>
+                    <option value="Periyasamy Gpay">Periyasamy Gpay</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">UTR / Bank Ref No.</label>
@@ -1604,10 +1707,19 @@ export default function StandardPayrollPage() {
                   className="w-full px-3 py-2 rounded-lg border border-slate-200"
                 />
               </div>
+              <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={markPaidForm.syncToCashBook}
+                  onChange={(e) => setMarkPaidForm({ ...markPaidForm, syncToCashBook: e.target.checked })}
+                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>Sync disbursement legs to 8-Wallet Cash Book &amp; Bank Statement</span>
+              </label>
               <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2.5 flex items-center justify-between">
                 <span className="font-semibold text-emerald-900">Total Paying Now</span>
                 <span className="text-sm font-black text-emerald-700 tabular-nums">
-                  {formatINR(markPaidForm.paidCash + markPaidForm.paidBankOrGpay + markPaidForm.paidGpay)}
+                  {formatINR((markPaidForm.paidCash || 0) + (markPaidForm.paidBankOrGpay || 0) + (markPaidForm.paidGpay || 0))}
                 </span>
               </div>
             </div>
@@ -1620,7 +1732,7 @@ export default function StandardPayrollPage() {
                 disabled={markingPaid}
                 className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
               >
-                {markingPaid ? "Posting..." : "Mark Paid & Post to Cash Book"}
+                {markingPaid ? "Posting..." : "Save & Mark Paid"}
               </button>
             </div>
           </form>
@@ -1661,6 +1773,15 @@ function PayrollDetailDrawer({
   onDelete: () => void;
 }) {
   const [saving, setSaving] = useState(false);
+  const rawDrawerGpay = (item.gpayWallet || "").trim();
+  const normalizedDrawerGpay =
+    rawDrawerGpay.toLowerCase() === "ravi gpay"
+      ? "Ravi Gpay"
+      : rawDrawerGpay.toLowerCase() === "prabha gpay"
+      ? "Prabha Gpay"
+      : rawDrawerGpay.toLowerCase() === "periyasamy gpay"
+      ? "Periyasamy Gpay"
+      : "Office Gpay";
   const [form, setForm] = useState({
     totalWorkingDays: item.totalWorkingDays,
     daysPresent: item.daysPresent,
@@ -1674,9 +1795,11 @@ function PayrollDetailDrawer({
     paidCash: item.paidCash,
     paidBankOrGpay: item.paidBankOrGpay,
     paidGpay: item.paidGpay || 0,
-    gpayWallet: item.gpayWallet || "Office GPay",
+    gpayWallet: normalizedDrawerGpay,
     paymentChannel: item.paymentChannel,
     paymentStatus: item.paymentStatus || "UNPAID",
+    paymentRef: item.paymentRef || "",
+    paidDate: item.paidDate ? String(item.paidDate).slice(0, 10) : "",
     paymentReason: item.paymentReason || "",
     notes: item.notes || "",
   });
@@ -1790,10 +1913,10 @@ function PayrollDetailDrawer({
             <div>
               <label className="block font-semibold text-slate-700 mb-1">GPay Wallet</label>
               <select value={form.gpayWallet} onChange={(e) => setForm({ ...form, gpayWallet: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 font-semibold focus:outline-none focus:border-[#4F46E5]">
-                <option value="Office GPay">Office GPay</option>
-                <option value="Ravi GPay">Ravi GPay</option>
-                <option value="Prabha GPay">Prabha GPay</option>
-                <option value="Periyasamy GPay">Periyasamy GPay</option>
+                <option value="Office Gpay">Office Gpay</option>
+                <option value="Ravi Gpay">Ravi Gpay</option>
+                <option value="Prabha Gpay">Prabha Gpay</option>
+                <option value="Periyasamy Gpay">Periyasamy Gpay</option>
               </select>
             </div>
           </div>
@@ -1805,7 +1928,7 @@ function PayrollDetailDrawer({
                 <option value="CASH">Cash</option>
                 <option value="ICICI">ICICI</option>
                 <option value="RBL">RBL</option>
-                <option value="OFFICE_GPAY">Office GPay</option>
+                <option value="OFFICE_GPAY">Office Gpay</option>
                 <option value="AGENT_ACCOUNT">Agent Account</option>
               </select>
             </div>
@@ -1817,6 +1940,14 @@ function PayrollDetailDrawer({
                 <option value="HOLD">On Hold</option>
                 <option value="UNPAID">Unpaid</option>
               </select>
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">UTR / Bank Ref No.</label>
+              <input type="text" placeholder="e.g. ICICI2611249981" value={form.paymentRef} onChange={(e) => setForm({ ...form, paymentRef: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 font-mono text-slate-900 focus:outline-none focus:border-[#4F46E5]" />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Paid Date</label>
+              <input type="date" value={form.paidDate} onChange={(e) => setForm({ ...form, paidDate: e.target.value })} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-slate-900 font-semibold focus:outline-none focus:border-[#4F46E5]" />
             </div>
           </div>
 
@@ -2098,6 +2229,16 @@ function PayrollTableRow({
           onBlur={() => commitNum("paidBankOrGpay", paidBank, item.paidBankOrGpay)}
           className="w-16 text-right px-1.5 py-1 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-slate-900 font-medium tabular-nums"
         />
+        {(item.paidGpay || 0) > 0 && (
+          <div className="text-[10px] font-bold text-violet-700 whitespace-nowrap mt-0.5">
+            +{formatINR(item.paidGpay || 0)} {item.gpayWallet || "GPay"}
+          </div>
+        )}
+        {item.paymentRef && (
+          <div className="text-[9.5px] font-mono text-slate-500 whitespace-nowrap mt-0.5 truncate max-w-[100px] ml-auto" title={item.paymentRef}>
+            Ref: {item.paymentRef}
+          </div>
+        )}
       </td>
 
       <td className="py-4 px-3">
@@ -2111,6 +2252,7 @@ function PayrollTableRow({
           >
             <option value="CASH">Cash</option>
             <option value="ICICI">ICICI</option>
+            <option value="RBL">RBL</option>
             <option value="OFFICE_GPAY">GPay</option>
             <option value="AGENT_ACCOUNT">Agent</option>
           </select>

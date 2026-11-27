@@ -82,8 +82,15 @@ export async function POST(req: NextRequest) {
 
     const cash = Number(paidCash) || 0;
     const bank = Number(paidBankOrGpay) || 0;
-    const carryForwardBalance = Math.round((netSalary - (cash + bank)) * 100) / 100;
-    const isCleared = cash + bank > 0 && Math.abs(carryForwardBalance) < 1;
+    const totalPaid = cash + bank;
+    const carryForwardBalance = Math.round((netSalary - totalPaid) * 100) / 100;
+    const paymentStatus =
+      totalPaid >= netSalary && (netSalary > 0 || totalPaid > 0)
+        ? "PAID"
+        : totalPaid > 0
+        ? "PARTIAL"
+        : "UNPAID";
+    const isCleared = paymentStatus === "PAID";
 
     const cleanName = String(employeeName).trim();
     const slug = cleanName.toUpperCase().replace(/[^A-Z0-9]+/g, "_").slice(0, 10);
@@ -109,7 +116,10 @@ export async function POST(req: NextRequest) {
         netSalary,
         paidCash: cash,
         paidBankOrGpay: bank,
+        paidGpay: 0,
         paymentChannel,
+        paymentStatus,
+        paidDate: totalPaid > 0 ? new Date() : null,
         carryForwardBalance,
         isCleared,
         notes: notes ? String(notes).trim() : null,

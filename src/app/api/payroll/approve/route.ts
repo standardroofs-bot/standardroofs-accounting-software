@@ -34,9 +34,9 @@ export async function POST(req: NextRequest) {
     const session = auth.session;
     const approvedByName = session.name || "Prabhakaran T";
 
-    // Sum paid cash and paid bank
+    // Sum paid cash and paid bank + GPay
     const totalCash = Math.round(run.items.reduce((s, it) => s + it.paidCash, 0) * 100) / 100;
-    const totalBank = Math.round(run.items.reduce((s, it) => s + it.paidBankOrGpay, 0) * 100) / 100;
+    const totalBank = Math.round(run.items.reduce((s, it) => s + it.paidBankOrGpay + (it.paidGpay || 0), 0) * 100) / 100;
     const totalDisbursed = totalCash + totalBank > 0 ? totalCash + totalBank : run.totalNet;
 
     // Attempt double-entry & CashBook posting if FinancialYear & Accounts exist

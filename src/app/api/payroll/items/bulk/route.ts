@@ -21,14 +21,20 @@ export async function POST(req: NextRequest) {
 
     if (action === "MARK_CLEARED") {
       const items = await prisma.payrollItem.findMany({ where: { id: { in: itemIds } } });
+      const now = new Date();
       for (const it of items) {
-        const isBank = it.paymentChannel !== "CASH";
+        const isGpay = it.paymentChannel === "OFFICE_GPAY";
+        const isCash = it.paymentChannel === "CASH";
+        const isBank = !isCash && !isGpay;
         await prisma.payrollItem.update({
           where: { id: it.id },
           data: {
-            paidCash: isBank ? 0 : it.netSalary,
+            paidCash: isCash ? it.netSalary : 0,
             paidBankOrGpay: isBank ? it.netSalary : 0,
+            paidGpay: isGpay ? it.netSalary : 0,
             carryForwardBalance: 0,
+            paymentStatus: "PAID",
+            paidDate: it.paidDate || now,
             isCleared: true,
           },
         });

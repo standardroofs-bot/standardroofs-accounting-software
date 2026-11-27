@@ -169,6 +169,7 @@ export async function POST(req: NextRequest) {
 
       const otRatePerHr = cycleType === "MONTHLY_OFFICE" ? Math.round(baseRate / ((totalWorkingDays || 26) * 8)) : Math.round(baseRate / 8);
       const otAndIncentive = prevIt ? prevIt.otAndIncentive : Math.round(totalOtHours * otRatePerHr);
+      const performanceIncentive = prevIt?.performanceIncentive || 0;
       const nightDutyAmount = prevIt?.nightDutyAmount || 0;
       const vehicleAllowance = prevIt ? prevIt.vehicleAllowance : (emp.defaultVehicleAllowance || 0);
       const lastMonthBalance =
@@ -178,14 +179,25 @@ export async function POST(req: NextRequest) {
       const expenseBalanceDeduction = prevIt?.expenseBalanceDeduction || 0;
 
       const netSalary = Math.round(
-        grossSalary + otAndIncentive + nightDutyAmount + vehicleAllowance + lastMonthBalance - advanceDeduction - expenseBalanceDeduction
+        grossSalary + otAndIncentive + performanceIncentive + nightDutyAmount + vehicleAllowance + lastMonthBalance - advanceDeduction - expenseBalanceDeduction
       );
 
       const paidCash = prevIt?.paidCash || 0;
       const paidBankOrGpay = prevIt?.paidBankOrGpay || 0;
-      const carryForwardBalance = Math.round(netSalary - (paidCash + paidBankOrGpay));
+      const paidGpay = prevIt?.paidGpay || 0;
+      const totalPaid = Math.round((paidCash + paidBankOrGpay + paidGpay) * 100) / 100;
+      const carryForwardBalance = Math.round((netSalary - totalPaid) * 100) / 100;
+      const paymentStatus =
+        prevIt?.paymentStatus === "HOLD"
+          ? "HOLD"
+          : totalPaid >= netSalary && (netSalary > 0 || totalPaid > 0)
+          ? "PAID"
+          : totalPaid > 0
+          ? "PARTIAL"
+          : "UNPAID";
 
       return {
+        existingId: prevIt?.id || null,
         employeeId: emp.id,
         employeeName: emp.name,
         employeeCode: emp.employeeCode,
@@ -197,6 +209,7 @@ export async function POST(req: NextRequest) {
         baseRate,
         grossSalary,
         otAndIncentive,
+        performanceIncentive,
         nightDutyAmount,
         vehicleAllowance,
         lastMonthBalance,
@@ -205,9 +218,16 @@ export async function POST(req: NextRequest) {
         netSalary,
         paidCash,
         paidBankOrGpay,
+        paidGpay,
+        gpayWallet: prevIt?.gpayWallet || null,
         paymentChannel: prevIt?.paymentChannel || "CASH",
+        paymentStatus,
+        paymentReason: prevIt?.paymentReason || null,
+        paymentRef: prevIt?.paymentRef || null,
+        paidDate: prevIt?.paidDate || null,
+        performanceScore: prevIt?.performanceScore ?? null,
         carryForwardBalance,
-        isCleared: prevIt?.isCleared || false,
+        isCleared: paymentStatus === "PAID",
         notes: prevIt?.notes || (recs.length > 0 ? `Synced from ${recs.length} attendance records` : "Planned / Default Working Days"),
         designation: emp.designation || emp.role || null,
         joiningDate: fmtJoining(emp.dateOfJoining),
@@ -224,7 +244,7 @@ export async function POST(req: NextRequest) {
     const totalDeductions = newItems.reduce((s, x) => s + x.advanceDeduction + x.expenseBalanceDeduction, 0);
     const totalNet = newItems.reduce((s, x) => s + x.netSalary, 0);
     const paidCash = newItems.reduce((s, x) => s + x.paidCash, 0);
-    const paidBank = newItems.reduce((s, x) => s + x.paidBankOrGpay, 0);
+    const paidBank = newItems.reduce((s, x) => s + x.paidBankOrGpay + (x.paidGpay || 0), 0);
 
     const run = await prisma.payrollRun.upsert({
       where: {
@@ -256,11 +276,29 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await prisma.payrollItem.deleteMany({ where: { payrollRunId: run.id } });
-    if (newItems.length > 0) {
-      await prisma.payrollItem.createMany({
-        data: newItems.map((it) => ({ ...it, payrollRunId: run.id })),
-      });
+    // Preserve existing PayrollItem IDs so payment proof & CashBook voucher links never break
+    const activeEmpIds = new Set(newItems.map((it) => it.employeeId));
+    const staleIds = (existingRun?.items || [])
+      .filter((it) => !activeEmpIds.has(it.employeeId) && !it.employeeId.startsWith("ADHOC_"))
+      .map((it) => it.id);
+    if (staleIds.length > 0) {
+      await prisma.payrollItem.deleteMany({ where: { id: { in: staleIds } } });
+    }
+
+    const toCreate: Array<Omit<(typeof newItems)[number], "existingId"> & { payrollRunId: string }> = [];
+    for (const item of newItems) {
+      const { existingId, ...data } = item;
+      if (existingId) {
+        await prisma.payrollItem.update({
+          where: { id: existingId },
+          data,
+        });
+      } else {
+        toCreate.push({ ...data, payrollRunId: run.id });
+      }
+    }
+    if (toCreate.length > 0) {
+      await prisma.payrollItem.createMany({ data: toCreate });
     }
 
     const updated = await prisma.payrollRun.findUnique({

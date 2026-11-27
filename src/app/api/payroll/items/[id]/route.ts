@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { recalculatePayrollRunTotals } from "@/lib/payrollTotals";
+import {
+  normalizeCashBookWalletName,
+  recalculatePayrollRunTotals,
+  removePayrollItemCashBookLegs,
+  syncPayrollItemCashBookLegs,
+} from "@/lib/payrollTotals";
 import { syncLinkedCashBookForPaidRun } from "@/lib/payrollAttendanceSync";
 
 export async function PATCH(
@@ -66,33 +71,69 @@ export async function PATCH(
         expenseBalanceDeduction
     );
 
-    const paidCash = body.paidCash !== undefined ? Number(body.paidCash) : existing.paidCash;
-    const paidBankOrGpay = body.paidBankOrGpay !== undefined ? Number(body.paidBankOrGpay) : existing.paidBankOrGpay;
-    const paidGpay = body.paidGpay !== undefined ? Number(body.paidGpay) : (existing.paidGpay || 0);
-    const gpayWallet = body.gpayWallet !== undefined ? body.gpayWallet : existing.gpayWallet;
-    const totalPaid = paidCash + paidBankOrGpay + paidGpay;
+    const paidCash = body.paidCash !== undefined ? (Number(body.paidCash) || 0) : existing.paidCash;
+    const paidBankOrGpay = body.paidBankOrGpay !== undefined ? (Number(body.paidBankOrGpay) || 0) : existing.paidBankOrGpay;
+    const paidGpay = body.paidGpay !== undefined ? (Number(body.paidGpay) || 0) : (existing.paidGpay || 0);
+    const gpayWallet =
+      body.gpayWallet !== undefined
+        ? normalizeCashBookWalletName(body.gpayWallet)
+        : existing.gpayWallet;
+    const totalPaid = Math.round((paidCash + paidBankOrGpay + paidGpay) * 100) / 100;
     const carryForwardBalance = Math.round((netSalary - totalPaid) * 100) / 100;
-    const paymentChannel = body.paymentChannel !== undefined ? String(body.paymentChannel) : existing.paymentChannel;
+
+    const derivedChannel =
+      paidBankOrGpay > 0 && paidCash === 0 && paidGpay === 0
+        ? existing.paymentChannel === "RBL"
+          ? "RBL"
+          : "ICICI"
+        : paidGpay > 0 && paidCash === 0 && paidBankOrGpay === 0
+        ? "OFFICE_GPAY"
+        : paidCash > 0 && paidBankOrGpay === 0 && paidGpay === 0
+        ? "CASH"
+        : existing.paymentChannel;
+
+    const paymentChannel = body.paymentChannel !== undefined ? String(body.paymentChannel) : derivedChannel;
     const paymentReason = body.paymentReason !== undefined ? (body.paymentReason ? String(body.paymentReason) : null) : existing.paymentReason;
-    const paymentRef = body.paymentRef !== undefined ? (body.paymentRef ? String(body.paymentRef) : null) : existing.paymentRef;
+    const paymentRef = body.paymentRef !== undefined ? (body.paymentRef ? String(body.paymentRef).trim() : null) : existing.paymentRef;
+
+    const paymentFieldsTouched =
+      body.paidCash !== undefined ||
+      body.paidBankOrGpay !== undefined ||
+      body.paidGpay !== undefined ||
+      body.gpayWallet !== undefined ||
+      body.paymentChannel !== undefined ||
+      body.paymentRef !== undefined ||
+      body.paidDate !== undefined;
+
     const paidDate =
       body.paidDate !== undefined
         ? body.paidDate
           ? new Date(body.paidDate)
           : null
+        : paymentFieldsTouched && totalPaid > 0
+        ? existing.paidDate || new Date()
         : existing.paidDate;
-    const paymentStatus =
-      body.paymentStatus !== undefined
-        ? String(body.paymentStatus)
-        : totalPaid >= netSalary && netSalary > 0
+
+    const computedStatus =
+      totalPaid >= netSalary && (netSalary > 0 || totalPaid > 0)
         ? "PAID"
         : totalPaid > 0
         ? "PARTIAL"
         : "UNPAID";
+
+    const paymentStatus =
+      body.paymentStatus === "HOLD"
+        ? "HOLD"
+        : paymentFieldsTouched
+        ? computedStatus
+        : body.paymentStatus !== undefined
+        ? String(body.paymentStatus)
+        : computedStatus;
+
     const isCleared =
-      body.isCleared !== undefined
+      body.isCleared !== undefined && !paymentFieldsTouched
         ? Boolean(body.isCleared)
-        : totalPaid >= netSalary && netSalary > 0;
+        : paymentStatus === "PAID";
     const notes = body.notes !== undefined ? (body.notes ? String(body.notes) : null) : existing.notes;
 
     const updatedItem = await prisma.payrollItem.update({
@@ -135,6 +176,14 @@ export async function PATCH(
       },
     });
 
+    if (paymentFieldsTouched || existing.payrollRun.status === "PAID") {
+      await syncPayrollItemCashBookLegs(prisma as any, updatedItem, existing.payrollRun, {
+        bankWallet: body.bankWallet,
+        gpayWallet,
+        syncToCashBook: body.syncToCashBook !== false,
+      });
+    }
+
     const updatedRun = await recalculatePayrollRunTotals(existing.payrollRunId, prisma as any);
     if (existing.payrollRun.status === "PAID") {
       await syncLinkedCashBookForPaidRun(existing.payrollRunId);
@@ -169,6 +218,7 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: "Payroll item not found" }, { status: 404 });
     }
 
+    await removePayrollItemCashBookLegs(prisma as any, existing.payrollRun.month, existing.id);
     await prisma.payrollItem.delete({ where: { id } });
     const updatedRun = await recalculatePayrollRunTotals(existing.payrollRunId, prisma as any);
     if (existing.payrollRun.status === "PAID") {
