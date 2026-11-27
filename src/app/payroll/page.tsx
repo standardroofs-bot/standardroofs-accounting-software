@@ -1130,14 +1130,13 @@ export default function StandardPayrollPage() {
                       className="rounded border-slate-300 text-[#4F46E5] focus:ring-[#4F46E5] cursor-pointer"
                     />
                   </th>
-                  <th className="py-3.5 px-4">Employee</th>
-                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Payable Days</th>
-                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Rate &amp; Gross</th>
-                  <th className="py-3.5 px-4 text-right whitespace-nowrap">+OT / Prev / −Adv</th>
-                  <th className="py-3.5 px-4 text-right text-[#4F46E5] whitespace-nowrap">Net Payable</th>
-                  <th className="py-3.5 px-4 whitespace-nowrap">Paid Breakdown</th>
-                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Payment Status</th>
-                  <th className="py-3.5 px-4 text-center whitespace-nowrap">Actions</th>
+                  <th className="py-3.5 px-4 min-w-[210px] whitespace-nowrap">Employee &amp; Base Rate</th>
+                  <th className="py-3.5 px-4 min-w-[125px] whitespace-nowrap">Attendance</th>
+                  <th className="py-3.5 px-4 min-w-[205px] whitespace-nowrap">Earned So Far vs Full Month</th>
+                  <th className="py-3.5 px-4 min-w-[175px] whitespace-nowrap">Adjustments (OT / Prev / Adv)</th>
+                  <th className="py-3.5 px-4 min-w-[155px] text-right text-[#4F46E5] whitespace-nowrap">Net Payable</th>
+                  <th className="py-3.5 px-4 min-w-[175px] whitespace-nowrap">Payment &amp; Status</th>
+                  <th className="py-3.5 px-4 min-w-[155px] text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -2161,28 +2160,6 @@ function PayrollTableRow({
   onMarkPaid: () => void;
   onSalaryHistory: () => void;
 }) {
-  const [daysPresent, setDaysPresent] = useState(String(item.daysPresent));
-  const [baseRate, setBaseRate] = useState(String(item.baseRate));
-  const [otOnly, setOtOnly] = useState(String(item.otAndIncentive));
-  const [advDed, setAdvDed] = useState(String(item.advanceDeduction + item.expenseBalanceDeduction));
-
-  useEffect(() => {
-    setDaysPresent(String(item.daysPresent));
-    setBaseRate(String(item.baseRate));
-    setOtOnly(String(item.otAndIncentive));
-    setAdvDed(String(item.advanceDeduction + item.expenseBalanceDeduction));
-  }, [item]);
-
-  const commitNum = (field: keyof PayrollItem, valStr: string, currentVal: number) => {
-    const parsed = Number(valStr);
-    if (!Number.isFinite(parsed) || parsed === currentVal) return;
-    onPatch(item.id, { [field]: parsed });
-  };
-
-  const handleEnterBlur = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") e.currentTarget.blur();
-  };
-
   const totalCash = Number(item.paidCash || 0);
   const totalBankGpay = Number(item.paidBankOrGpay || 0) + Number(item.paidGpay || 0);
   const totalPaid = totalCash + totalBankGpay;
@@ -2194,7 +2171,7 @@ function PayrollTableRow({
     ((totalPaid >= item.netSalary && (item.netSalary > 0 || totalPaid > 0)) ||
       (item.paymentStatus === "PAID" && balanceDue === 0));
   const isPartial = !isHold && !isPaidInFull && totalPaid > 0;
-  const rateSuffix = item.category === "OFFICE" ? "/mo" : "/d";
+  const rateLabel = item.category === "OFFICE" ? `${formatINR(item.baseRate)} / mo` : `${formatINR(item.baseRate)} / day`;
   const actualMarked = item.actualMarkedDays ?? item.attendanceSummary?.markedPayableSoFar ?? item.daysPresent;
   const remainingLeft = item.remainingWorkingDays ?? item.attendanceSummary?.remainingScheduledDays ?? 0;
   const earnedTillToday =
@@ -2204,9 +2181,26 @@ function PayrollTableRow({
       ? Math.round((item.baseRate / item.totalWorkingDays) * actualMarked)
       : item.grossSalary;
 
+  const totalAdvDed = (item.advanceDeduction || 0) + (item.expenseBalanceDeduction || 0);
+  const earnedNetToday = Math.round(
+    earnedTillToday +
+      item.otAndIncentive +
+      (item.performanceIncentive || 0) +
+      item.nightDutyAmount +
+      (item.vehicleAllowance || 0) +
+      item.lastMonthBalance -
+      totalAdvDed
+  );
+  const hasAnyAdjustment =
+    item.otAndIncentive > 0 ||
+    item.lastMonthBalance !== 0 ||
+    totalAdvDed > 0 ||
+    (item.performanceIncentive || 0) > 0 ||
+    (item.vehicleAllowance || 0) > 0;
+
   return (
-    <tr className={`hover:bg-indigo-50/40 transition ${selected ? "bg-indigo-50/50" : ""}`}>
-      <td className="py-3.5 px-4">
+    <tr className={`hover:bg-slate-50/80 transition ${selected ? "bg-indigo-50/40" : ""}`}>
+      <td className="py-4 px-4 align-middle">
         <input
           type="checkbox"
           checked={selected}
@@ -2215,193 +2209,182 @@ function PayrollTableRow({
         />
       </td>
 
-      {/* 1. EMPLOYEE */}
-      <td className="py-3.5 px-4">
-        <div className="flex items-center gap-3">
+      {/* 1. EMPLOYEE & BASE RATE */}
+      <td className="py-4 px-4 min-w-[210px] align-middle">
+        <div className="flex items-start gap-3">
           <button
             type="button"
             onClick={onOpenDrawer}
-            className="flex items-center gap-3 text-left group cursor-pointer"
+            className="flex items-center gap-3 text-left group cursor-pointer min-w-0"
           >
             <InitialsAvatar name={item.employeeName} />
             <div className="min-w-0">
-              <div className="font-semibold text-slate-900 group-hover:text-[#4F46E5] transition whitespace-nowrap">
-                {item.employeeName}
-              </div>
-              <div className="text-[11px] text-slate-500 font-mono truncate max-w-[180px]">
-                {item.employeeCode} • {item.designation || (item.company === "INVI_CREATION" ? "Invi" : "SR")}
-              </div>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={onOpenKpi}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border cursor-pointer whitespace-nowrap ${
-              (item.performanceReview?.overallRating ?? item.performanceScore)
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700"
-            }`}
-            title="Score Performance KPI & Apply Incentive"
-          >
-            {item.performanceReview?.overallRating ?? item.performanceScore
-              ? `${item.performanceReview?.overallRating ?? item.performanceScore}/100 KPI`
-              : "+ KPI"}
-          </button>
-        </div>
-      </td>
-
-      {/* 2. PAYABLE DAYS */}
-      <td className="py-3.5 px-4 text-right tabular-nums">
-        <div className="flex items-center justify-end gap-0.5">
-          <input
-            type="number"
-            step="0.5"
-            value={daysPresent}
-            onChange={(e) => setDaysPresent(e.target.value)}
-            onKeyDown={handleEnterBlur}
-            onBlur={() => commitNum("daysPresent", daysPresent, item.daysPresent)}
-            className="w-14 text-right px-1.5 py-0.5 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent font-bold text-slate-900 tabular-nums"
-          />
-          <span className="text-[11px] font-semibold text-slate-500">/ {item.totalWorkingDays}d</span>
-        </div>
-        {item.attendanceSummary && item.attendanceSummary.totalRecords > 0 && (
-          <div className="text-[10.5px] font-medium text-indigo-600 whitespace-nowrap mt-0.5">
-            {item.category === "OFFICE" && remainingLeft > 0
-              ? `${actualMarked} marked + ${remainingLeft} left`
-              : item.category !== "OFFICE"
-              ? `Actual worked (${item.attendanceSummary.presentCount}P · ${item.attendanceSummary.halfDayCount}H)`
-              : `${item.attendanceSummary.presentCount}P · ${item.attendanceSummary.paidLeaveCount}PL · ${item.attendanceSummary.halfDayCount}H`}
-          </div>
-        )}
-      </td>
-
-      {/* 3. RATE & GROSS */}
-      <td className="py-3.5 px-4 text-right tabular-nums">
-        {item.category === "OFFICE" && remainingLeft > 0 ? (
-          <div className="space-y-0.5">
-            <div className="text-[11px] font-semibold text-sky-700 whitespace-nowrap">
-              Earned Till Today: <strong>{formatINR(earnedTillToday)}</strong>{" "}
-              <span className="text-[10px] text-sky-600">({actualMarked}/{item.totalWorkingDays}d)</span>
-            </div>
-            <div className="text-[12.5px] font-bold text-slate-900 whitespace-nowrap">
-              Payday Projected (Dec 1): {formatINR(item.grossSalary)}
-            </div>
-          </div>
-        ) : (
-          <div className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
-            {formatINR(item.grossSalary)}
-          </div>
-        )}
-        <div className="flex items-center justify-end gap-0.5 mt-0.5">
-          <span className="text-[10.5px] text-slate-500">₹</span>
-          <input
-            type="number"
-            value={baseRate}
-            onChange={(e) => setBaseRate(e.target.value)}
-            onKeyDown={handleEnterBlur}
-            onBlur={() => commitNum("baseRate", baseRate, item.baseRate)}
-            className="w-16 text-right px-1 py-0.5 rounded border border-transparent hover:border-slate-300 focus:border-[#4F46E5] focus:bg-white bg-transparent text-[11px] text-slate-600 font-medium tabular-nums"
-          />
-          <span className="text-[10.5px] text-slate-500">{rateSuffix}</span>
-        </div>
-      </td>
-
-      {/* 4. +OT / PREV / −ADV */}
-      <td className="py-3.5 px-4 text-right tabular-nums">
-        <div className="flex flex-col items-end gap-1">
-          <div className="inline-flex items-center justify-end gap-1.5">
-            <label className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold" title="Overtime Amount (₹)">
-              <span className="text-[9.5px] font-extrabold text-emerald-600 mr-0.5">OT</span>
-              <span>+₹</span>
-              <input
-                type="number"
-                value={otOnly}
-                onChange={(e) => setOtOnly(e.target.value)}
-                onKeyDown={handleEnterBlur}
-                onBlur={() => {
-                  const val = Number(otOnly);
-                  if (!Number.isFinite(val)) return;
-                  if (val !== item.otAndIncentive) {
-                    onPatch(item.id, { otAndIncentive: val });
-                  }
-                }}
-                aria-label="Overtime Amount"
-                className="w-11 text-right bg-transparent focus:outline-none text-emerald-700 font-bold tabular-nums"
-              />
-            </label>
-            <label className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-bold" title="Cash Book Advances & Expense Deductions (₹)">
-              <span className="text-[9.5px] font-extrabold text-rose-600 mr-0.5">Adv</span>
-              <span>−₹</span>
-              <input
-                type="number"
-                value={advDed}
-                onChange={(e) => setAdvDed(e.target.value)}
-                onKeyDown={handleEnterBlur}
-                onBlur={() => {
-                  const val = Number(advDed);
-                  if (!Number.isFinite(val)) return;
-                  const prevSum = item.advanceDeduction + item.expenseBalanceDeduction;
-                  if (val !== prevSum) {
-                    onPatch(item.id, { advanceDeduction: val, expenseBalanceDeduction: 0 });
-                  }
-                }}
-                aria-label="Advance and Expense Deductions"
-                className="w-11 text-right bg-transparent focus:outline-none text-rose-700 font-bold tabular-nums"
-              />
-            </label>
-          </div>
-          {(item.lastMonthBalance !== 0 || (item.vehicleAllowance || 0) > 0 || (item.performanceIncentive || 0) > 0) && (
-            <div className="flex flex-wrap items-center justify-end gap-1">
-              {item.lastMonthBalance !== 0 && (
-                <span
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                    item.lastMonthBalance > 0
-                      ? "bg-sky-50 text-sky-700 border-sky-200"
-                      : "bg-amber-50 text-amber-800 border-amber-200"
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-slate-900 group-hover:text-[#4F46E5] transition whitespace-nowrap">
+                  {item.employeeName}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenKpi();
+                  }}
+                  className={`px-1.5 py-0.5 rounded-full text-[9.5px] font-bold border cursor-pointer whitespace-nowrap ${
+                    (item.performanceReview?.overallRating ?? item.performanceScore)
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-700"
                   }`}
-                  title="Previous Month Unpaid (+) or Overpaid (−) Balance Carry-Forward"
+                  title="Score Performance KPI & Apply Incentive"
                 >
-                  Prev Bal {item.lastMonthBalance > 0 ? `+₹${item.lastMonthBalance.toLocaleString("en-IN")}` : `−₹${Math.abs(item.lastMonthBalance).toLocaleString("en-IN")}`}
+                  {item.performanceReview?.overallRating ?? item.performanceScore
+                    ? `${item.performanceReview?.overallRating ?? item.performanceScore}/100`
+                    : "+ KPI"}
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                <span className="text-[11px] text-slate-500 font-mono truncate max-w-[155px]">
+                  {item.employeeCode} • {item.designation || (item.company === "INVI_CREATION" ? "Invi" : "SR")}
                 </span>
-              )}
-              {(item.performanceIncentive || 0) > 0 && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  KPI +₹{item.performanceIncentive?.toLocaleString("en-IN")}
+                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200/80 text-[10px] font-semibold tabular-nums whitespace-nowrap">
+                  {rateLabel}
                 </span>
-              )}
-              {(item.vehicleAllowance || 0) > 0 && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                  Veh +₹{item.vehicleAllowance?.toLocaleString("en-IN")}
-                </span>
-              )}
+              </div>
             </div>
+          </button>
+        </div>
+      </td>
+
+      {/* 2. ATTENDANCE */}
+      <td className="py-4 px-4 min-w-[125px] align-middle tabular-nums">
+        <div className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
+          {actualMarked} / {item.totalWorkingDays} days
+        </div>
+        <div className="mt-1">
+          {item.category === "OFFICE" && remainingLeft > 0 ? (
+            <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium whitespace-nowrap">
+              +{remainingLeft} working {remainingLeft === 1 ? "day" : "days"} left
+            </span>
+          ) : (
+            <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium whitespace-nowrap">
+              Full cycle closed
+            </span>
           )}
         </div>
       </td>
 
-      {/* 5. NET PAYABLE */}
-      <td className="py-3.5 px-4 text-right tabular-nums">
-        <div className="text-sm font-extrabold text-slate-900 whitespace-nowrap">{formatINR(item.netSalary)}</div>
-        {item.notes && (
-          <div className="text-[10.5px] text-slate-500 max-w-[140px] truncate ml-auto mt-0.5" title={item.notes}>
-            {item.notes}
+      {/* 3. EARNED SO FAR vs FULL MONTH */}
+      <td className="py-4 px-4 min-w-[205px] align-middle tabular-nums">
+        {item.category === "OFFICE" && remainingLeft > 0 ? (
+          <div className="flex flex-col items-start gap-1">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-indigo-50/80 border border-indigo-100 text-sm font-bold text-indigo-700 whitespace-nowrap">
+              Earned So Far: {formatINR(earnedTillToday)}
+            </span>
+            <span className="text-xs text-slate-500 pl-0.5 whitespace-nowrap">
+              Full-Month Gross: <strong className="text-slate-700">{formatINR(item.grossSalary)}</strong>
+            </span>
           </div>
+        ) : (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-indigo-50/80 border border-indigo-100 text-sm font-bold text-indigo-700 whitespace-nowrap">
+            Earned: {formatINR(item.grossSalary)}
+          </span>
         )}
       </td>
 
-      {/* 6. PAID BREAKDOWN */}
-      <td className="py-3.5 px-4 tabular-nums">
-        <div className="flex flex-col gap-1">
-          <div className="text-[11px] font-semibold text-slate-800 whitespace-nowrap">
-            {totalPaid > 0 ? (
-              <span>
-                Cash: <strong>{formatINR(totalCash)}</strong> · Bank/GPay: <strong>{formatINR(totalBankGpay)}</strong>
-              </span>
-            ) : (
-              <span className="text-slate-400 font-medium">₹0 Paid</span>
-            )}
+      {/* 4. ADJUSTMENTS (OT / PREV / ADV) */}
+      <td className="py-4 px-4 min-w-[175px] align-middle tabular-nums">
+        <button
+          type="button"
+          onClick={onOpenDrawer}
+          className="flex flex-wrap items-center gap-1.5 text-left group cursor-pointer"
+          title="Click to edit OT, Prev Bal, or Advances"
+        >
+          {hasAnyAdjustment ? (
+            <>
+              {item.otAndIncentive > 0 && (
+                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold whitespace-nowrap">
+                  +{formatINR(item.otAndIncentive)} OT
+                </span>
+              )}
+              {item.lastMonthBalance !== 0 && (
+                <span
+                  className={`px-2 py-0.5 rounded-md border text-[11px] font-bold whitespace-nowrap ${
+                    item.lastMonthBalance > 0
+                      ? "bg-sky-50 text-sky-700 border-sky-200"
+                      : "bg-amber-50 text-amber-800 border-amber-200"
+                  }`}
+                >
+                  {item.lastMonthBalance > 0
+                    ? `+${formatINR(item.lastMonthBalance)}`
+                    : `−${formatINR(Math.abs(item.lastMonthBalance))}`}{" "}
+                  Prev Bal
+                </span>
+              )}
+              {totalAdvDed > 0 && (
+                <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold whitespace-nowrap">
+                  −{formatINR(totalAdvDed)} Adv
+                </span>
+              )}
+              {(item.performanceIncentive || 0) > 0 && (
+                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold whitespace-nowrap">
+                  +{formatINR(item.performanceIncentive || 0)} KPI
+                </span>
+              )}
+              {(item.vehicleAllowance || 0) > 0 && (
+                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-bold whitespace-nowrap">
+                  +{formatINR(item.vehicleAllowance || 0)} Veh
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="px-2 py-0.5 rounded-md bg-slate-50 group-hover:bg-indigo-50 text-slate-400 group-hover:text-indigo-600 border border-slate-200/80 text-[11px] font-medium transition whitespace-nowrap">
+              No adjustments (+ Add)
+            </span>
+          )}
+        </button>
+      </td>
+
+      {/* 5. NET PAYABLE */}
+      <td className="py-4 px-4 min-w-[155px] text-right align-middle tabular-nums">
+        <div className="text-base font-bold text-slate-950 whitespace-nowrap">{formatINR(item.netSalary)}</div>
+        {item.category === "OFFICE" && remainingLeft > 0 ? (
+          <div className="text-[11px] font-medium text-emerald-700 whitespace-nowrap mt-0.5">
+            Earned Net Today: {formatINR(earnedNetToday)}
           </div>
-          <div className="flex items-center gap-1.5">
+        ) : item.notes ? (
+          <div className="text-[10.5px] text-slate-500 max-w-[150px] truncate ml-auto mt-0.5" title={item.notes}>
+            {item.notes}
+          </div>
+        ) : null}
+      </td>
+
+      {/* 6. PAYMENT & STATUS */}
+      <td className="py-4 px-4 min-w-[175px] align-middle tabular-nums">
+        <div className="flex flex-col items-start gap-1.5">
+          {isPaidInFull ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+              <CheckCircle2 size={12} />
+              <span>PAID IN FULL</span>
+            </span>
+          ) : isHold ? (
+            <span className="inline-flex items-center text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+              ON HOLD • {formatINR(balanceDue)}
+            </span>
+          ) : isPartial ? (
+            <span className="inline-flex items-center text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
+              PARTIAL • {formatINR(balanceDue)} Due
+            </span>
+          ) : (
+            <span
+              className={`inline-flex items-center text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${
+                balanceDue > 0
+                  ? "bg-rose-50/70 text-rose-700 border-rose-200"
+                  : "bg-slate-100 text-slate-600 border-slate-200"
+              }`}
+            >
+              UNPAID • {formatINR(balanceDue)}
+            </span>
+          )}
+          <div className="flex flex-wrap items-center gap-1.5">
             <select
               value={item.paymentChannel}
               onChange={(e) => onPatch(item.id, { paymentChannel: e.target.value })}
@@ -2409,44 +2392,17 @@ function PayrollTableRow({
               className="px-2 py-0.5 rounded-md border border-slate-200 bg-slate-50 hover:bg-white text-[10.5px] font-semibold text-slate-700 focus:outline-none focus:border-[#4F46E5] cursor-pointer"
             >
               <option value="CASH">Office Cash</option>
-              <option value="ICICI">ICICI Bank</option>
-              <option value="RBL">RBL Bank</option>
-              <option value="OFFICE_GPAY">{item.gpayWallet || "Office GPay"}</option>
+              <option value="ICICI">ICICI</option>
+              <option value="RBL">RBL</option>
+              <option value="OFFICE_GPAY">{item.gpayWallet || "GPay"}</option>
               <option value="AGENT_ACCOUNT">Agent Acct</option>
             </select>
+            <span className="text-[10.5px] font-medium text-slate-500 whitespace-nowrap">
+              {totalPaid > 0 ? `Cash ${formatINR(totalCash)} • Bank ${formatINR(totalBankGpay)}` : "₹0 paid"}
+            </span>
           </div>
-        </div>
-      </td>
-
-      {/* 7. PAYMENT STATUS (SINGLE CLEAR PILL) */}
-      <td className="py-3.5 px-4 text-right tabular-nums">
-        <div className="flex flex-col items-end gap-1">
-          {isPaidInFull ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-              <CheckCircle2 size={12} />
-              <span>PAID IN FULL</span>
-            </span>
-          ) : isHold ? (
-            <span className="inline-flex items-center text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
-              ON HOLD · {formatINR(balanceDue)}
-            </span>
-          ) : isPartial ? (
-            <span className="inline-flex items-center text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
-              PARTIAL · {formatINR(balanceDue)} Due
-            </span>
-          ) : (
-            <span
-              className={`inline-flex items-center text-[11px] font-extrabold px-2.5 py-1 rounded-full border whitespace-nowrap ${
-                balanceDue > 0
-                  ? "bg-rose-50/70 text-rose-700 border-rose-200"
-                  : "bg-slate-100 text-slate-600 border-slate-200"
-              }`}
-            >
-              UNPAID · {formatINR(balanceDue)}
-            </span>
-          )}
           {item.paymentRef && (
-            <span className="text-[10px] font-mono text-slate-500 max-w-[150px] truncate" title={item.paymentRef}>
+            <span className="text-[10px] font-mono text-slate-500 max-w-[165px] truncate" title={item.paymentRef}>
               UTR: {item.paymentRef}
             </span>
           )}
@@ -2458,9 +2414,9 @@ function PayrollTableRow({
         </div>
       </td>
 
-      {/* 8. ACTIONS */}
-      <td className="py-3.5 px-4 text-center">
-        <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+      {/* 7. ACTIONS */}
+      <td className="py-4 px-4 min-w-[155px] text-right align-middle">
+        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
           <button
             type="button"
             onClick={onMarkPaid}
@@ -2478,7 +2434,7 @@ function PayrollTableRow({
             type="button"
             onClick={onOpenDrawer}
             className="p-1.5 rounded-lg text-slate-600 hover:text-[#4F46E5] hover:bg-indigo-50 transition cursor-pointer"
-            title="Edit in Drawer"
+            title="Edit Salary, OT & Deductions"
           >
             <Pencil size={14} />
           </button>
