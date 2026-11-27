@@ -8,6 +8,33 @@ export function getTodayISTDateString(): string {
   return new Date(istMs).toISOString().slice(0, 10);
 }
 
+export function computeGrossForCycle(
+  isOffice: boolean,
+  rate: number,
+  payableDays: number,
+  totalWorkingDays: number
+): number {
+  if (!isOffice) {
+    return Math.round(rate * payableDays);
+  }
+  if (totalWorkingDays <= 0) return Math.round(rate);
+  if (Math.abs(payableDays - totalWorkingDays) < 0.001 || payableDays >= totalWorkingDays) {
+    return Math.round(rate);
+  }
+  return Math.round((rate / totalWorkingDays) * payableDays);
+}
+
+export function computeHourlyOtAmount(
+  isOffice: boolean,
+  rate: number,
+  otHours: number,
+  totalWorkingDays: number
+): number {
+  if (!otHours || otHours <= 0 || rate <= 0) return 0;
+  const hourlyRate = isOffice ? rate / (totalWorkingDays || 24) / 8 : rate / 8;
+  return Math.round(otHours * hourlyRate);
+}
+
 export function getCycleDateRange(month: string, halfPeriod: string) {
   const [yStr, mStr] = month.split("-");
   const year = Number(yStr);
@@ -233,24 +260,33 @@ export async function computeAttendanceBreakdownMap(
     empDates.add(iso);
     markedDatesByEmp.set(r.employeeId, empDates);
 
+    const isUpToToday = iso <= monthInfo.todayISO;
     const st = (r.status || "").toUpperCase();
     if (st === "P" || st === "1H" || st === "1H_MORNING" || st === "1H_EVENING") {
-      cur.presentCount += 1;
-      cur.payableDays += 1.0;
-    } else if (st === "PL") {
-      const isHalf = Number(r.permissionHours) === 0.5 || (r.workNotes && r.workNotes.includes("HALF_PAID"));
-      if (isHalf) {
-        cur.paidLeaveCount += 0.5;
-        cur.payableDays += 0.5;
-      } else {
-        cur.paidLeaveCount += 1;
+      if (isUpToToday) {
+        cur.presentCount += 1;
         cur.payableDays += 1.0;
       }
+    } else if (st === "PL") {
+      const isHalf = Number(r.permissionHours) === 0.5 || (r.workNotes && r.workNotes.includes("HALF_PAID"));
+      if (isUpToToday) {
+        if (isHalf) {
+          cur.paidLeaveCount += 0.5;
+          cur.payableDays += 0.5;
+        } else {
+          cur.paidLeaveCount += 1;
+          cur.payableDays += 1.0;
+        }
+      }
     } else if (st === "H") {
-      cur.halfDayCount += 1;
-      cur.payableDays += 0.5;
+      if (isUpToToday) {
+        cur.halfDayCount += 1;
+        cur.payableDays += 0.5;
+      }
     } else if (st === "A" || st === "UP") {
-      cur.absentCount += 1;
+      if (isUpToToday) {
+        cur.absentCount += 1;
+      }
     }
     cur.otHours += Number(r.otHours || 0);
     cur.dailyAdvanceSum += Number(r.dailyAdvance || 0);
@@ -274,13 +310,18 @@ export async function computeAttendanceBreakdownMap(
       totalRecords: 0,
     };
     const empDates = markedDatesByEmp.get(empId) || new Set<string>();
-    const remaining = monthInfo.remainingDateStrings.filter((d) => !empDates.has(d)).length;
+    const isFullOfficeMonth = halfPeriod === "FULL";
+    const remaining = isFullOfficeMonth
+      ? monthInfo.remainingDateStrings.filter((d) => !empDates.has(d)).length
+      : 0;
     cur.markedPayableSoFar = Math.round(cur.payableDays * 100) / 100;
-    cur.remainingScheduledDays = remaining;
-    cur.projectedPayableDays = Math.min(
-      monthInfo.scheduledWorkingDays,
-      Math.round((cur.markedPayableSoFar + remaining) * 100) / 100
+    cur.remainingScheduledDays = Math.max(
+      0,
+      Math.min(remaining, Math.max(0, monthInfo.scheduledWorkingDays - cur.markedPayableSoFar))
     );
+    cur.projectedPayableDays = isFullOfficeMonth
+      ? Math.min(monthInfo.scheduledWorkingDays, Math.round((cur.markedPayableSoFar + remaining) * 100) / 100)
+      : cur.markedPayableSoFar;
     cur.scheduledWorkingDays = monthInfo.scheduledWorkingDays;
     map.set(empId, cur);
   }
@@ -362,16 +403,14 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string, targetComp
             : summary!.markedPayableSoFar
           : Math.min(totalWorkingDays, item.daysPresent || totalWorkingDays);
         const leaveDays = Math.max(0, Math.round((totalWorkingDays - daysPresent) * 100) / 100);
-        const grossSalary =
-          item.category === "OFFICE"
-            ? item.baseRate <= 2500
-              ? Math.round(item.baseRate * daysPresent)
-              : Math.round((item.baseRate / (totalWorkingDays || 24)) * daysPresent)
-            : Math.round(item.baseRate * daysPresent);
+        const grossSalary = computeGrossForCycle(isOfficeCycle, item.baseRate, daysPresent, totalWorkingDays);
+        const otAndIncentive = hasRecords
+          ? computeHourlyOtAmount(isOfficeCycle, item.baseRate, summary!.otHours, totalWorkingDays)
+          : item.otAndIncentive;
 
         const netSalary = Math.round(
           grossSalary +
-            item.otAndIncentive +
+            otAndIncentive +
             (item.performanceIncentive || 0) +
             item.nightDutyAmount +
             (item.vehicleAllowance || 0) +
@@ -397,6 +436,7 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string, targetComp
             daysPresent,
             leaveDays,
             grossSalary,
+            otAndIncentive,
             netSalary,
             carryForwardBalance,
             paymentStatus,
@@ -502,19 +542,19 @@ export async function syncEmployeeToOpenDraftRuns(targetCompanyId?: string) {
           ? Number(emp.monthlySalary || emp.baseWage || 0)
           : Number(emp.dailyWage || emp.baseWage || 0);
 
-        const grossSalary = isOfficeCycle
-          ? baseRate <= 2500
-            ? Math.round(baseRate * daysPresent)
-            : Math.round((baseRate / (totalWorkingDays || 24)) * daysPresent)
-          : Math.round(baseRate * daysPresent);
+        const grossSalary = computeGrossForCycle(isOfficeCycle, baseRate, daysPresent, totalWorkingDays);
 
-        const otAndIncentive = prevIt?.otAndIncentive ?? 0;
+        const otAndIncentive =
+          summary && summary.totalRecords > 0
+            ? computeHourlyOtAmount(isOfficeCycle, baseRate, summary.otHours, totalWorkingDays)
+            : (prevIt?.otAndIncentive ?? 0);
         const performanceIncentive = prevIt?.performanceIncentive ?? 0;
         const nightDutyAmount = prevIt?.nightDutyAmount ?? 0;
+        const isDriver = (emp.designation || emp.role || "").toLowerCase().includes("driver");
         const vehicleAllowance =
-          prevIt && prevIt.vehicleAllowance > 0
-            ? prevIt.vehicleAllowance
-            : Number(emp.defaultVehicleAllowance || 0);
+          isDriver || Number(emp.defaultVehicleAllowance || 0) > 0
+            ? (prevIt && prevIt.vehicleAllowance > 0 ? prevIt.vehicleAllowance : Number(emp.defaultVehicleAllowance || 0))
+            : 0;
         const lastMonthBalance = prevIt?.lastMonthBalance ?? 0;
         const advanceDeduction = prevIt?.advanceDeduction ?? Math.round(summary?.dailyAdvanceSum || 0);
         const expenseBalanceDeduction = prevIt?.expenseBalanceDeduction ?? 0;

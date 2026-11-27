@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   computeAttendanceBreakdownMap,
+  computeGrossForCycle,
+  computeHourlyOtAmount,
   computeMonthWorkingDaysInfo,
   getCycleDateRange,
   syncLinkedCashBookForPaidRun,
@@ -166,21 +168,18 @@ export async function POST(req: NextRequest) {
           ? Number(emp.monthlySalary || emp.baseWage || 0)
           : Number(emp.dailyWage || emp.baseWage || 0);
 
-      const grossSalary =
-        cycleType === "MONTHLY_OFFICE"
-          ? baseRate <= 2500
-            ? Math.round(baseRate * daysPresent)
-            : Math.round((baseRate / (totalWorkingDays || 24)) * daysPresent)
-          : Math.round(baseRate * daysPresent);
+      const isOffice = cycleType === "MONTHLY_OFFICE";
+      const grossSalary = computeGrossForCycle(isOffice, baseRate, daysPresent, totalWorkingDays);
 
-      const otRatePerHr = cycleType === "MONTHLY_OFFICE" ? Math.round(baseRate / ((totalWorkingDays || 26) * 8)) : Math.round(baseRate / 8);
-      const otAndIncentive = prevIt ? prevIt.otAndIncentive : Math.round(totalOtHours * otRatePerHr);
+      const computedOt = computeHourlyOtAmount(isOffice, baseRate, totalOtHours, totalWorkingDays);
+      const otAndIncentive = recs.length > 0 ? computedOt : (prevIt?.otAndIncentive ?? 0);
       const performanceIncentive = prevIt?.performanceIncentive || 0;
       const nightDutyAmount = prevIt?.nightDutyAmount || 0;
-      const vehicleAllowance = prevIt ? prevIt.vehicleAllowance : (emp.defaultVehicleAllowance || 0);
-      const lastMonthBalance =
-        prevIt?.lastMonthBalance ??
-        (prevBalanceMap.get(emp.id) ?? prevBalanceMap.get(emp.name.toLowerCase().trim()) ?? 0);
+      const isDriver = (emp.designation || emp.role || "").toLowerCase().includes("driver");
+      const vehicleAllowance = isDriver || Number(emp.defaultVehicleAllowance || 0) > 0
+        ? (prevIt ? prevIt.vehicleAllowance : Number(emp.defaultVehicleAllowance || 0))
+        : 0;
+      const lastMonthBalance = 0;
       const advanceDeduction = prevIt ? prevIt.advanceDeduction : Math.round(dailyAdvSum);
       const expenseBalanceDeduction = prevIt?.expenseBalanceDeduction || 0;
 
@@ -326,19 +325,44 @@ export async function POST(req: NextRequest) {
       run: updated
         ? {
             ...updated,
-            items: updated.items.map((it) => ({
-              ...it,
-              attendanceSummary: attMap.get(it.employeeId) || {
-                presentCount: 0,
-                halfDayCount: 0,
-                paidLeaveCount: 0,
-                absentCount: 0,
-                otHours: 0,
-                payableDays: 0,
-                dailyAdvanceSum: 0,
-                totalRecords: 0,
-              },
-            })),
+            items: updated.items.map((it) => {
+              const att = attMap.get(it.employeeId);
+              const isOfficeItem = it.category === "OFFICE";
+              const hasAtt = Boolean(att && att.totalRecords > 0);
+              const actualMarkedDays = isOfficeItem
+                ? hasAtt
+                  ? Math.min(it.totalWorkingDays, att!.markedPayableSoFar)
+                  : it.daysPresent
+                : it.daysPresent;
+              const remainingWorkingDays =
+                isOfficeItem && hasAtt
+                  ? Math.max(0, Math.min(att!.remainingScheduledDays, Math.max(0, it.totalWorkingDays - actualMarkedDays)))
+                  : 0;
+              const earnedTillDate = isOfficeItem
+                ? computeGrossForCycle(true, it.baseRate, actualMarkedDays, it.totalWorkingDays)
+                : it.grossSalary;
+
+              return {
+                ...it,
+                actualMarkedDays,
+                remainingWorkingDays,
+                earnedTillDate,
+                attendanceSummary: att || {
+                  presentCount: 0,
+                  halfDayCount: 0,
+                  paidLeaveCount: 0,
+                  absentCount: 0,
+                  otHours: 0,
+                  payableDays: 0,
+                  markedPayableSoFar: actualMarkedDays,
+                  remainingScheduledDays: remainingWorkingDays,
+                  projectedPayableDays: it.daysPresent,
+                  scheduledWorkingDays: it.totalWorkingDays,
+                  dailyAdvanceSum: 0,
+                  totalRecords: 0,
+                },
+              };
+            }),
           }
         : updated,
       syncedEmployees: newItems.length,

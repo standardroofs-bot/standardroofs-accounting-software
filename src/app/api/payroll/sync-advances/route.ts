@@ -48,11 +48,12 @@ export async function POST(req: NextRequest) {
 
     const { start, end } = getCycleWindow(run.month, run.halfPeriod);
 
+    const advanceCategory = run.cycleType === "MONTHLY_OFFICE" ? "Employee Advance" : "Labour Advance";
     const advanceEntries = await prisma.cashBookEntry.findMany({
       where: {
         companyId: tenant.companyId,
         date: { gte: start, lte: end },
-        category: { in: ["Employee Advance", "Labour Advance"] },
+        category: advanceCategory,
       },
     });
 
@@ -61,14 +62,15 @@ export async function POST(req: NextRequest) {
     for (const item of run.items) {
       const firstName = item.employeeName.toLowerCase().split(/[\s.]+/)[0];
       if (firstName.length < 3) continue;
+      const escaped = firstName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const wordRe = new RegExp(`\\b${escaped}\\b`, "i");
+      const specificRe = new RegExp(`\\b${escaped}[^0-9]{0,6}(\\d+)`, "i");
 
       let advTotal = 0;
       for (const cb of advanceEntries) {
-        const text = `${cb.purpose || ""} ${cb.counterpartyName || ""}`.toLowerCase();
-        // Match individual name in purpose when single-person entry (not multi-person list unless exact match)
-        if (text.includes(firstName)) {
-          // If it's a multi-person list like "Santhosh-200, Suresh-200", extract the specific amount if formatted
-          const specificMatch = text.match(new RegExp(`${firstName}[^0-9]{0,6}(\\d+)`, "i"));
+        const text = `${cb.purpose || ""} ${cb.counterpartyName || ""}`;
+        if (wordRe.test(text)) {
+          const specificMatch = text.match(specificRe);
           if (specificMatch) {
             advTotal += Number(specificMatch[1]);
           } else if (!text.includes(",")) {
@@ -81,13 +83,16 @@ export async function POST(req: NextRequest) {
         const netSalary = Math.round(
           item.grossSalary +
             item.otAndIncentive +
+            (item.performanceIncentive || 0) +
             item.nightDutyAmount +
             item.vehicleAllowance +
             item.lastMonthBalance -
             advTotal -
             item.expenseBalanceDeduction
         );
-        const carryForwardBalance = Math.round((netSalary - (item.paidCash + item.paidBankOrGpay)) * 100) / 100;
+        const carryForwardBalance = Math.round(
+          (netSalary - ((item.paidCash || 0) + (item.paidBankOrGpay || 0) + (item.paidGpay || 0))) * 100
+        ) / 100;
 
         await prisma.payrollItem.update({
           where: { id: item.id },

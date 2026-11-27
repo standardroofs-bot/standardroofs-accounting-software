@@ -6,7 +6,7 @@ import {
   removePayrollItemCashBookLegs,
   syncPayrollItemCashBookLegs,
 } from "@/lib/payrollTotals";
-import { syncLinkedCashBookForPaidRun } from "@/lib/payrollAttendanceSync";
+import { computeGrossForCycle, syncLinkedCashBookForPaidRun } from "@/lib/payrollAttendanceSync";
 import { getActiveTenantContext } from "@/lib/tenant";
 
 export async function PATCH(
@@ -40,12 +40,12 @@ export async function PATCH(
     if (body.grossSalary !== undefined) {
       grossSalary = Number(body.grossSalary);
     } else if (body.daysPresent !== undefined || body.baseRate !== undefined || body.totalWorkingDays !== undefined) {
-      grossSalary =
-        existing.category === "OFFICE"
-          ? baseRate <= 2500
-            ? Math.round(baseRate * daysPresent)
-            : Math.round((baseRate / (totalWorkingDays || 26)) * daysPresent)
-          : Math.round(baseRate * daysPresent);
+      grossSalary = computeGrossForCycle(
+        existing.category === "OFFICE",
+        baseRate,
+        daysPresent,
+        totalWorkingDays
+      );
     }
 
     const otAndIncentive = body.otAndIncentive !== undefined ? Number(body.otAndIncentive) : existing.otAndIncentive;

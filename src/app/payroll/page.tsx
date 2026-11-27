@@ -35,6 +35,9 @@ interface PayrollItem extends BrandedPayslipItem {
   payrollRunId: string;
   employeeId: string;
   isCleared: boolean;
+  actualMarkedDays?: number;
+  remainingWorkingDays?: number;
+  earnedTillDate?: number;
   performanceReview?: {
     overallRating: number;
     recommendedIncentive: number;
@@ -629,6 +632,10 @@ export default function StandardPayrollPage() {
   });
 
   const displayGross = visibleItems.reduce((s, it) => s + it.grossSalary, 0);
+  const displayEarnedTillDate = visibleItems.reduce(
+    (s, it) => s + (typeof it.earnedTillDate === "number" ? it.earnedTillDate : it.grossSalary),
+    0
+  );
   const displayDeductions = visibleItems.reduce((s, it) => s + it.advanceDeduction + it.expenseBalanceDeduction, 0);
   const displayNet = visibleItems.reduce((s, it) => s + it.netSalary, 0);
   const displayCash = visibleItems.reduce((s, it) => s + (it.paidCash || 0), 0);
@@ -913,20 +920,25 @@ export default function StandardPayrollPage() {
       {/* 4-STEP LIVE FORMULA BAR */}
       <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 font-bold">
-            1. Base Earned = {formatINR(displayGross)}
+          {cycleType === "MONTHLY_OFFICE" && (
+            <span className="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-900 border border-sky-200 font-bold tabular-nums">
+              Accrued Till Today{month === "2026-11" ? " (Nov 27)" : ""}: {formatINR(displayEarnedTillDate)}
+            </span>
+          )}
+          <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 font-bold tabular-nums">
+            1. {cycleType === "MONTHLY_OFFICE" ? "Payday Projected Gross" : "Actual Worked Gross"} = {formatINR(displayGross)}
           </span>
           <span className="text-slate-400 font-bold">+</span>
-          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
+          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold tabular-nums">
             2. OT / Inc / Veh = {formatINR(visibleItems.reduce((s, it) => s + it.otAndIncentive + (it.performanceIncentive || 0) + (it.vehicleAllowance || 0) + it.lastMonthBalance, 0))}
           </span>
           <span className="text-slate-400 font-bold">–</span>
-          <span className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 font-bold">
+          <span className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 font-bold tabular-nums">
             3. Advances = {formatINR(displayDeductions)}
           </span>
           <span className="text-slate-400 font-bold">=</span>
-          <span className="px-2.5 py-1 rounded-lg bg-slate-900 text-white font-extrabold">
-            4. Net Payable = {formatINR(displayNet)}
+          <span className="px-2.5 py-1 rounded-lg bg-slate-900 text-white font-extrabold tabular-nums">
+            4. Projected Net Payable = {formatINR(displayNet)}
           </span>
         </div>
         <div className="text-[11px] font-semibold text-slate-600 tabular-nums">
@@ -1894,9 +1906,9 @@ function PayrollDetailDrawer({
   const leaveDays = Math.max(0, Math.round((form.totalWorkingDays - form.daysPresent) * 100) / 100);
   const gross =
     item.category === "OFFICE"
-      ? form.baseRate <= 2500
-        ? Math.round(form.baseRate * form.daysPresent)
-        : Math.round((form.baseRate / (form.totalWorkingDays || 26)) * form.daysPresent)
+      ? form.totalWorkingDays <= 0 || form.daysPresent >= form.totalWorkingDays || Math.abs(form.daysPresent - form.totalWorkingDays) < 0.001
+        ? Math.round(form.baseRate)
+        : Math.round((form.baseRate / form.totalWorkingDays) * form.daysPresent)
       : Math.round(form.baseRate * form.daysPresent);
   const net = Math.round(
     gross +
@@ -2181,7 +2193,15 @@ function PayrollTableRow({
     ((totalPaid >= item.netSalary && (item.netSalary > 0 || totalPaid > 0)) ||
       (item.paymentStatus === "PAID" && balanceDue === 0));
   const isPartial = !isHold && !isPaidInFull && totalPaid > 0;
-  const rateSuffix = item.category === "OFFICE" && item.baseRate > 2500 ? "/mo" : "/d";
+  const rateSuffix = item.category === "OFFICE" ? "/mo" : "/d";
+  const actualMarked = item.actualMarkedDays ?? item.attendanceSummary?.markedPayableSoFar ?? item.daysPresent;
+  const remainingLeft = item.remainingWorkingDays ?? item.attendanceSummary?.remainingScheduledDays ?? 0;
+  const earnedTillToday =
+    typeof item.earnedTillDate === "number"
+      ? item.earnedTillDate
+      : item.category === "OFFICE" && item.totalWorkingDays > 0 && actualMarked < item.totalWorkingDays
+      ? Math.round((item.baseRate / item.totalWorkingDays) * actualMarked)
+      : item.grossSalary;
 
   return (
     <tr className={`hover:bg-indigo-50/40 transition ${selected ? "bg-indigo-50/50" : ""}`}>
@@ -2245,10 +2265,10 @@ function PayrollTableRow({
         </div>
         {item.attendanceSummary && item.attendanceSummary.totalRecords > 0 && (
           <div className="text-[10.5px] font-medium text-indigo-600 whitespace-nowrap mt-0.5">
-            {item.category === "OFFICE" && item.attendanceSummary.remainingScheduledDays && item.attendanceSummary.remainingScheduledDays > 0
-              ? `${item.attendanceSummary.markedPayableSoFar ?? item.attendanceSummary.payableDays} marked + ${item.attendanceSummary.remainingScheduledDays} left`
+            {item.category === "OFFICE" && remainingLeft > 0
+              ? `${actualMarked} marked + ${remainingLeft} left`
               : item.category !== "OFFICE"
-              ? `${item.attendanceSummary.presentCount}P · ${item.attendanceSummary.halfDayCount}H · ${item.attendanceSummary.paidLeaveCount}PL`
+              ? `Actual worked (${item.attendanceSummary.presentCount}P · ${item.attendanceSummary.halfDayCount}H)`
               : `${item.attendanceSummary.presentCount}P · ${item.attendanceSummary.paidLeaveCount}PL · ${item.attendanceSummary.halfDayCount}H`}
           </div>
         )}
@@ -2256,9 +2276,21 @@ function PayrollTableRow({
 
       {/* 3. RATE & GROSS */}
       <td className="py-3.5 px-4 text-right tabular-nums">
-        <div className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
-          {formatINR(item.grossSalary)}
-        </div>
+        {item.category === "OFFICE" && remainingLeft > 0 ? (
+          <div className="space-y-0.5">
+            <div className="text-[11px] font-semibold text-sky-700 whitespace-nowrap">
+              Earned Till Today: <strong>{formatINR(earnedTillToday)}</strong>{" "}
+              <span className="text-[10px] text-sky-600">({actualMarked}/{item.totalWorkingDays}d)</span>
+            </div>
+            <div className="text-[12.5px] font-bold text-slate-900 whitespace-nowrap">
+              Payday Projected (Dec 1): {formatINR(item.grossSalary)}
+            </div>
+          </div>
+        ) : (
+          <div className="text-[13px] font-bold text-slate-900 whitespace-nowrap">
+            {formatINR(item.grossSalary)}
+          </div>
+        )}
         <div className="flex items-center justify-end gap-0.5 mt-0.5">
           <span className="text-[10.5px] text-slate-500">₹</span>
           <input

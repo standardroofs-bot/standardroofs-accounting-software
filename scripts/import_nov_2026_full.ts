@@ -145,7 +145,7 @@ async function runFullImport() {
     const empCode = String(r[0]).trim();
     const name = String(r[1] || '').trim();
     const designation = String(r[2] || (empCode === 'Invi001' ? 'UI/UX Designer' : empCode === 'Invi002' ? 'Full-Stack Developer' : 'Operations Specialist')).trim();
-    const monthlySalary = Number(r[38]) || (empCode === 'Invi001' ? 9100 : empCode === 'Invi002' ? 10400 : 10000);
+    const monthlySalary = Number(r[37]) || (empCode === 'Invi001' ? 9100 : empCode === 'Invi002' ? 10400 : 10000);
 
     const emp = await prisma.employeeOrLabour.upsert({
       where: { employeeCode: empCode },
