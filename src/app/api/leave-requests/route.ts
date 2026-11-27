@@ -170,6 +170,7 @@ export async function PATCH(request: Request) {
     if (!session) {
       return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
     }
+    const tenant = await getActiveTenantContext();
 
     const body = await request.json();
     const { id, leaveCategory, dayType, startDate, endDate, reason } = body;
@@ -183,7 +184,7 @@ export async function PATCH(request: Request) {
       include: { employee: true },
     });
 
-    if (!existing) {
+    if (!existing || (existing.companyId && existing.companyId !== tenant.companyId)) {
       return NextResponse.json({ success: false, error: "Leave request not found." }, { status: 404 });
     }
 

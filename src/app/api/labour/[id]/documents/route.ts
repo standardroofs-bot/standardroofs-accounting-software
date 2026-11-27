@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuthorizedSession } from "@/lib/rbac";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export interface KycVaultDoc {
   id: string;
@@ -28,6 +29,7 @@ export async function POST(
   try {
     const auth = await requireAuthorizedSession("labour", "EDIT");
     if (auth.error) return auth.error;
+    const tenant = await getActiveTenantContext();
 
     const { id } = await context.params;
     const body = await req.json();
@@ -40,8 +42,8 @@ export async function POST(
       return NextResponse.json({ success: false, error: "Document URL is required" }, { status: 400 });
     }
 
-    const worker = await prisma.employeeOrLabour.findUnique({
-      where: { id },
+    const worker = await prisma.employeeOrLabour.findFirst({
+      where: { id, companyId: tenant.companyId },
       select: { kycDocumentsJson: true },
     });
     if (!worker) {
@@ -80,14 +82,15 @@ export async function DELETE(
   try {
     const auth = await requireAuthorizedSession("labour", "EDIT");
     if (auth.error) return auth.error;
+    const tenant = await getActiveTenantContext();
 
     const { id } = await context.params;
     const { searchParams } = new URL(req.url);
     const docId = searchParams.get("docId");
     const url = searchParams.get("url");
 
-    const worker = await prisma.employeeOrLabour.findUnique({
-      where: { id },
+    const worker = await prisma.employeeOrLabour.findFirst({
+      where: { id, companyId: tenant.companyId },
       select: { kycDocumentsJson: true },
     });
     if (!worker) {

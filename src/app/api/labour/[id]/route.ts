@@ -12,6 +12,9 @@ export async function GET(
 ) {
   try {
     const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const isContractor = searchParams.get("isContractor") === "true";
@@ -61,6 +64,9 @@ export async function PUT(
 ) {
   try {
     const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const { id } = await params;
     const body = await request.json();
     const {
@@ -126,7 +132,8 @@ export async function PUT(
         aadhaarNumber: aadhaarNumber || null,
         panNumber: panNumber ? panNumber.toUpperCase() : null,
         bankName: bankName || null,
-        bankAccountNo: bankAccountNo || null,
+        bankAccountNo: body.bankAccountNumber || bankAccountNo || null,
+        bankAccountNumber: body.bankAccountNumber || bankAccountNo || null,
         bankIfsc: bankIfsc ? bankIfsc.toUpperCase() : null,
         ifscCode: bankIfsc ? bankIfsc.toUpperCase() : null,
         designation: designation || undefined,
@@ -145,7 +152,10 @@ export async function PUT(
     });
 
     await syncEmployeeToOpenDraftRuns(tenant.companyId);
-    return NextResponse.json({ success: true, labourer });
+    const safeLabourer = tenant.isSuperAdmin
+      ? { ...labourer, salaryMasked: false }
+      : { ...labourer, monthlySalary: null, dailyWage: null, baseWage: null, defaultVehicleAllowance: 0, salaryMasked: true };
+    return NextResponse.json({ success: true, labourer: safeLabourer });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -157,6 +167,9 @@ export async function PATCH(
 ) {
   try {
     const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const { id } = await params;
     const body = await request.json();
     const { action = "archive", isContractor } = body;
@@ -199,6 +212,9 @@ export async function DELETE(
 ) {
   try {
     const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const isContractor = searchParams.get("isContractor") === "true";

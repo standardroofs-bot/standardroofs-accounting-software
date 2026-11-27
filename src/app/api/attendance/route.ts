@@ -30,6 +30,9 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const dateStr = searchParams.get("date") || getTodayISTDateString(); // live auto-today default
     const monthStr = searchParams.get("month") || dateStr.substring(0, 7); // YYYY-MM
@@ -210,6 +213,17 @@ export async function GET(request: Request) {
 
     const monthInfo = await computeMonthWorkingDaysInfo(monthStr, "FULL", tenant.companyId);
 
+    const safeEmployees = tenant.isSuperAdmin
+      ? employees
+      : employees.map((e) => ({
+          ...e,
+          monthlySalary: null,
+          dailyWage: null,
+          baseWage: null,
+          defaultVehicleAllowance: 0,
+          salaryMasked: true,
+        }));
+
     return NextResponse.json({
       success: true,
       date: dateStr,
@@ -222,7 +236,7 @@ export async function GET(request: Request) {
         name: tenant.companyName,
         tagline: tenant.companyTagline,
       },
-      employees,
+      employees: safeEmployees,
       contractors: contractorList,
       contractorLogs,
       holidays,
@@ -261,6 +275,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const body = await request.json();
     const { action = "mark", record, records, date, month, category, siteName } = body;
 
@@ -372,6 +389,7 @@ export async function POST(request: Request) {
           await prisma.leaveRequest.create({
             data: {
               employeeId,
+              companyId: emp.companyId,
               leaveCategory: "PERMISSION_1H",
               dayType: parsedPermMins >= 60 ? "PERMISSION" : `${parsedPermMins}M`,
               startDate: targetDate,
@@ -390,6 +408,7 @@ export async function POST(request: Request) {
           await prisma.leaveRequest.create({
             data: {
               employeeId,
+              companyId: emp.companyId,
               leaveCategory: "GENERAL_REQUEST",
               dayType: "OT",
               startDate: targetDate,
@@ -623,9 +642,9 @@ export async function POST(request: Request) {
 
       const startMonth = start.toISOString().substring(0, 7);
       const endMonth = end.toISOString().substring(0, 7);
-      await syncOpenDraftPayrollRunsForMonth(startMonth);
+      await syncOpenDraftPayrollRunsForMonth(startMonth, tenant.companyId);
       if (endMonth !== startMonth) {
-        await syncOpenDraftPayrollRunsForMonth(endMonth);
+        await syncOpenDraftPayrollRunsForMonth(endMonth, tenant.companyId);
       }
 
       return NextResponse.json({ success: true, message: "Leave approved and attendance matrix updated." });
@@ -633,6 +652,12 @@ export async function POST(request: Request) {
 
     // 1.6 Reject Employee Leave Request
     if (action === "reject-leave" && body.requestId) {
+      const targetLeave = await prisma.leaveRequest.findFirst({
+        where: { id: body.requestId, companyId: tenant.companyId },
+      });
+      if (!targetLeave) {
+        return NextResponse.json({ success: false, error: "Leave request not found in active organization." }, { status: 404 });
+      }
       await prisma.leaveRequest.update({
         where: { id: body.requestId },
         data: {
@@ -666,7 +691,8 @@ export async function POST(request: Request) {
           workNotes,
         } = item;
         const targetDate = new Date(`${rDate}T00:00:00.000Z`);
-        const emp = await prisma.employeeOrLabour.findUnique({ where: { id: employeeId } });
+        const emp = await prisma.employeeOrLabour.findFirst({ where: { id: employeeId, companyId: tenant.companyId } });
+        if (!emp) continue;
 
         const res = await prisma.attendanceRecord.upsert({
           where: {
@@ -688,8 +714,9 @@ export async function POST(request: Request) {
             otHours: otHours !== undefined ? Number(otHours) : 0,
             otApprovalStatus: otApprovalStatus ?? null,
             workNotes: workNotes ?? null,
-            category: emp?.category,
-            companyUnit: emp?.companyUnit,
+            category: emp.category,
+            companyUnit: emp.companyUnit,
+            companyId: tenant.companyId,
           },
           create: {
             employeeId,
@@ -706,8 +733,9 @@ export async function POST(request: Request) {
             otHours: otHours !== undefined ? Number(otHours) : 0,
             otApprovalStatus: otApprovalStatus ?? null,
             workNotes: workNotes ?? null,
-            category: emp?.category,
-            companyUnit: emp?.companyUnit,
+            category: emp.category,
+            companyUnit: emp.companyUnit,
+            companyId: tenant.companyId,
           },
         });
         results.push(res);

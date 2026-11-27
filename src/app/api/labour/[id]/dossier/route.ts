@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuthorizedSession } from "@/lib/rbac";
+import { getActiveTenantContext } from "@/lib/tenant";
 import * as XLSX from "xlsx";
 import fs from "fs";
 import path from "path";
@@ -96,13 +97,14 @@ export async function GET(
   try {
     const auth = await requireAuthorizedSession("labour", "VIEW");
     if (auth.error) return auth.error;
+    const tenant = await getActiveTenantContext();
 
     const { id } = await context.params;
     const bundle = new URL(req.url).searchParams.get("bundle");
-    const isSuperAdmin = String(auth.session.role || "").toUpperCase() === "SUPER_ADMIN";
+    const isSuperAdmin = tenant.isSuperAdmin;
 
-    const worker = await prisma.employeeOrLabour.findUnique({
-      where: { id },
+    const worker = await prisma.employeeOrLabour.findFirst({
+      where: { id, companyId: tenant.companyId },
       include: {
         attendances: { orderBy: { date: "desc" }, take: 90 },
         leaveRequests: { orderBy: { createdAt: "desc" }, take: 20 },
@@ -111,11 +113,11 @@ export async function GET(
     });
 
     if (!worker) {
-      return NextResponse.json({ success: false, error: "Worker not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Worker not found in active organization" }, { status: 404 });
     }
 
     const payrollHistory = await prisma.payrollItem.findMany({
-      where: { employeeId: id },
+      where: { employeeId: id, payrollRun: { companyId: tenant.companyId } },
       include: {
         payrollRun: {
           select: { month: true, halfPeriod: true, cycleType: true, status: true },

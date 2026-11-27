@@ -3,9 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { postDoubleEntryTransaction, getNextVoucherNumber } from "@/lib/accounting";
 import { toDecimal } from "@/lib/decimal";
 import { VoucherType } from "@prisma/client";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export async function POST(request: Request) {
   try {
+    const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const body = await request.json();
     const { employeeId, amount: amountStr, purpose, date } = body;
 
@@ -17,9 +22,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const employee = await prisma.employeeOrLabour.findUniqueOrThrow({ where: { id: employeeId } });
+    const employee = await prisma.employeeOrLabour.findFirst({
+      where: { id: employeeId, companyId: tenant.companyId },
+    });
+    if (!employee) {
+      return NextResponse.json({ success: false, error: "Employee not found in active organization." }, { status: 404 });
+    }
     const fy = await prisma.financialYear.findFirstOrThrow({ where: { isCurrent: true } });
-    const defaultUser = await prisma.user.findFirstOrThrow();
 
     // Accounts
     const advanceControlAccount = await prisma.account.findUniqueOrThrow({ where: { code: "1050" } }); // Labour Advance Control A/c
@@ -36,7 +45,7 @@ export async function POST(request: Request) {
       entryNumber: voucherInfo.voucherNumber,
       date: date ? new Date(date) : new Date(),
       narration: `Cash Advance to Labourer: ${employee.name} (${employee.employeeCode}) - ${purpose}`,
-      createdById: defaultUser.id,
+      createdById: tenant.userId,
       lines: [
         {
           accountId: advanceControlAccount.id,

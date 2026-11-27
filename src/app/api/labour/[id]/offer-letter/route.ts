@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuthorizedSession } from "@/lib/rbac";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export async function POST(
   req: NextRequest,
@@ -9,8 +10,16 @@ export async function POST(
   try {
     const auth = await requireAuthorizedSession("labour", "EDIT");
     if (auth.error) return auth.error;
+    const tenant = await getActiveTenantContext();
 
     const { id } = await context.params;
+    const existingWorker = await prisma.employeeOrLabour.findFirst({
+      where: { id, companyId: tenant.companyId },
+      select: { id: true },
+    });
+    if (!existingWorker) {
+      return NextResponse.json({ success: false, error: "Employee not found in active organization" }, { status: 404 });
+    }
     const body = await req.json();
     const { terms } = body;
 

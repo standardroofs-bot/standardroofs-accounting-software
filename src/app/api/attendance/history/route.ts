@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get("employeeId");
     const contractorTeamName = searchParams.get("contractorTeamName");
@@ -13,7 +18,7 @@ export async function GET(request: Request) {
     // Case 1: Contractor Team History
     if (contractorTeamName) {
       const logs = await prisma.contractorDailyLog.findMany({
-        where: { contractorTeamName },
+        where: { contractorTeamName, companyId: tenant.companyId },
         orderBy: { date: "asc" },
       });
 
@@ -117,8 +122,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: "Employee ID or contractorTeamName required." }, { status: 400 });
     }
 
-    const employee = await prisma.employeeOrLabour.findUnique({
-      where: { id: employeeId },
+    const employee = await prisma.employeeOrLabour.findFirst({
+      where: { id: employeeId, companyId: tenant.companyId },
       include: {
         attendances: {
           orderBy: { date: "asc" },

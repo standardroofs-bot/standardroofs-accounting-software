@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUserSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getActiveTenantContext } from "@/lib/tenant";
 import fs from "fs";
 import path from "path";
 
@@ -10,6 +11,7 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
     }
+    const tenant = await getActiveTenantContext();
 
     if (session.role === "EMPLOYEE") {
       return NextResponse.json({ success: false, error: "Forbidden: Employee cannot upload KYC records directly." }, { status: 403 });
@@ -20,6 +22,16 @@ export async function POST(request: Request) {
     const documentType = ((formData.get("documentType") || formData.get("docType")) as string) || "document";
     const employeeId = (formData.get("employeeId") || formData.get("workerId")) as string | null;
     const employeeCode = formData.get("employeeCode") as string | null;
+
+    if (employeeId) {
+      const targetEmp = await prisma.employeeOrLabour.findFirst({
+        where: { id: employeeId, companyId: tenant.companyId },
+        select: { id: true },
+      });
+      if (!targetEmp) {
+        return NextResponse.json({ success: false, error: "Employee not found in active organization." }, { status: 404 });
+      }
+    }
 
     if (!file) {
       return NextResponse.json({ success: false, error: "No file provided." }, { status: 400 });

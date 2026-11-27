@@ -21,6 +21,9 @@ function isInFinancialYear(month: string, fy: string): boolean {
 export async function GET(req: NextRequest) {
   try {
     const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const { searchParams } = new URL(req.url);
     const employeeId = searchParams.get("employeeId");
     const employeeCode = searchParams.get("employeeCode");
@@ -135,15 +138,24 @@ export async function GET(req: NextRequest) {
       }
     );
 
+    const safeEmployee = employee
+      ? tenant.isSuperAdmin
+        ? { ...employee, salaryMasked: false }
+        : { ...employee, monthlySalary: null, dailyWage: null, salaryMasked: true }
+      : {
+          id: employeeId || "",
+          name: employeeName || filtered[0]?.employeeName || "Employee",
+          employeeCode: employeeCode || filtered[0]?.employeeCode || "",
+          designation: filtered[0]?.designation || null,
+          dateOfJoining: filtered[0]?.joiningDate || null,
+          monthlySalary: null,
+          dailyWage: null,
+          salaryMasked: !tenant.isSuperAdmin,
+        };
+
     return NextResponse.json({
       success: true,
-      employee: employee || {
-        id: employeeId || "",
-        name: employeeName || filtered[0]?.employeeName || "Employee",
-        employeeCode: employeeCode || filtered[0]?.employeeCode || "",
-        designation: filtered[0]?.designation || null,
-        dateOfJoining: filtered[0]?.joiningDate || null,
-      },
+      employee: safeEmployee,
       fy,
       items: filtered,
       totals,

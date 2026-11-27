@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseAndImportPayrollWorkbook } from "@/lib/payrollExcelParser";
+import { requireAuthorizedSession } from "@/lib/rbac";
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuthorizedSession("labour", "EDIT");
+    if (auth.error) return auth.error;
+    if (auth.session.role !== "SUPER_ADMIN") {
+      return NextResponse.json({ success: false, error: "Forbidden: Only Super Admin can import workbooks." }, { status: 403 });
+    }
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     if (!file) {

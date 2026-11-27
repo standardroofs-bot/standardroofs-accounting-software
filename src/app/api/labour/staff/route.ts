@@ -3,10 +3,19 @@ import { prisma } from "@/lib/prisma";
 import { toDecimal } from "@/lib/decimal";
 import { postDoubleEntryTransaction } from "@/lib/accounting";
 import { Decimal } from "@prisma/client/runtime/library";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export async function GET() {
   try {
+    const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
+
     const payrolls = await prisma.staffPayroll.findMany({
+      where: {
+        employee: { companyId: tenant.companyId },
+      },
       include: {
         employee: true,
         journalEntry: { select: { id: true, entryNumber: true } },
@@ -14,8 +23,9 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    const staffMembers = await prisma.employeeOrLabour.findMany({
+    const rawStaff = await prisma.employeeOrLabour.findMany({
       where: {
+        companyId: tenant.companyId,
         OR: [
           { roleType: "PERMANENT_STAFF" },
           { payCycle: "MONTHLY" },
@@ -29,7 +39,18 @@ export async function GET() {
       orderBy: { name: "asc" },
     });
 
-    return NextResponse.json({ success: true, payrolls, staffMembers });
+    const staffMembers = tenant.isSuperAdmin
+      ? rawStaff
+      : rawStaff.map((s) => ({
+          ...s,
+          monthlySalary: null,
+          dailyWage: null,
+          baseWage: null,
+          defaultVehicleAllowance: 0,
+          salaryMasked: true,
+        }));
+
+    return NextResponse.json({ success: true, payrolls, staffMembers, canRevealSalaries: tenant.isSuperAdmin });
   } catch (error: any) {
     console.error("GET /api/labour/staff error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -38,6 +59,10 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const body = await req.json();
     const {
       employeeId,
@@ -52,10 +77,12 @@ export async function POST(req: NextRequest) {
       payoutDate,
     } = body;
 
-    const employee = await prisma.employeeOrLabour.findUnique({
-      where: { id: employeeId },
+    const employee = await prisma.employeeOrLabour.findFirst({
+      where: { id: employeeId, companyId: tenant.companyId },
     });
-    if (!employee) throw new Error("Staff member not found");
+    if (!employee) {
+      return NextResponse.json({ success: false, error: "Staff member not found in active organization" }, { status: 404 });
+    }
 
     const basic = toDecimal(basicSalary || 0);
     const allow = toDecimal(allowances || 0);

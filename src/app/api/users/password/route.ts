@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserSession } from "@/lib/auth";
+import { getActiveTenantContext } from "@/lib/tenant";
 import bcrypt from "bcryptjs";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export async function PATCH(request: Request) {
     if (!session) {
       return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
     }
+    const tenant = await getActiveTenantContext();
 
     // Only Super Admin, MD, or HR Manager can change passwords
     const isAuthorized =
@@ -46,10 +48,19 @@ export async function PATCH(request: Request) {
       where: {
         OR: [{ id: userId || undefined }, { email: email || undefined }],
       },
+      include: { companyAccess: { select: { companyId: true } } },
     });
 
     if (!user) {
       return NextResponse.json({ success: false, error: "User not found." }, { status: 404 });
+    }
+
+    if (!tenant.isGroupSuperAdmin) {
+      const targetCompanyIds = new Set(user.companyAccess.map((c) => c.companyId));
+      if (user.defaultCompanyId) targetCompanyIds.add(user.defaultCompanyId);
+      if (!targetCompanyIds.has(tenant.companyId)) {
+        return NextResponse.json({ success: false, error: "Forbidden: User belongs to another organization." }, { status: 403 });
+      }
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);

@@ -10,6 +10,9 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const category = searchParams.get("category"); // OFFICE_STAFF, TAMIL_LABOUR, HINDI_LABOUR, CONTRACTOR_TEAM
     const status = searchParams.get("status") || "ACTIVE"; // ACTIVE, ARCHIVED, ALL
@@ -158,6 +161,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const session = tenant.session;
     const body = await request.json();
     const {

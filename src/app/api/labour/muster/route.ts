@@ -3,9 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { postDoubleEntryTransaction, getNextVoucherNumber } from "@/lib/accounting";
 import { toDecimal, Decimal } from "@/lib/decimal";
 import { VoucherType } from "@prisma/client";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export async function POST(request: Request) {
   try {
+    const tenant = await getActiveTenantContext();
+    if (!tenant.userId) {
+      return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
+    }
     const body = await request.json();
     const {
       employeeId,
@@ -18,9 +23,13 @@ export async function POST(request: Request) {
       paymentMode = "CASH",
     } = body;
 
-    const employee = await prisma.employeeOrLabour.findUniqueOrThrow({ where: { id: employeeId } });
+    const employee = await prisma.employeeOrLabour.findFirst({
+      where: { id: employeeId, companyId: tenant.companyId },
+    });
+    if (!employee) {
+      return NextResponse.json({ success: false, error: "Employee not found in active organization." }, { status: 404 });
+    }
     const fy = await prisma.financialYear.findFirstOrThrow({ where: { isCurrent: true } });
-    const defaultUser = await prisma.user.findFirstOrThrow();
 
     const grossWage = toDecimal(grossWageStr || employee.baseWage);
     const advanceDeduction = toDecimal(advanceDeductionStr);
@@ -78,7 +87,7 @@ export async function POST(request: Request) {
       entryNumber: voucherInfo.voucherNumber,
       date: new Date(),
       narration: `15-Day Labour Muster Payout: ${employee.name} (${employee.employeeCode})`,
-      createdById: defaultUser.id,
+      createdById: tenant.userId,
       lines: journalLines,
     });
 
