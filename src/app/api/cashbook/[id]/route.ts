@@ -2,18 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { CashFlowType } from "@prisma/client";
 import { toDecimal } from "@/lib/decimal";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const tenant = await getActiveTenantContext();
     const { id } = await context.params;
     const body = await req.json();
 
-    const existing = await prisma.cashBookEntry.findUnique({ where: { id } });
+    const existing = await prisma.cashBookEntry.findFirst({
+      where: { id, companyId: tenant.companyId },
+    });
     if (!existing) {
-      return NextResponse.json({ success: false, error: "CashBook entry not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "CashBook entry not found in active organization" }, { status: 404 });
     }
 
     const updated = await prisma.cashBookEntry.update({
@@ -46,7 +50,14 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const tenant = await getActiveTenantContext();
     const { id } = await context.params;
+    const existing = await prisma.cashBookEntry.findFirst({
+      where: { id, companyId: tenant.companyId },
+    });
+    if (!existing) {
+      return NextResponse.json({ success: false, error: "CashBook entry not found in active organization" }, { status: 404 });
+    }
     await prisma.cashBookEntry.delete({ where: { id } });
     return NextResponse.json({ success: true, deletedId: id });
   } catch (error: any) {

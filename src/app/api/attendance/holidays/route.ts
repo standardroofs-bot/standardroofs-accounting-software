@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncOpenDraftPayrollRunsForMonth } from "@/lib/payrollAttendanceSync";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +22,14 @@ const OFFICIAL_12_HOLIDAYS = [
 
 export async function GET(request: Request) {
   try {
+    const tenant = await getActiveTenantContext();
     const { searchParams } = new URL(request.url);
     const yearStr = searchParams.get("year");
     const year = yearStr ? parseInt(yearStr, 10) : undefined;
 
-    const whereClause: any = {};
+    const whereClause: any = {
+      OR: [{ companyId: "ALL" }, { companyId: tenant.companyId }],
+    };
     if (year) {
       whereClause.year = year;
     }
@@ -43,18 +47,22 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const tenant = await getActiveTenantContext();
     const body = await request.json();
     const { action = "add", id, date, name, year, holidayType = "PL", description, markOfficeStaff = true } = body;
 
-    // Action: Apply all holidays for year to office staff
+    // Action: Apply all holidays for year to active organization's office staff
     if (action === "applyAll") {
       const targetYear = year || 2026;
       const holidays = await prisma.companyHoliday.findMany({
-        where: { year: targetYear },
+        where: {
+          year: targetYear,
+          OR: [{ companyId: "ALL" }, { companyId: tenant.companyId }],
+        },
       });
 
       const officeEmployees = await prisma.employeeOrLabour.findMany({
-        where: { category: "OFFICE_STAFF", status: "ACTIVE" },
+        where: { category: "OFFICE_STAFF", status: "ACTIVE", companyId: tenant.companyId },
       });
 
       for (const h of holidays) {
@@ -76,6 +84,7 @@ export async function POST(request: Request) {
               workNotes: `Company Holiday: ${h.name} (${h.holidayType})`,
               category: emp.category,
               companyUnit: emp.companyUnit,
+              companyId: emp.companyId,
             },
             create: {
               employeeId: emp.id,
@@ -85,6 +94,7 @@ export async function POST(request: Request) {
               workNotes: `Company Holiday: ${h.name} (${h.holidayType})`,
               category: emp.category,
               companyUnit: emp.companyUnit,
+              companyId: emp.companyId,
             },
           });
         }
@@ -92,12 +102,12 @@ export async function POST(request: Request) {
 
       const holidayMonths = Array.from(new Set(holidays.map((h) => h.date.toISOString().slice(0, 7))));
       for (const hm of holidayMonths) {
-        await syncOpenDraftPayrollRunsForMonth(hm);
+        await syncOpenDraftPayrollRunsForMonth(hm, tenant.companyId);
       }
 
       return NextResponse.json({
         success: true,
-        message: `Applied ${holidays.length} holidays to ${officeEmployees.length} office staff members.`,
+        message: `Applied ${holidays.length} holidays to ${officeEmployees.length} ${tenant.companyName} office staff.`,
       });
     }
 
@@ -123,15 +133,16 @@ export async function POST(request: Request) {
         year: holidayYear,
         holidayType,
         description: description || null,
+        companyId: tenant.companyId,
         isPublic: true,
       },
     });
 
     let staffMarkedCount = 0;
-    // Mark holiday on Office Staff attendance if requested
+    // Mark holiday on active organization's Office Staff attendance if requested
     if (markOfficeStaff) {
       const officeEmployees = await prisma.employeeOrLabour.findMany({
-        where: { category: "OFFICE_STAFF", status: "ACTIVE" },
+        where: { category: "OFFICE_STAFF", status: "ACTIVE", companyId: tenant.companyId },
       });
 
       const status = holidayType === "UP" ? "UP" : "PL";
@@ -151,6 +162,7 @@ export async function POST(request: Request) {
             workNotes: `Company Holiday: ${name} (${holidayType})`,
             category: emp.category,
             companyUnit: emp.companyUnit,
+            companyId: emp.companyId,
           },
           create: {
             employeeId: emp.id,
@@ -160,6 +172,7 @@ export async function POST(request: Request) {
             workNotes: `Company Holiday: ${name} (${holidayType})`,
             category: emp.category,
             companyUnit: emp.companyUnit,
+            companyId: emp.companyId,
           },
         })
       );
@@ -168,7 +181,7 @@ export async function POST(request: Request) {
       staffMarkedCount = officeEmployees.length;
     }
 
-    await syncOpenDraftPayrollRunsForMonth(targetDate.toISOString().slice(0, 7));
+    await syncOpenDraftPayrollRunsForMonth(targetDate.toISOString().slice(0, 7), tenant.companyId);
 
     return NextResponse.json({ success: true, holiday, staffMarkedCount });
   } catch (error: any) {

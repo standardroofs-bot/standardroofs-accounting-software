@@ -5,12 +5,14 @@ import {
   recalculatePayrollRunTotals,
   syncPayrollItemCashBookLegs,
 } from "@/lib/payrollTotals";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export async function POST(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const tenant = await getActiveTenantContext();
     const { id } = await context.params;
     const body = await req.json();
 
@@ -19,8 +21,8 @@ export async function POST(
       include: { payrollRun: true },
     });
 
-    if (!existing) {
-      return NextResponse.json({ success: false, error: "Payroll item not found" }, { status: 404 });
+    if (!existing || existing.payrollRun.companyId !== tenant.companyId) {
+      return NextResponse.json({ success: false, error: "Payroll item not found in active organization" }, { status: 404 });
     }
 
     const paidCash =

@@ -472,6 +472,7 @@ export default function UsersPage() {
                 <th className="py-3 px-4">Member Name</th>
                 <th className="py-3 px-4">Email Address</th>
                 <th className="py-3 px-4">Assigned Role</th>
+                <th className="py-3 px-4">Organization Access</th>
                 <th className="py-3 px-4 text-center">Status</th>
                 <th className="py-3 px-4 text-center">Actions</th>
               </tr>
@@ -479,23 +480,24 @@ export default function UsersPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400">
+                  <td colSpan={6} className="py-8 text-center text-slate-400">
                     Loading team accounts...
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400">
+                  <td colSpan={6} className="py-8 text-center text-slate-400">
                     No team members found matching filter.
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((u) => {
-                  const isSuperAdmin =
-                    u.email === "admin@standardroofs.in" ||
-                    u.email === "admin@standardroofs.com" ||
-                    u.role === "SUPER_ADMIN";
-                  const resolvedName = isSuperAdmin ? "Prabhakaran T" : u.name;
+                filteredUsers.map((u: any) => {
+                  const isSuperAdmin = u.role === "SUPER_ADMIN";
+                  const resolvedName =
+                    u.email === "admin@standardroofs.in" || u.email === "admin@standardroofs.com"
+                      ? "Prabhakaran T"
+                      : u.name;
+                  const orgAccessList: any[] = Array.isArray(u.companyAccess) ? u.companyAccess : [];
 
                   return (
                     <tr key={u.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition">
@@ -528,6 +530,31 @@ export default function UsersPage() {
                         >
                           {u.role === "SUPER_ADMIN" ? "Super Admin" : u.role.replace(/_/g, " ")}
                         </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-wrap gap-1">
+                          {orgAccessList.length > 0 ? (
+                            orgAccessList.map((acc: any) => {
+                              const isInvi = acc.companyId === "invi-creation" || acc.company?.code === "INVI_CREATION";
+                              return (
+                                <span
+                                  key={acc.companyId}
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                    isInvi
+                                      ? "bg-purple-50 text-purple-700 border-purple-200"
+                                      : "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                  }`}
+                                >
+                                  {acc.company?.name || (isInvi ? "Invi Creation" : "Standard Roofs")}
+                                </span>
+                              );
+                            })
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                              Standard Roofs
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-center">
                         <button

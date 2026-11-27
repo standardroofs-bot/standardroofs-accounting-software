@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { recalculatePayrollRunTotals } from "@/lib/payrollTotals";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 function getCycleWindow(month: string, halfPeriod: string) {
   const [yStr, mStr] = month.split("-");
@@ -28,6 +29,7 @@ function getCycleWindow(month: string, halfPeriod: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    const tenant = await getActiveTenantContext();
     const body = await req.json();
     const { payrollRunId } = body;
 
@@ -35,19 +37,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "payrollRunId is required" }, { status: 400 });
     }
 
-    const run = await prisma.payrollRun.findUnique({
-      where: { id: payrollRunId },
+    const run = await prisma.payrollRun.findFirst({
+      where: { id: payrollRunId, companyId: tenant.companyId },
       include: { items: true },
     });
 
     if (!run) {
-      return NextResponse.json({ success: false, error: "Payroll run not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Payroll run not found in active organization" }, { status: 404 });
     }
 
     const { start, end } = getCycleWindow(run.month, run.halfPeriod);
 
     const advanceEntries = await prisma.cashBookEntry.findMany({
       where: {
+        companyId: tenant.companyId,
         date: { gte: start, lte: end },
         category: { in: ["Employee Advance", "Labour Advance"] },
       },

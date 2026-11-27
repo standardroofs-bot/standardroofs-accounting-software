@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { getCurrentUserSession, getDefaultPermissionsForRole, ALL_MODULES } from "@/lib/auth";
+import { getActiveTenantContext } from "@/lib/tenant";
 import { UserRole } from "@prisma/client";
 
 export async function GET() {
@@ -10,24 +11,54 @@ export async function GET() {
     if (!session) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
+    const tenant = await getActiveTenantContext();
 
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        phone: true,
-        active: true,
-        permissions: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    const whereClause: any = tenant.isGroupSuperAdmin
+      ? {}
+      : {
+          companyAccess: {
+            some: { companyId: tenant.companyId },
+          },
+        };
+
+    const [users, companies] = await Promise.all([
+      prisma.user.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          phone: true,
+          active: true,
+          defaultCompanyId: true,
+          permissions: true,
+          createdAt: true,
+          companyAccess: {
+            select: {
+              companyId: true,
+              role: true,
+              isDefault: true,
+              company: {
+                select: { id: true, code: true, name: true },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.company.findMany({
+        where: { isActive: true },
+        select: { id: true, code: true, name: true, tagline: true },
+        orderBy: { name: "asc" },
+      }),
+    ]);
 
     return NextResponse.json({
       success: true,
       users,
+      companies,
+      activeCompanyId: tenant.companyId,
       availableModules: ALL_MODULES,
       roles: Object.values(UserRole),
     });
@@ -45,9 +76,10 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     }
+    const tenant = await getActiveTenantContext();
 
     const body = await request.json();
-    const { name, email, password, role, phone, permissions } = body;
+    const { name, email, password, role, phone, permissions, companyIds } = body;
 
     if (!name || !email || !password || !role) {
       return NextResponse.json(
@@ -66,6 +98,13 @@ export async function POST(request: Request) {
       );
     }
 
+    // Lock non-Group admins to creating users solely inside their active company
+    const targetCompanyIds: string[] =
+      tenant.isGroupSuperAdmin && Array.isArray(companyIds) && companyIds.length > 0
+        ? companyIds
+        : [tenant.companyId];
+    const defaultCompanyId = targetCompanyIds[0];
+
     const passwordHash = await bcrypt.hash(password, 10);
     const finalPermissions = permissions || getDefaultPermissionsForRole(role as UserRole);
 
@@ -76,16 +115,28 @@ export async function POST(request: Request) {
         passwordHash,
         role: role as UserRole,
         phone: phone || null,
+        defaultCompanyId,
         permissions: finalPermissions,
         active: true,
+        companyAccess: {
+          create: targetCompanyIds.map((cid, idx) => ({
+            companyId: cid,
+            role: role as UserRole,
+            isDefault: idx === 0,
+          })),
+        },
       },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
+        defaultCompanyId: true,
         permissions: true,
         active: true,
+        companyAccess: {
+          select: { companyId: true, role: true, isDefault: true, company: { select: { id: true, code: true, name: true } } },
+        },
       },
     });
 
@@ -104,9 +155,10 @@ export async function PUT(request: Request) {
         { status: 403 }
       );
     }
+    const tenant = await getActiveTenantContext();
 
     const body = await request.json();
-    const { id, role, active, permissions, password } = body;
+    const { id, role, active, permissions, password, companyIds } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: "User ID is required." }, { status: 400 });
@@ -118,6 +170,34 @@ export async function PUT(request: Request) {
     if (permissions) updateData.permissions = permissions;
     if (password) updateData.passwordHash = await bcrypt.hash(password, 10);
 
+    if (tenant.isGroupSuperAdmin && Array.isArray(companyIds) && companyIds.length > 0) {
+      updateData.defaultCompanyId = companyIds[0];
+      await prisma.userCompanyAccess.deleteMany({
+        where: { userId: id, companyId: { notIn: companyIds } },
+      });
+      for (let i = 0; i < companyIds.length; i++) {
+        const cid = companyIds[i];
+        await prisma.userCompanyAccess.upsert({
+          where: { userId_companyId: { userId: id, companyId: cid } },
+          update: {
+            ...(role ? { role: role as UserRole } : {}),
+            isDefault: i === 0,
+          },
+          create: {
+            userId: id,
+            companyId: cid,
+            role: (role || UserRole.VIEWER) as UserRole,
+            isDefault: i === 0,
+          },
+        });
+      }
+    } else if (role) {
+      await prisma.userCompanyAccess.updateMany({
+        where: { userId: id, companyId: tenant.companyId },
+        data: { role: role as UserRole },
+      });
+    }
+
     const updated = await prisma.user.update({
       where: { id },
       data: updateData,
@@ -126,8 +206,12 @@ export async function PUT(request: Request) {
         name: true,
         email: true,
         role: true,
+        defaultCompanyId: true,
         permissions: true,
         active: true,
+        companyAccess: {
+          select: { companyId: true, role: true, isDefault: true, company: { select: { id: true, code: true, name: true } } },
+        },
       },
     });
 

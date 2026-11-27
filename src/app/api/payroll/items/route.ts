@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { recalculatePayrollRunTotals } from "@/lib/payrollTotals";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export async function POST(req: NextRequest) {
   try {
+    const tenant = await getActiveTenantContext();
     const body = await req.json();
     const {
       cycleType = "MONTHLY_OFFICE",
@@ -11,7 +13,7 @@ export async function POST(req: NextRequest) {
       halfPeriod = "FULL",
       employeeName,
       employeeCode,
-      company = "STANDARD_ROOFS",
+      company = tenant.companyUnit,
       totalWorkingDays = cycleType === "MONTHLY_OFFICE" ? 26 : 15,
       daysPresent = 0,
       baseRate = 0,
@@ -41,14 +43,15 @@ export async function POST(req: NextRequest) {
         ? "TAMIL_LABOUR"
         : "HINDI_CREW";
 
-    // Find or create DRAFT run
+    // Find or create DRAFT run strictly inside tenant.companyId
     let run = await prisma.payrollRun.findUnique({
       where: {
-        cycleType_month_halfPeriod_companyFilter: {
+        cycleType_month_halfPeriod_companyFilter_companyId: {
           cycleType,
           month,
           halfPeriod: effectiveHalf,
           companyFilter: "ALL",
+          companyId: tenant.companyId,
         },
       },
     });
@@ -60,6 +63,7 @@ export async function POST(req: NextRequest) {
           month,
           halfPeriod: effectiveHalf,
           companyFilter: "ALL",
+          companyId: tenant.companyId,
           status: "DRAFT",
         },
       });

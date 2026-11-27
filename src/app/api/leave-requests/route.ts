@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserSession } from "@/lib/auth";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -10,15 +11,16 @@ export async function GET(request: Request) {
     if (!session) {
       return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
     }
+    const tenant = await getActiveTenantContext();
 
     const { searchParams } = new URL(request.url);
     const employeeIdParam = searchParams.get("employeeId");
     const statusParam = searchParams.get("status");
 
-    const where: any = {};
+    const where: any = { companyId: tenant.companyId };
 
     // If EMPLOYEE, force filter to their own employeeId
-    if (session.role === "EMPLOYEE") {
+    if (tenant.role === "EMPLOYEE") {
       let empId = session.employeeId;
       if (!empId) {
         const u = await prisma.user.findUnique({ where: { id: session.userId } });
@@ -65,6 +67,7 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
     }
+    const tenant = await getActiveTenantContext();
 
     const body = await request.json();
     let { employeeId, leaveCategory = "PLANNED", dayType = "FULL_DAY", startDate, endDate, reason } = body;
@@ -77,7 +80,7 @@ export async function POST(request: Request) {
     }
 
     // If role is EMPLOYEE, always use their linked employeeId
-    if (session.role === "EMPLOYEE") {
+    if (tenant.role === "EMPLOYEE") {
       let empId = session.employeeId;
       if (!empId) {
         const u = await prisma.user.findUnique({ where: { id: session.userId } });
@@ -93,9 +96,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Employee ID is required." }, { status: 400 });
     }
 
-    const emp = await prisma.employeeOrLabour.findUnique({
-      where: { id: employeeId },
-      select: { category: true, companyUnit: true, employeeCode: true },
+    const emp = await prisma.employeeOrLabour.findFirst({
+      where: { id: employeeId, companyId: tenant.companyId },
+      select: { category: true, companyUnit: true, employeeCode: true, companyId: true },
     });
     if (!emp || emp.category !== "OFFICE_STAFF") {
       return NextResponse.json(
@@ -135,6 +138,7 @@ export async function POST(request: Request) {
     const leaveRequest = await prisma.leaveRequest.create({
       data: {
         employeeId,
+        companyId: emp.companyId,
         leaveCategory,
         dayType,
         startDate: start,
@@ -263,6 +267,7 @@ export async function DELETE(request: Request) {
     if (!session) {
       return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
     }
+    const tenant = await getActiveTenantContext();
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
@@ -280,6 +285,10 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: "Leave request not found." }, { status: 404 });
     }
 
+    if (leave.companyId && leave.companyId !== tenant.companyId) {
+      return NextResponse.json({ success: false, error: "Leave request belongs to another organization." }, { status: 403 });
+    }
+
     // 1. Move to RecycleBinItem
     await prisma.recycleBinItem.create({
       data: {
@@ -289,6 +298,7 @@ export async function DELETE(request: Request) {
         subtitle: `${leave.leaveCategory} • ${leave.totalDays} day(s) • Status: ${leave.status}`,
         payloadJson: JSON.stringify(leave),
         deletedBy: session.email || "HR Manager",
+        companyId: leave.companyId || tenant.companyId,
       },
     });
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { toDecimal } from "@/lib/decimal";
 import { syncEmployeeToOpenDraftRuns } from "@/lib/payrollAttendanceSync";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -10,27 +11,45 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const tenant = await getActiveTenantContext();
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const isContractor = searchParams.get("isContractor") === "true";
 
     if (isContractor) {
-      const contractor = await prisma.contractor.findUnique({
-        where: { id },
+      const contractor = await prisma.contractor.findFirst({
+        where: { id, companyId: tenant.companyId },
         include: { dailyLogs: { orderBy: { date: "desc" }, take: 20 } },
       });
+      if (!contractor) {
+        return NextResponse.json({ success: false, error: "Contractor not found in active organization" }, { status: 404 });
+      }
       return NextResponse.json({ success: true, labourer: contractor });
     }
 
-    const labourer = await prisma.employeeOrLabour.findUnique({
-      where: { id },
+    const labourer = await prisma.employeeOrLabour.findFirst({
+      where: { id, companyId: tenant.companyId },
       include: {
         attendances: { orderBy: { date: "desc" }, take: 20 },
         advances: { orderBy: { date: "desc" }, take: 10 },
       },
     });
+    if (!labourer) {
+      return NextResponse.json({ success: false, error: "Worker not found in active organization" }, { status: 404 });
+    }
 
-    return NextResponse.json({ success: true, labourer });
+    const masked = tenant.isSuperAdmin
+      ? { ...labourer, salaryMasked: false }
+      : {
+          ...labourer,
+          monthlySalary: null,
+          dailyWage: null,
+          baseWage: null,
+          defaultVehicleAllowance: 0,
+          salaryMasked: true,
+        };
+
+    return NextResponse.json({ success: true, labourer: masked });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -41,6 +60,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const tenant = await getActiveTenantContext();
     const { id } = await params;
     const body = await request.json();
     const {
@@ -67,6 +87,10 @@ export async function PUT(
     } = body;
 
     if (isContractor || category === "CONTRACTOR_TEAM") {
+      const existing = await prisma.contractor.findFirst({ where: { id, companyId: tenant.companyId } });
+      if (!existing) {
+        return NextResponse.json({ success: false, error: "Contractor not found in active organization" }, { status: 404 });
+      }
       const contractor = await prisma.contractor.update({
         where: { id },
         data: {
@@ -86,6 +110,11 @@ export async function PUT(
       return NextResponse.json({ success: true, labourer: contractor });
     }
 
+    const existingEmp = await prisma.employeeOrLabour.findFirst({ where: { id, companyId: tenant.companyId } });
+    if (!existingEmp) {
+      return NextResponse.json({ success: false, error: "Worker not found in active organization" }, { status: 404 });
+    }
+
     const labourer = await prisma.employeeOrLabour.update({
       where: { id },
       data: {
@@ -103,7 +132,7 @@ export async function PUT(
         designation: designation || undefined,
         role: role || designation || undefined,
         category: category || undefined,
-        companyUnit: companyUnit || undefined,
+        companyUnit: tenant.companyUnit,
         dailyWage: dailyWage !== undefined ? toDecimal(dailyWage).toFixed(2) : undefined,
         monthlySalary: monthlySalary !== undefined ? toDecimal(monthlySalary).toFixed(2) : undefined,
         dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : undefined,
@@ -115,7 +144,7 @@ export async function PUT(
       },
     });
 
-    await syncEmployeeToOpenDraftRuns();
+    await syncEmployeeToOpenDraftRuns(tenant.companyId);
     return NextResponse.json({ success: true, labourer });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -127,6 +156,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const tenant = await getActiveTenantContext();
     const { id } = await params;
     const body = await request.json();
     const { action = "archive", isContractor } = body;
@@ -135,6 +165,10 @@ export async function PATCH(
     const newActive = action === "restore";
 
     if (isContractor) {
+      const existing = await prisma.contractor.findFirst({ where: { id, companyId: tenant.companyId } });
+      if (!existing) {
+        return NextResponse.json({ success: false, error: "Contractor not found in active organization" }, { status: 404 });
+      }
       const contractor = await prisma.contractor.update({
         where: { id },
         data: { status: newStatus, active: newActive },
@@ -142,12 +176,17 @@ export async function PATCH(
       return NextResponse.json({ success: true, labourer: contractor });
     }
 
+    const existingEmp = await prisma.employeeOrLabour.findFirst({ where: { id, companyId: tenant.companyId } });
+    if (!existingEmp) {
+      return NextResponse.json({ success: false, error: "Worker not found in active organization" }, { status: 404 });
+    }
+
     const labourer = await prisma.employeeOrLabour.update({
       where: { id },
       data: { status: newStatus, active: newActive },
     });
 
-    await syncEmployeeToOpenDraftRuns();
+    await syncEmployeeToOpenDraftRuns(tenant.companyId);
     return NextResponse.json({ success: true, labourer });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -159,11 +198,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const tenant = await getActiveTenantContext();
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const isContractor = searchParams.get("isContractor") === "true";
 
     if (isContractor) {
+      const existing = await prisma.contractor.findFirst({ where: { id, companyId: tenant.companyId } });
+      if (!existing) {
+        return NextResponse.json({ success: false, error: "Contractor not found in active organization" }, { status: 404 });
+      }
       await prisma.contractor.update({
         where: { id },
         data: { status: "ARCHIVED", active: false },
@@ -171,11 +215,16 @@ export async function DELETE(
       return NextResponse.json({ success: true, message: "Contractor safely archived." });
     }
 
+    const existingEmp = await prisma.employeeOrLabour.findFirst({ where: { id, companyId: tenant.companyId } });
+    if (!existingEmp) {
+      return NextResponse.json({ success: false, error: "Worker not found in active organization" }, { status: 404 });
+    }
+
     await prisma.employeeOrLabour.update({
       where: { id },
       data: { status: "ARCHIVED", active: false },
     });
-    await syncEmployeeToOpenDraftRuns();
+    await syncEmployeeToOpenDraftRuns(tenant.companyId);
     return NextResponse.json({ success: true, message: "Worker safely archived." });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

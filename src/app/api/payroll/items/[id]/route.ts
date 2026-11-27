@@ -7,12 +7,14 @@ import {
   syncPayrollItemCashBookLegs,
 } from "@/lib/payrollTotals";
 import { syncLinkedCashBookForPaidRun } from "@/lib/payrollAttendanceSync";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const tenant = await getActiveTenantContext();
     const { id } = await context.params;
     const body = await req.json();
 
@@ -21,8 +23,8 @@ export async function PATCH(
       include: { payrollRun: true },
     });
 
-    if (!existing) {
-      return NextResponse.json({ success: false, error: "Payroll item not found" }, { status: 404 });
+    if (!existing || existing.payrollRun.companyId !== tenant.companyId) {
+      return NextResponse.json({ success: false, error: "Payroll item not found in active organization" }, { status: 404 });
     }
 
     const employeeName = body.employeeName !== undefined ? String(body.employeeName).trim() : existing.employeeName;
@@ -208,14 +210,15 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const tenant = await getActiveTenantContext();
     const { id } = await context.params;
     const existing = await prisma.payrollItem.findUnique({
       where: { id },
       include: { payrollRun: true },
     });
 
-    if (!existing) {
-      return NextResponse.json({ success: false, error: "Payroll item not found" }, { status: 404 });
+    if (!existing || existing.payrollRun.companyId !== tenant.companyId) {
+      return NextResponse.json({ success: false, error: "Payroll item not found in active organization" }, { status: 404 });
     }
 
     await removePayrollItemCashBookLegs(prisma as any, existing.payrollRun.month, existing.id);

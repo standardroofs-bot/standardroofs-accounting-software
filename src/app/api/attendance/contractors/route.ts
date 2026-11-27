@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const tenant = await getActiveTenantContext();
     const { searchParams } = new URL(request.url);
     const dateStr = searchParams.get("date");
     const monthStr = searchParams.get("month"); // YYYY-MM
     const teamName = searchParams.get("teamName");
 
-    const where: any = {};
+    const where: any = { companyId: tenant.companyId };
     if (dateStr) {
       where.date = new Date(`${dateStr}T00:00:00.000Z`);
     } else if (monthStr) {
@@ -40,6 +42,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const tenant = await getActiveTenantContext();
     const body = await request.json();
     const {
       contractorTeamName,
@@ -63,9 +66,10 @@ export async function POST(request: Request) {
 
     const targetDate = new Date(`${date}T00:00:00.000Z`);
 
-    // Match contractor record ID if available
+    // Match contractor record ID inside active organization
     const contractor = await prisma.contractor.findFirst({
       where: {
+        companyId: tenant.companyId,
         OR: [
           { name: { equals: contractorTeamName, mode: "insensitive" } },
           { name: { contains: contractorTeamName.replace(" Team", ""), mode: "insensitive" } },
@@ -76,6 +80,7 @@ export async function POST(request: Request) {
     // Check if a log already exists for this team and date
     const existing = await prisma.contractorDailyLog.findFirst({
       where: {
+        companyId: tenant.companyId,
         contractorTeamName,
         date: targetDate,
       },
@@ -113,6 +118,7 @@ export async function POST(request: Request) {
           otTimeRange: otTimeRange || null,
           otReason: otReason || null,
           contractorId: contractor?.id || null,
+          companyId: tenant.companyId,
         },
       });
     }
@@ -125,11 +131,17 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const tenant = await getActiveTenantContext();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
     if (!id) {
       return NextResponse.json({ success: false, error: "Log ID is required." }, { status: 400 });
+    }
+
+    const existing = await prisma.contractorDailyLog.findFirst({ where: { id, companyId: tenant.companyId } });
+    if (!existing) {
+      return NextResponse.json({ success: false, error: "Log not found in active organization." }, { status: 404 });
     }
 
     await prisma.contractorDailyLog.delete({

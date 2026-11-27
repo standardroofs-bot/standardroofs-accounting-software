@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { recalculatePayrollRunTotals } from "@/lib/payrollTotals";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export async function POST(req: NextRequest) {
   try {
+    const tenant = await getActiveTenantContext();
     const body = await req.json();
     const { payrollRunId, itemIds, action, paymentChannel } = body;
 
@@ -14,9 +16,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const run = await prisma.payrollRun.findUnique({ where: { id: payrollRunId } });
+    const run = await prisma.payrollRun.findFirst({ where: { id: payrollRunId, companyId: tenant.companyId } });
     if (!run) {
-      return NextResponse.json({ success: false, error: "Payroll run not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Payroll run not found in active organization" }, { status: 404 });
     }
 
     if (action === "MARK_CLEARED") {

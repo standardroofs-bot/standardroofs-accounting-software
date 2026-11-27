@@ -59,7 +59,8 @@ export interface MonthWorkingDaysInfo {
  */
 export async function computeMonthWorkingDaysInfo(
   month: string,
-  halfPeriod: string = "FULL"
+  halfPeriod: string = "FULL",
+  companyId?: string
 ): Promise<MonthWorkingDaysInfo> {
   const { start, end } = getCycleDateRange(month, halfPeriod);
   const [yStr, mStr] = month.split("-");
@@ -70,17 +71,25 @@ export async function computeMonthWorkingDaysInfo(
 
   const [holidays, activeOfficeCount, upRecords] = await Promise.all([
     prisma.companyHoliday.findMany({
-      where: { date: { gte: start, lte: end } },
+      where: {
+        date: { gte: start, lte: end },
+        ...(companyId ? { OR: [{ companyId: "ALL" }, { companyId }] } : {}),
+      },
       select: { date: true, holidayType: true },
     }),
     prisma.employeeOrLabour.count({
-      where: { active: true, status: "ACTIVE", category: "OFFICE_STAFF" },
+      where: {
+        active: true,
+        status: "ACTIVE",
+        category: "OFFICE_STAFF",
+        ...(companyId ? { companyId } : {}),
+      },
     }),
     prisma.attendanceRecord.findMany({
       where: {
         date: { gte: start, lte: end },
         status: "UP",
-        employee: { category: "OFFICE_STAFF" },
+        employee: { category: "OFFICE_STAFF", ...(companyId ? { companyId } : {}) },
       },
       select: { date: true },
     }),
@@ -175,7 +184,8 @@ export interface AttendanceSummary {
 export async function computeAttendanceBreakdownMap(
   employeeIds: string[],
   month: string,
-  halfPeriod: string
+  halfPeriod: string,
+  companyId?: string
 ): Promise<Map<string, AttendanceSummary>> {
   const map = new Map<string, AttendanceSummary>();
   if (employeeIds.length === 0) return map;
@@ -197,7 +207,7 @@ export async function computeAttendanceBreakdownMap(
         dailyAdvance: true,
       },
     }),
-    computeMonthWorkingDaysInfo(month, halfPeriod),
+    computeMonthWorkingDaysInfo(month, halfPeriod, companyId),
   ]);
 
   const markedDatesByEmp = new Map<string, Set<string>>();
@@ -314,14 +324,18 @@ export async function syncLinkedCashBookForPaidRun(payrollRunId: string) {
   }
 }
 
-export async function syncOpenDraftPayrollRunsForMonth(month: string) {
+export async function syncOpenDraftPayrollRunsForMonth(month: string, targetCompanyId?: string) {
   try {
     // Protect historical / closed months (e.g. Oct 2026) from being overwritten by sparse attendance records
     const currentMonthIST = getTodayISTDateString().slice(0, 7);
     if (month < currentMonthIST) return;
 
     const draftRuns = await prisma.payrollRun.findMany({
-      where: { month, status: "DRAFT" },
+      where: {
+        month,
+        status: "DRAFT",
+        ...(targetCompanyId ? { companyId: targetCompanyId } : {}),
+      },
       include: { items: true },
     });
     if (draftRuns.length === 0) return;
@@ -330,8 +344,8 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string) {
       const empIds = Array.from(new Set(run.items.map((it) => it.employeeId).filter(Boolean)));
       const isOfficeCycle = run.cycleType === "MONTHLY_OFFICE";
       const [attMap, monthInfo] = await Promise.all([
-        computeAttendanceBreakdownMap(empIds, run.month, run.halfPeriod),
-        isOfficeCycle ? computeMonthWorkingDaysInfo(run.month, run.halfPeriod) : Promise.resolve(null),
+        computeAttendanceBreakdownMap(empIds, run.month, run.halfPeriod, run.companyId),
+        isOfficeCycle ? computeMonthWorkingDaysInfo(run.month, run.halfPeriod, run.companyId) : Promise.resolve(null),
       ]);
 
       for (const item of run.items) {
@@ -402,19 +416,21 @@ export async function syncOpenDraftPayrollRunsForMonth(month: string) {
  * Propagates employee additions, salary/rate updates, restores, or archives
  * from Standard People (/labour) into open DRAFT PayrollRuns (>= current month).
  */
-export async function syncEmployeeToOpenDraftRuns() {
+export async function syncEmployeeToOpenDraftRuns(targetCompanyId?: string) {
   try {
     const currentMonthIST = getTodayISTDateString().slice(0, 7);
     const draftRuns = await prisma.payrollRun.findMany({
       where: {
         status: "DRAFT",
         month: { gte: currentMonthIST },
+        ...(targetCompanyId ? { companyId: targetCompanyId } : {}),
       },
       include: { items: true },
     });
     if (draftRuns.length === 0) return;
 
     for (const run of draftRuns) {
+      const runCompanyId = run.companyId || "standard-roofs";
       const empCategory =
         run.cycleType === "MONTHLY_OFFICE"
           ? "OFFICE_STAFF"
@@ -432,16 +448,22 @@ export async function syncEmployeeToOpenDraftRuns() {
       const { defaultWorkingDays } = getCycleDateRange(run.month, run.halfPeriod);
       const [employees, monthInfo] = await Promise.all([
         prisma.employeeOrLabour.findMany({
-          where: { active: true, status: "ACTIVE", category: empCategory },
+          where: {
+            active: true,
+            status: "ACTIVE",
+            category: empCategory,
+            companyId: runCompanyId,
+          },
           orderBy: { name: "asc" },
         }),
-        isOfficeCycle ? computeMonthWorkingDaysInfo(run.month, run.halfPeriod) : Promise.resolve(null),
+        isOfficeCycle ? computeMonthWorkingDaysInfo(run.month, run.halfPeriod, runCompanyId) : Promise.resolve(null),
       ]);
 
       const attMap = await computeAttendanceBreakdownMap(
         employees.map((e) => e.id),
         run.month,
-        run.halfPeriod
+        run.halfPeriod,
+        runCompanyId
       );
       const existingByEmp = new Map(run.items.map((it) => [it.employeeId, it]));
       const activeEmpIds = new Set(employees.map((e) => e.id));
@@ -526,7 +548,7 @@ export async function syncEmployeeToOpenDraftRuns() {
           employeeName: emp.name,
           employeeCode: emp.employeeCode,
           category: itemCategory,
-          company: emp.companyUnit === "INVI_CREATION" ? "INVI_CREATION" : "STANDARD_ROOFS",
+          company: runCompanyId === "invi-creation" ? "INVI_CREATION" : "STANDARD_ROOFS",
           totalWorkingDays,
           daysPresent,
           leaveDays,

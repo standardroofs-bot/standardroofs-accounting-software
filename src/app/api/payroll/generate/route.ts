@@ -6,6 +6,7 @@ import {
   getCycleDateRange,
   syncLinkedCashBookForPaidRun,
 } from "@/lib/payrollAttendanceSync";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 function getPreviousCycle(month: string, halfPeriod: string): { month: string; halfPeriod: string } {
   const [yStr, mStr] = month.split("-");
@@ -35,6 +36,7 @@ function fmtJoining(d: Date | null | undefined): string | null {
 
 export async function POST(req: NextRequest) {
   try {
+    const tenant = await getActiveTenantContext();
     const body = await req.json();
     const cycleType = body.cycleType || "MONTHLY_OFFICE";
     const month = body.month || "2026-11";
@@ -59,7 +61,7 @@ export async function POST(req: NextRequest) {
     const { start, end, defaultWorkingDays } = getCycleDateRange(month, halfPeriod);
     const monthInfo =
       cycleType === "MONTHLY_OFFICE"
-        ? await computeMonthWorkingDaysInfo(month, halfPeriod)
+        ? await computeMonthWorkingDaysInfo(month, halfPeriod, tenant.companyId)
         : null;
     const effectiveDefaultWorkingDays =
       customWorkingDays || monthInfo?.scheduledWorkingDays || defaultWorkingDays;
@@ -69,6 +71,7 @@ export async function POST(req: NextRequest) {
         active: true,
         status: "ACTIVE",
         category: empCategory,
+        companyId: tenant.companyId,
       },
       orderBy: { name: "asc" },
     });
@@ -90,11 +93,12 @@ export async function POST(req: NextRequest) {
     const prev = getPreviousCycle(month, halfPeriod);
     const prevRun = await prisma.payrollRun.findUnique({
       where: {
-        cycleType_month_halfPeriod_companyFilter: {
+        cycleType_month_halfPeriod_companyFilter_companyId: {
           cycleType,
           month: prev.month,
           halfPeriod: prev.halfPeriod,
           companyFilter: "ALL",
+          companyId: tenant.companyId,
         },
       },
       include: { items: true },
@@ -112,11 +116,12 @@ export async function POST(req: NextRequest) {
 
     const existingRun = await prisma.payrollRun.findUnique({
       where: {
-        cycleType_month_halfPeriod_companyFilter: {
+        cycleType_month_halfPeriod_companyFilter_companyId: {
           cycleType,
           month,
           halfPeriod,
           companyFilter: "ALL",
+          companyId: tenant.companyId,
         },
       },
       include: { items: true },
@@ -126,7 +131,8 @@ export async function POST(req: NextRequest) {
     const attBreakdownMap = await computeAttendanceBreakdownMap(
       employees.map((e) => e.id),
       month,
-      halfPeriod
+      halfPeriod,
+      tenant.companyId
     );
 
     const newItems = employees.map((emp) => {
@@ -248,11 +254,12 @@ export async function POST(req: NextRequest) {
 
     const run = await prisma.payrollRun.upsert({
       where: {
-        cycleType_month_halfPeriod_companyFilter: {
+        cycleType_month_halfPeriod_companyFilter_companyId: {
           cycleType,
           month,
           halfPeriod,
           companyFilter: "ALL",
+          companyId: tenant.companyId,
         },
       },
       update: {
@@ -267,6 +274,7 @@ export async function POST(req: NextRequest) {
         month,
         halfPeriod,
         companyFilter: "ALL",
+        companyId: tenant.companyId,
         status: "DRAFT",
         totalGross,
         totalDeductions,
@@ -311,7 +319,7 @@ export async function POST(req: NextRequest) {
     }
 
     const empIds = updated ? Array.from(new Set(updated.items.map((it) => it.employeeId).filter(Boolean))) : [];
-    const attMap = updated ? await computeAttendanceBreakdownMap(empIds, updated.month, updated.halfPeriod) : new Map();
+    const attMap = updated ? await computeAttendanceBreakdownMap(empIds, updated.month, updated.halfPeriod, tenant.companyId) : new Map();
 
     return NextResponse.json({
       success: true,

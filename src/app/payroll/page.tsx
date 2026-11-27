@@ -112,6 +112,7 @@ export default function StandardPayrollPage() {
   const [month, setMonth] = useState("2026-11");
   const [halfPeriod, setHalfPeriod] = useState<"FULL" | "FIRST_HALF" | "SECOND_HALF">("FULL");
   const [companyFilter, setCompanyFilter] = useState<"ALL" | "STANDARD_ROOFS" | "INVI_CREATION">("ALL");
+  const [activeCompany, setActiveCompany] = useState<{ id: string; code: string; name: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewTab, setViewTab] = useState<"register" | "summary">("register");
 
@@ -206,6 +207,12 @@ export default function StandardPayrollPage() {
       const res = await fetch(`/api/payroll?${params.toString()}`, { cache: "no-store" });
       const data = await res.json();
       if (data.success) {
+        if (data.activeCompany) {
+          setActiveCompany(data.activeCompany);
+          if (data.activeCompany.id === "invi-creation" && cycleType !== "MONTHLY_OFFICE") {
+            setCycleType("MONTHLY_OFFICE");
+          }
+        }
         setRun(data.run);
         setAvailableRuns(data.availableRuns || []);
         if (!silent) setSelectedIds([]);
@@ -762,6 +769,8 @@ export default function StandardPayrollPage() {
           >
             Office Staff (Monthly · Paid 1st–2nd)
           </button>
+          {activeCompany?.id !== "invi-creation" && (
+          <>
           <button
             type="button"
             onClick={() => handleTabChange("BI_MONTHLY_TAMIL")}
@@ -791,6 +800,8 @@ export default function StandardPayrollPage() {
           >
             <span>Sub-Contractors (Site-by-Site Milestone Billing) &rarr;</span>
           </Link>
+          </>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
@@ -830,17 +841,16 @@ export default function StandardPayrollPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
-            <Building2 size={13} className="text-slate-500" />
-            <select
-              value={companyFilter}
-              onChange={(e) => setCompanyFilter(e.target.value as any)}
-              className="bg-transparent font-semibold text-slate-800 focus:outline-none cursor-pointer"
-            >
-              <option value="ALL">All Companies</option>
-              <option value="STANDARD_ROOFS">Standard Roofs</option>
-              <option value="INVI_CREATION">Invi Creation</option>
-            </select>
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold ${
+              activeCompany?.id === "invi-creation"
+                ? "bg-purple-50 border-purple-200 text-purple-800"
+                : "bg-slate-50 border-slate-200 text-slate-800"
+            }`}
+            title="Switch organization from the top header switcher"
+          >
+            <Building2 size={13} className={activeCompany?.id === "invi-creation" ? "text-purple-600" : "text-indigo-600"} />
+            <span>{activeCompany?.name || "Standard Roofs"}</span>
           </div>
 
           <div className="relative">

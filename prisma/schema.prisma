@@ -137,6 +137,41 @@ enum RoleType {
 // USER & RBAC
 // -------------------------------------------------------------
 
+model Company {
+  id        String   @id
+  code      String   @unique // STANDARD_ROOFS | INVI_CREATION
+  name      String
+  tagline   String?
+  gstin     String?
+  location  String   @default("Erode")
+  address   String?
+  phone     String?
+  email     String?
+  website   String?
+  logoUrl   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userAccess UserCompanyAccess[]
+}
+
+model UserCompanyAccess {
+  id        String   @id @default(cuid())
+  userId    String
+  companyId String
+  role      UserRole @default(VIEWER)
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@index([userId])
+  @@index([companyId])
+}
+
 model User {
   id                     String            @id @default(cuid())
   name                   String
@@ -146,10 +181,12 @@ model User {
   phone                  String?
   permissions            Json?
   employeeId             String?
+  defaultCompanyId       String            @default("standard-roofs")
   active                 Boolean           @default(true)
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 
+  companyAccess          UserCompanyAccess[]
   journalEntriesCreated  JournalEntry[]    @relation("JournalCreatedBy")
   cashBookEntries        CashBookEntry[]   @relation("CashBookCreatedBy")
   dailyClosings          DailyCashClosing[] @relation("DailyClosingClosedBy")
@@ -315,6 +352,7 @@ model CashBookEntry {
   projectId        String?
   isOfficeExpense  Boolean       @default(false)
   teamName         String?
+  companyId        String        @default("standard-roofs")
   importBatchId    String?
   financialYearId  String
   journalEntryId   String?       @unique
@@ -327,6 +365,8 @@ model CashBookEntry {
   project          Project?      @relation(fields: [projectId], references: [id])
   createdBy        User          @relation("CashBookCreatedBy", fields: [createdById], references: [id])
   importBatch      ImportBatch?  @relation(fields: [importBatchId], references: [id])
+
+  @@index([companyId])
 }
 
 model DailyCashClosing {
@@ -741,6 +781,7 @@ model Contractor {
   bankIfsc      String?
   ifscCode      String?
   category      String                @default("CONTRACTOR_TEAM")
+  companyId     String                @default("standard-roofs")
   status        String                @default("ACTIVE")
   contractValue Decimal               @default(0.00) @db.Decimal(15, 2)
   active        Boolean               @default(true)
@@ -750,6 +791,8 @@ model Contractor {
   milestones    ContractorMilestone[]
   journalLines  JournalLine[]
   dailyLogs     ContractorDailyLog[]
+
+  @@index([companyId])
 }
 
 model ContractorMilestone {
@@ -846,6 +889,7 @@ model EmployeeOrLabour {
   payCycle           PayCycle           @default(FIFTEEN_DAYS) // 15-day pay cycle default
   category           String             @default("TAMIL_LABOUR") // OFFICE_STAFF, TAMIL_LABOUR, HINDI_LABOUR, CONTRACTOR_TEAM
   companyUnit        String             @default("STANDARD_ROOFS") // STANDARD_ROOFS, INVI_CREATION
+  companyId          String             @default("standard-roofs")
   status             String             @default("ACTIVE") // ACTIVE, ARCHIVED
   baseWage           Decimal            @default(0.00) @db.Decimal(15, 2) // Per day / 15-day base wage
   dailyWage          Decimal            @default(0.00) @db.Decimal(15, 2) // Per day wage for site labours
@@ -875,6 +919,8 @@ model EmployeeOrLabour {
   attendances        AttendanceRecord[]
   leaveRequests      LeaveRequest[]
   performanceReviews PerformanceReview[]
+
+  @@index([companyId])
 }
 
 model AttendanceRecord {
@@ -899,6 +945,7 @@ model AttendanceRecord {
   workNotes       String?          // Remarks, work notes
   category        String?          // OFFICE_STAFF, TAMIL_LABOUR, HINDI_LABOUR
   companyUnit     String?          // STANDARD_ROOFS, INVI_CREATION
+  companyId       String           @default("standard-roofs")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -909,6 +956,7 @@ model AttendanceRecord {
   @@index([employeeId, date])
   @@index([category])
   @@index([category, date])
+  @@index([companyId])
 }
 
 model CompanyHoliday {
@@ -918,12 +966,14 @@ model CompanyHoliday {
   year        Int      @default(2026)
   holidayType String   @default("PL") // "PL" (Paid Leave = 1.0), "UP" (Non-Paid Leave = 0.0), "HALF_PAID" (Half-Day Paid Leave = 0.5)
   description String?
+  companyId   String   @default("ALL") // ALL | standard-roofs | invi-creation
   isPublic    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([date])
   @@index([year])
+  @@index([companyId])
 }
 
 model ContractorDailyLog {
@@ -939,6 +989,7 @@ model ContractorDailyLog {
   otTimeRange        String?     // e.g. "07:00 PM - 09:00 PM"
   otReason           String?
   remarks            String?
+  companyId          String      @default("standard-roofs")
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
@@ -947,11 +998,13 @@ model ContractorDailyLog {
   @@index([date])
   @@index([contractorTeamName])
   @@index([contractorTeamName, date])
+  @@index([companyId])
 }
 
 model LeaveRequest {
   id               String           @id @default(cuid())
   employeeId       String
+  companyId        String           @default("standard-roofs")
   leaveCategory    String           @default("PLANNED") // PLANNED, UNPLANNED, SICK, EMERGENCY
   dayType          String           @default("FULL_DAY") // FULL_DAY, HALF_DAY
   startDate        DateTime         @db.Date
@@ -980,6 +1033,7 @@ model LeaveRequest {
   @@index([employeeId])
   @@index([status])
   @@index([startDate, endDate])
+  @@index([companyId])
 }
 
 model PerformanceReview {
@@ -1887,12 +1941,14 @@ model RecycleBinItem {
   subtitle    String?
   payloadJson String   @db.Text
   deletedBy   String?
+  companyId   String   @default("standard-roofs")
   deletedAt   DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([entityType])
   @@index([deletedAt])
+  @@index([companyId])
 }
 
 // -------------------------------------------------------------
@@ -1905,6 +1961,7 @@ model PayrollRun {
   month           String        // e.g. "2026-11"
   halfPeriod      String        // FULL | FIRST_HALF | SECOND_HALF
   companyFilter   String        @default("ALL") // ALL | STANDARD_ROOFS | INVI_CREATION
+  companyId       String        @default("standard-roofs")
   status          String        @default("DRAFT") // DRAFT | APPROVED | PAID
   totalGross      Float         @default(0)
   totalDeductions Float         @default(0)
@@ -1918,8 +1975,9 @@ model PayrollRun {
 
   items           PayrollItem[]
 
-  @@unique([cycleType, month, halfPeriod, companyFilter])
+  @@unique([cycleType, month, halfPeriod, companyFilter, companyId])
   @@index([month, cycleType])
+  @@index([companyId])
 }
 
 model PayrollItem {

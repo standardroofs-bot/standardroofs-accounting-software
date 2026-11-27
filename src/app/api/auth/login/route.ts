@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { createSessionToken, COOKIE_NAME, getDefaultPermissionsForRole } from "@/lib/auth";
+import { ACTIVE_COMPANY_COOKIE, getUserAllowedCompanies, STANDARD_ROOFS_COMPANY_ID } from "@/lib/tenant";
 
 export async function POST(request: Request) {
   try {
@@ -49,15 +50,26 @@ export async function POST(request: Request) {
       );
     }
 
+    const allowedCompanies = await getUserAllowedCompanies(
+      user.id,
+      user.role,
+      user.defaultCompanyId || STANDARD_ROOFS_COMPANY_ID
+    );
+    const defaultCompany = allowedCompanies.find((c) => c.isDefault) || allowedCompanies[0];
+    const activeCompanyId = defaultCompany.id;
+    const effectiveRole = defaultCompany.role || user.role;
+
     const permissions =
-      (user.permissions as any) || getDefaultPermissionsForRole(user.role);
+      (user.permissions as any) || getDefaultPermissionsForRole(effectiveRole);
 
     const token = await createSessionToken({
       userId: user.id,
       email: user.email,
       name: user.name,
-      role: user.role,
+      role: effectiveRole,
       employeeId: user.employeeId || undefined,
+      activeCompanyId,
+      allowedCompanyIds: allowedCompanies.map((c) => c.id),
       permissions,
     });
 
@@ -67,8 +79,10 @@ export async function POST(request: Request) {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: effectiveRole,
         employeeId: user.employeeId || undefined,
+        activeCompanyId,
+        allowedCompanies,
         permissions,
       },
     });
@@ -79,6 +93,13 @@ export async function POST(request: Request) {
       sameSite: "lax",
       path: "/",
       maxAge: 30 * 24 * 60 * 60, // 30 days
+    });
+    response.cookies.set(ACTIVE_COMPANY_COOKIE, activeCompanyId, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 30 * 24 * 60 * 60,
     });
 
     return response;

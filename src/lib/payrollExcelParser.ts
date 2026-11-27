@@ -455,11 +455,12 @@ export async function parseAndImportPayrollWorkbook(
 
     const run = await prisma.payrollRun.upsert({
       where: {
-        cycleType_month_halfPeriod_companyFilter: {
+        cycleType_month_halfPeriod_companyFilter_companyId: {
           cycleType: runData.cycleType,
           month: runData.month,
           halfPeriod: runData.halfPeriod,
           companyFilter: runData.companyFilter,
+          companyId: "standard-roofs",
         },
       },
       update: {
@@ -475,6 +476,7 @@ export async function parseAndImportPayrollWorkbook(
         month: runData.month,
         halfPeriod: runData.halfPeriod,
         companyFilter: runData.companyFilter,
+        companyId: "standard-roofs",
         status: runData.status,
         totalGross,
         totalDeductions,

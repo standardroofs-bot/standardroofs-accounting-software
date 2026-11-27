@@ -4,6 +4,7 @@ import { postDoubleEntryTransaction, getNextVoucherNumber } from "@/lib/accounti
 import { getStorageService } from "@/lib/storage";
 import { CashFlowType, VoucherType } from "@prisma/client";
 import { toDecimal } from "@/lib/decimal";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 const STANDARD_WALLETS = [
   "Office Cash",
@@ -32,6 +33,7 @@ function normalizeWalletName(raw?: string | null): string {
 
 export async function GET(request: Request) {
   try {
+    const tenant = await getActiveTenantContext();
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
     const walletFilter = searchParams.get("wallet");
@@ -46,7 +48,10 @@ export async function GET(request: Request) {
     }
 
     const allFyEntries = await prisma.cashBookEntry.findMany({
-      where: { financialYearId: fy.id },
+      where: {
+        financialYearId: fy.id,
+        companyId: tenant.companyId,
+      },
       include: {
         project: { select: { id: true, name: true, code: true } },
         journalEntry: {
@@ -119,6 +124,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const tenant = await getActiveTenantContext();
     const contentType = request.headers.get("content-type") || "";
     let type = "CASH_OUTFLOW";
     let amountStr = "0";
@@ -246,6 +252,7 @@ export async function POST(request: Request) {
         counterpartyName: counterpartyName || null,
         receiptUrl,
         projectId,
+        companyId: tenant.companyId,
         financialYearId: fy.id,
         journalEntryId,
         createdById: defaultUser.id,

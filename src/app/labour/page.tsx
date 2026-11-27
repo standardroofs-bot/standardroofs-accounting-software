@@ -57,6 +57,7 @@ export default function LabourWorkforceMasterPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [activeOrgId, setActiveOrgId] = useState<string>("standard-roofs");
   const [showSalaries, setShowSalaries] = useState(false);
   const [offerExitModal, setOfferExitModal] = useState<{
     mode: "OFFER_LETTER" | "EXIT_FNF";
@@ -67,7 +68,15 @@ export default function LabourWorkforceMasterPage() {
     fetch("/api/auth/me", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
-        if (d.success && String(d.user?.role || "").toUpperCase() === "SUPER_ADMIN") setIsSuperAdmin(true);
+        if (d.success) {
+          if (String(d.user?.role || "").toUpperCase() === "SUPER_ADMIN") setIsSuperAdmin(true);
+          if (d.user?.activeCompanyId) {
+            setActiveOrgId(d.user.activeCompanyId);
+            if (d.user.activeCompanyId === "invi-creation") {
+              setActiveSegment("INVI_OFFICE");
+            }
+          }
+        }
       })
       .catch(() => {});
   }, []);
@@ -513,22 +522,25 @@ export default function LabourWorkforceMasterPage() {
           },
           {
             title: "Workforce Headcount Distribution",
-            description: "Breakdown across 5 functional teams",
+            description: activeOrgId === "invi-creation" ? "Invi Creation digital hub workforce" : "Breakdown across functional teams",
             type: "bar",
-            data: [
-              { name: "SR Office (10)", value: segmentCounts.srOffice, color: "#2563eb" },
-              { name: "Invi Hub (3)", value: segmentCounts.inviOffice, color: "#8b5cf6" },
-              { name: "Tamil Labours (71)", value: segmentCounts.tamil, color: "#10b981" },
-              { name: "Hindi Crew (5)", value: segmentCounts.hindi, color: "#f59e0b" },
-              { name: "Contractors (6)", value: segmentCounts.contractor, color: "#ec4899" },
-            ],
+            data:
+              activeOrgId === "invi-creation"
+                ? [{ name: "Invi Hub", value: segmentCounts.inviOffice, color: "#8b5cf6" }]
+                : [
+                    { name: "SR Office", value: segmentCounts.srOffice, color: "#2563eb" },
+                    { name: "Tamil Labours", value: segmentCounts.tamil, color: "#10b981" },
+                    { name: "Hindi Crew", value: segmentCounts.hindi, color: "#f59e0b" },
+                    { name: "Contractors", value: segmentCounts.contractor, color: "#ec4899" },
+                  ],
           },
         ]}
       />
 
-      {/* 2. THE 5 FLAGSHIP HRIS SEGMENT CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+      {/* 2. TENANT-ISOLATED HRIS SEGMENT CARDS */}
+      <div className={`grid gap-3.5 ${activeOrgId === "invi-creation" ? "grid-cols-1 max-w-sm" : "grid-cols-2 lg:grid-cols-4"}`}>
         {/* Tab 1: Standard Roofs Office */}
+        {activeOrgId !== "invi-creation" && (
         <button
           type="button"
           onClick={() => setActiveSegment("SR_OFFICE")}
@@ -570,8 +582,10 @@ export default function LabourWorkforceMasterPage() {
             </div>
           </div>
         </button>
+        )}
 
         {/* Tab 2: Invi Creation Team */}
+        {activeOrgId === "invi-creation" && (
         <button
           type="button"
           onClick={() => setActiveSegment("INVI_OFFICE")}
@@ -613,7 +627,10 @@ export default function LabourWorkforceMasterPage() {
             </div>
           </div>
         </button>
+        )}
 
+        {activeOrgId !== "invi-creation" && (
+        <>
         {/* Tab 3: Tamil Site Labours */}
         <button
           type="button"
@@ -742,6 +759,8 @@ export default function LabourWorkforceMasterPage() {
             </div>
           </div>
         </button>
+        </>
+        )}
       </div>
 
       {/* 3. TOOLBAR & INSTANT SEARCH */}

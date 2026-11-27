@@ -308,6 +308,7 @@ export default function AttendancePage() {
   // Optimistic draft attendance updates
   const [attendanceDrafts, setAttendanceDrafts] = useState<Record<string, Partial<AttendanceRecordItem>>>({});
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [activeCompany, setActiveCompany] = useState<{ id: string; code: string; name: string } | null>(null);
 
   // Contractor Form state
   const [contractorForm, setContractorForm] = useState({
@@ -388,6 +389,7 @@ export default function AttendancePage() {
           const parsed = JSON.parse(cached);
           if (parsed && Array.isArray(parsed.employees) && parsed.employees.length > 0) {
             setEmployees(parsed.employees);
+            if (parsed.activeCompany) setActiveCompany(parsed.activeCompany);
             if (parsed.contractorLogs) setContractorLogs(parsed.contractorLogs);
             if (parsed.contractors) setContractorsFromDb(parsed.contractors);
             if (parsed.holidays) setHolidays(parsed.holidays);
@@ -405,6 +407,12 @@ export default function AttendancePage() {
           if (res.ok) {
             const data = await res.json();
             if (data.success) {
+              if (data.activeCompany) {
+                setActiveCompany(data.activeCompany);
+                if (data.activeCompany.id === "invi-creation") {
+                  setActiveTab("office");
+                }
+              }
               setEmployees(data.employees || []);
               setContractorLogs(data.contractorLogs || []);
               setContractorsFromDb(data.contractors || []);
@@ -1267,8 +1275,8 @@ export default function AttendancePage() {
         </div>
       )}
 
-      {/* 2. TOP 4 REAL-TIME ATTENDANCE KPI CARDS (COMPACT SINGLE-LINE) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      {/* 2. TOP REAL-TIME ATTENDANCE KPI CARDS (TENANT ISOLATED) */}
+      <div className={`grid gap-3 ${activeCompany?.id === "invi-creation" ? "grid-cols-1 max-w-sm" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"}`}>
         {/* KPI 1: Office Staff Presence */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-3 shadow-2xs flex flex-col justify-between">
           <div>
@@ -1283,26 +1291,34 @@ export default function AttendancePage() {
             <div className="flex items-baseline justify-between mt-2">
               <div className="text-xl font-black text-slate-900 dark:text-slate-100 tabular-nums">
                 {kpis.presentOfficeToday || 0}
-                <span className="text-xs font-semibold text-slate-400"> / {employees.filter((e) => e.category === "OFFICE_STAFF").length || 13}</span>
+                <span className="text-xs font-semibold text-slate-400"> / {employees.filter((e) => e.category === "OFFICE_STAFF").length}</span>
               </div>
               <span className="text-xs font-bold text-emerald-600">
-                {Math.round(((kpis.presentOfficeToday || 0) / (employees.filter((e) => e.category === "OFFICE_STAFF").length || 13)) * 100)}%
+                {employees.filter((e) => e.category === "OFFICE_STAFF").length > 0
+                  ? Math.round(((kpis.presentOfficeToday || 0) / employees.filter((e) => e.category === "OFFICE_STAFF").length) * 100)
+                  : 0}%
               </span>
             </div>
             <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-              SR: 10 • Invi: 3 • Off: {kpis.leaveOfficeToday || 0}
+              {activeCompany?.name || "Standard Roofs"} • Off: {kpis.leaveOfficeToday || 0}
             </p>
           </div>
           <div className="w-full bg-slate-100 dark:bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
             <div
               className="bg-emerald-500 h-full"
               style={{
-                width: `${Math.round(((kpis.presentOfficeToday || 0) / (employees.filter((e) => e.category === "OFFICE_STAFF").length || 13)) * 100)}%`,
+                width: `${
+                  employees.filter((e) => e.category === "OFFICE_STAFF").length > 0
+                    ? Math.round(((kpis.presentOfficeToday || 0) / employees.filter((e) => e.category === "OFFICE_STAFF").length) * 100)
+                    : 0
+                }%`,
               }}
             />
           </div>
         </div>
 
+        {activeCompany?.id !== "invi-creation" && (
+        <>
         {/* KPI 2: Active Tamil Site Labours */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-3 shadow-2xs flex flex-col justify-between">
           <div>
@@ -1317,7 +1333,7 @@ export default function AttendancePage() {
             <div className="flex items-baseline justify-between mt-2">
               <div className="text-xl font-black text-blue-600 dark:text-blue-400 tabular-nums">
                 {kpis.activeTamilSiteLabours || 0}
-                <span className="text-xs font-semibold text-slate-400"> / {employees.filter((e) => e.category === "TAMIL_LABOUR").length || 71}</span>
+                <span className="text-xs font-semibold text-slate-400"> / {employees.filter((e) => e.category === "TAMIL_LABOUR").length}</span>
               </div>
               <span className="text-xs font-bold text-slate-500">
                 {Object.keys(kpis.siteBreakdown || {}).length} Sites
@@ -1331,7 +1347,11 @@ export default function AttendancePage() {
             <div
               className="bg-blue-600 h-full"
               style={{
-                width: `${Math.min(100, Math.round(((kpis.activeTamilSiteLabours || 0) / (employees.filter((e) => e.category === "TAMIL_LABOUR").length || 71)) * 100))}%`,
+                width: `${
+                  employees.filter((e) => e.category === "TAMIL_LABOUR").length > 0
+                    ? Math.min(100, Math.round(((kpis.activeTamilSiteLabours || 0) / employees.filter((e) => e.category === "TAMIL_LABOUR").length) * 100))
+                    : 0
+                }%`,
               }}
             />
           </div>
@@ -1345,22 +1365,35 @@ export default function AttendancePage() {
                 <Truck size={13} className="text-purple-600 shrink-0" /> Hindi Helpers & Crew
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800 whitespace-nowrap shrink-0 inline-flex items-center">
-                {employees.filter((e) => e.category === "HINDI_LABOUR").length || 5} Crew
+                {employees.filter((e) => e.category === "HINDI_LABOUR").length} Crew
               </span>
             </div>
             <div className="flex items-baseline justify-between mt-2">
               <div className="text-xl font-black text-purple-600 dark:text-purple-400 tabular-nums">
-                {kpis.activeHindiToday || 4}
+                {kpis.activeHindiToday || 0}
                 <span className="text-xs font-semibold text-slate-400"> Working</span>
               </div>
-              <span className="text-xs font-bold text-purple-600">80% Utilization</span>
+              <span className="text-xs font-bold text-purple-600">
+                {employees.filter((e) => e.category === "HINDI_LABOUR").length > 0
+                  ? Math.round(((kpis.activeHindiToday || 0) / employees.filter((e) => e.category === "HINDI_LABOUR").length) * 100)
+                  : 0}% Utilization
+              </span>
             </div>
             <p className="text-[10px] text-slate-400 mt-0.5 truncate">
               Rakeshkumar1, Nithish, Rakesh2, Ajith, Mithun
             </p>
           </div>
           <div className="w-full bg-purple-100 dark:bg-purple-950 h-1 rounded-full mt-2 overflow-hidden">
-            <div className="bg-purple-600 h-full w-[80%]" />
+            <div
+              className="bg-purple-600 h-full"
+              style={{
+                width: `${
+                  employees.filter((e) => e.category === "HINDI_LABOUR").length > 0
+                    ? Math.min(100, Math.round(((kpis.activeHindiToday || 0) / employees.filter((e) => e.category === "HINDI_LABOUR").length) * 100))
+                    : 0
+                }%`,
+              }}
+            />
           </div>
         </div>
 
@@ -1372,31 +1405,33 @@ export default function AttendancePage() {
                 <Users2 size={13} className="text-amber-600 shrink-0" /> Contractor Teams
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800 whitespace-nowrap shrink-0 inline-flex items-center">
-                6 Teams
+                {contractorsFromDb.length} Teams
               </span>
             </div>
             <div className="flex items-baseline justify-between mt-2">
               <div className="text-xl font-black text-amber-600 dark:text-amber-400 tabular-nums">
-                {kpis.contractorHeadcountToday || 14}
+                {kpis.contractorHeadcountToday || 0}
                 <span className="text-xs font-semibold text-slate-400"> Labours</span>
               </div>
               <span className="text-xs font-bold text-amber-600">Active Sites</span>
             </div>
             <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-              Nandeeshwaran, Sakthi, Prashop, Suresh, Suthish, Hydarali
+              {contractorsFromDb.slice(0, 6).map((c: any) => c.name).join(", ") || "No contractors"}
             </p>
           </div>
           <div className="w-full bg-amber-100 dark:bg-amber-950 h-1 rounded-full mt-2 overflow-hidden">
             <div className="bg-amber-500 h-full w-[70%]" />
           </div>
         </div>
+        </>
+        )}
       </div>
 
-      {/* 3. DEDICATED 4-SUBTAB NAVIGATION & CONTROL STRIP */}
+      {/* 3. DEDICATED SUBTAB NAVIGATION & CONTROL STRIP */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-3.5 shadow-2xs space-y-3">
         {/* Row 1: Segmented Workforce Tabs + Multi-Year/Month Switcher + Action Controls */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* 4 Main Tabs with consistent 38px height */}
+          {/* Main Tabs with consistent 38px height */}
           <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl h-[38px] shrink-0">
             <button
               onClick={() => setActiveTab("office")}
@@ -1407,9 +1442,11 @@ export default function AttendancePage() {
               }`}
             >
               <Building size={14} />
-              <span>Office Staff ({employees.filter((e) => e.category === "OFFICE_STAFF").length || 13})</span>
+              <span>Office Staff ({employees.filter((e) => e.category === "OFFICE_STAFF").length})</span>
             </button>
 
+            {activeCompany?.id !== "invi-creation" && (
+            <>
             <button
               onClick={() => setActiveTab("tamil")}
               className={`flex items-center gap-1.5 px-3 h-full rounded-lg text-xs font-bold transition cursor-pointer ${
@@ -1419,7 +1456,7 @@ export default function AttendancePage() {
               }`}
             >
               <HardHat size={14} />
-              <span>Tamil Labours ({employees.filter((e) => e.category === "TAMIL_LABOUR").length || 71})</span>
+              <span>Tamil Labours ({employees.filter((e) => e.category === "TAMIL_LABOUR").length})</span>
             </button>
 
             <button
@@ -1431,7 +1468,7 @@ export default function AttendancePage() {
               }`}
             >
               <Truck size={14} />
-              <span>Hindi Crew ({employees.filter((e) => e.category === "HINDI_LABOUR").length || 5})</span>
+              <span>Hindi Crew ({employees.filter((e) => e.category === "HINDI_LABOUR").length})</span>
             </button>
 
             <button
@@ -1443,8 +1480,10 @@ export default function AttendancePage() {
               }`}
             >
               <Users2 size={14} />
-              <span>Contractors (6)</span>
+              <span>Contractors ({contractorsFromDb.length})</span>
             </button>
+            </>
+            )}
           </div>
 
           {/* Right Toolbar Controls with consistent 38px height */}

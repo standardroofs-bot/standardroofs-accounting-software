@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserSession } from "@/lib/auth";
 import { computeMonthWorkingDaysInfo, getTodayISTDateString, syncOpenDraftPayrollRunsForMonth } from "@/lib/payrollAttendanceSync";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 function resolveSessionEmpCode(session: { email?: string | null; name?: string | null; role?: string | null } | null): string | null {
   if (!session) return null;
@@ -28,6 +29,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const tenant = await getActiveTenantContext();
     const { searchParams } = new URL(request.url);
     const dateStr = searchParams.get("date") || getTodayISTDateString(); // live auto-today default
     const monthStr = searchParams.get("month") || dateStr.substring(0, 7); // YYYY-MM
@@ -41,9 +43,10 @@ export async function GET(request: Request) {
     const startOfMonth = new Date(Date.UTC(year, month - 1, 1));
     const endOfMonth = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
 
-    // Filter employees
+    // Strictly isolate active employees by tenant.companyId
     const whereEmployee: any = {
       status: "ACTIVE",
+      companyId: tenant.companyId,
     };
     if (category) whereEmployee.category = category;
     if (companyUnit) whereEmployee.companyUnit = companyUnit;
@@ -80,6 +83,7 @@ export async function GET(request: Request) {
           prisma.attendanceRecord.findMany({
             where: {
               date: targetDate,
+              employee: { companyId: tenant.companyId },
             },
             include: {
               employee: true,
@@ -87,6 +91,7 @@ export async function GET(request: Request) {
           }),
           prisma.contractorDailyLog.findMany({
             where: {
+              companyId: tenant.companyId,
               date: {
                 gte: startOfMonth,
                 lte: endOfMonth,
@@ -97,17 +102,20 @@ export async function GET(request: Request) {
           prisma.companyHoliday.findMany({
             where: {
               year: year || 2026,
+              OR: [{ companyId: "ALL" }, { companyId: tenant.companyId }],
             },
             orderBy: { date: "asc" },
           }),
           prisma.contractor.findMany({
             where: {
               status: "ACTIVE",
+              companyId: tenant.companyId,
             },
             orderBy: { code: "asc" },
           }),
           prisma.leaveRequest.findMany({
             where: {
+              companyId: tenant.companyId,
               OR: [
                 { startDate: { gte: startOfMonth, lte: endOfMonth } },
                 { endDate: { gte: startOfMonth, lte: endOfMonth } },
@@ -200,7 +208,7 @@ export async function GET(request: Request) {
     });
     const contractorHeadcount = contractorsOnDate.reduce((sum, c) => sum + (c.headcount || 0), 0);
 
-    const monthInfo = await computeMonthWorkingDaysInfo(monthStr, "FULL");
+    const monthInfo = await computeMonthWorkingDaysInfo(monthStr, "FULL", tenant.companyId);
 
     return NextResponse.json({
       success: true,
@@ -208,6 +216,12 @@ export async function GET(request: Request) {
       month: monthStr,
       year: year || 2026,
       isSunday,
+      activeCompany: {
+        id: tenant.companyId,
+        code: tenant.companyCode,
+        name: tenant.companyName,
+        tagline: tenant.companyTagline,
+      },
       employees,
       contractors: contractorList,
       contractorLogs,
@@ -222,20 +236,20 @@ export async function GET(request: Request) {
         todayISO: monthInfo.todayISO,
       },
       kpis: {
-        totalOfficeStaff: officeStaff.length || 13,
-        presentOfficeToday: presentOffice || (isSunday ? 0 : 12),
+        totalOfficeStaff: officeStaff.length,
+        presentOfficeToday: presentOffice,
         halfDayOfficeToday: halfDayOffice,
         permissionOfficeToday: permissionOffice,
         leaveOfficeToday: isSunday ? officeStaff.length : leaveOffice,
         absentOfficeToday: absentOffice,
         unmarkedOfficeToday: isSunday ? 0 : unmarkedOffice,
-        totalTamilLabours: tamilLabours.length || 64,
-        activeTamilSiteLabours: activeTamil || (isSunday ? 0 : 18),
+        totalTamilLabours: tamilLabours.length,
+        activeTamilSiteLabours: activeTamil,
         siteBreakdown,
-        totalHindiLabours: hindiLabours.length || 5,
-        activeHindiToday: activeHindi || (isSunday ? 0 : 4),
-        totalContractorTeams: 6,
-        contractorHeadcountToday: contractorHeadcount || (isSunday ? 0 : 14),
+        totalHindiLabours: hindiLabours.length,
+        activeHindiToday: activeHindi,
+        totalContractorTeams: contractorList.length,
+        contractorHeadcountToday: contractorHeadcount,
         contractorsOnDate,
       },
     });
@@ -246,6 +260,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const tenant = await getActiveTenantContext();
     const body = await request.json();
     const { action = "mark", record, records, date, month, category, siteName } = body;
 
@@ -273,9 +288,12 @@ export async function POST(request: Request) {
       } = record;
       const targetDate = new Date(`${rDate}T00:00:00.000Z`);
 
-      const emp = await prisma.employeeOrLabour.findUnique({
-        where: { id: employeeId },
+      const emp = await prisma.employeeOrLabour.findFirst({
+        where: { id: employeeId, companyId: tenant.companyId },
       });
+      if (!emp) {
+        return NextResponse.json({ success: false, error: "Employee not found in active organization." }, { status: 404 });
+      }
 
       const savedNote = permissionNote || workNotes || (status === "1H" ? "1-Hour Permission" : null);
       const parsedPermMins = permissionMinutes !== undefined ? Number(permissionMinutes) : status === "1H" ? 60 : 0;
@@ -312,8 +330,9 @@ export async function POST(request: Request) {
           otTimeRange: otTimeRange ?? null,
           otReason: otReason ?? null,
           workNotes: savedNote,
-          category: emp?.category,
-          companyUnit: emp?.companyUnit,
+          category: emp.category,
+          companyUnit: emp.companyUnit,
+          companyId: tenant.companyId,
         },
         create: {
           employeeId,
@@ -334,8 +353,9 @@ export async function POST(request: Request) {
           otTimeRange: otTimeRange ?? null,
           otReason: otReason ?? null,
           workNotes: savedNote,
-          category: emp?.category,
-          companyUnit: emp?.companyUnit,
+          category: emp.category,
+          companyUnit: emp.companyUnit,
+          companyId: tenant.companyId,
         },
       });
 
@@ -387,7 +407,7 @@ export async function POST(request: Request) {
       }
 
       if (rDate) {
-        await syncOpenDraftPayrollRunsForMonth(String(rDate).substring(0, 7));
+        await syncOpenDraftPayrollRunsForMonth(String(rDate).substring(0, 7), tenant.companyId);
       }
 
       return NextResponse.json({ success: true, updated });
@@ -401,13 +421,16 @@ export async function POST(request: Request) {
         0.5,
         body.dayType === "HALF_DAY" ? 0.5 : Math.round((end.getTime() - start.getTime()) / 86400000) + 1
       );
-      const emp = await prisma.employeeOrLabour.findUnique({
-        where: { id: body.employeeId },
-        select: { employeeCode: true, reportingManagerCode: true },
+      const emp = await prisma.employeeOrLabour.findFirst({
+        where: { id: body.employeeId, companyId: tenant.companyId },
+        select: { employeeCode: true, reportingManagerCode: true, companyId: true },
       });
-      const empCodeUpper = (emp?.employeeCode || "").toUpperCase();
+      if (!emp) {
+        return NextResponse.json({ success: false, error: "Employee not found in active organization" }, { status: 404 });
+      }
+      const empCodeUpper = (emp.employeeCode || "").toUpperCase();
       const approverCode =
-        emp?.reportingManagerCode ||
+        emp.reportingManagerCode ||
         (["SR004", "SR007", "SR008"].includes(empCodeUpper) ? "SR006" : "SR009");
       const approverLabel =
         approverCode === "SR006" ? "Sri Manikandan (SR006)" : "Gowri (SR009)";
@@ -415,6 +438,7 @@ export async function POST(request: Request) {
       const created = await prisma.leaveRequest.create({
         data: {
           employeeId: body.employeeId,
+          companyId: emp.companyId,
           leaveCategory: body.leaveCategory || "PLANNED",
           dayType: body.dayType || "FULL_DAY",
           startDate: start,
@@ -435,8 +459,8 @@ export async function POST(request: Request) {
     if (action === "team-lead-approve" && body.requestId) {
       const session = await getCurrentUserSession();
       const myCode = resolveSessionEmpCode(session);
-      const existingLeave = await prisma.leaveRequest.findUnique({
-        where: { id: body.requestId },
+      const existingLeave = await prisma.leaveRequest.findFirst({
+        where: { id: body.requestId, companyId: tenant.companyId },
         include: { employee: { select: { reportingManagerCode: true } } },
       });
       if (!existingLeave) {
@@ -467,8 +491,8 @@ export async function POST(request: Request) {
     if (action === "team-lead-reject" && body.requestId) {
       const session = await getCurrentUserSession();
       const myCode = resolveSessionEmpCode(session);
-      const existingLeave = await prisma.leaveRequest.findUnique({
-        where: { id: body.requestId },
+      const existingLeave = await prisma.leaveRequest.findFirst({
+        where: { id: body.requestId, companyId: tenant.companyId },
         include: { employee: { select: { reportingManagerCode: true } } },
       });
       if (!existingLeave) {
@@ -499,8 +523,8 @@ export async function POST(request: Request) {
 
     // 1.5 Approve Employee Leave Request (Stage 2 HR Final Approval)
     if (action === "approve-leave" && body.requestId) {
-      const leave = await prisma.leaveRequest.findUnique({
-        where: { id: body.requestId },
+      const leave = await prisma.leaveRequest.findFirst({
+        where: { id: body.requestId, companyId: tenant.companyId },
         include: { employee: true },
       });
       if (!leave) {
@@ -690,7 +714,7 @@ export async function POST(request: Request) {
       }
       const affectedMonths = Array.from(new Set(records.map((r: any) => String(r.date || "").substring(0, 7)).filter(Boolean)));
       for (const m of affectedMonths) {
-        await syncOpenDraftPayrollRunsForMonth(m);
+        await syncOpenDraftPayrollRunsForMonth(m, tenant.companyId);
       }
       return NextResponse.json({ success: true, count: results.length });
     }
@@ -699,7 +723,7 @@ export async function POST(request: Request) {
     if (action === "mark-all-present" && date && category) {
       const targetDate = new Date(`${date}T00:00:00.000Z`);
       const employees = await prisma.employeeOrLabour.findMany({
-        where: { category, status: "ACTIVE" },
+        where: { category, status: "ACTIVE", companyId: tenant.companyId },
       });
 
       const promises = employees.map((emp) =>
@@ -714,6 +738,7 @@ export async function POST(request: Request) {
             status: "P",
             category: emp.category,
             companyUnit: emp.companyUnit,
+            companyId: tenant.companyId,
             siteName: siteName || (emp.category === "OFFICE_STAFF" ? "Headquarters Office" : "SSM School"),
             inTime: emp.category === "OFFICE_STAFF" ? "09:00 AM" : null,
             outTime: emp.category === "OFFICE_STAFF" ? "07:00 PM" : null,
@@ -724,6 +749,7 @@ export async function POST(request: Request) {
             status: "P",
             category: emp.category,
             companyUnit: emp.companyUnit,
+            companyId: tenant.companyId,
             siteName: siteName || (emp.category === "OFFICE_STAFF" ? "Headquarters Office" : "SSM School"),
             inTime: emp.category === "OFFICE_STAFF" ? "09:00 AM" : null,
             outTime: emp.category === "OFFICE_STAFF" ? "07:00 PM" : null,
@@ -732,7 +758,7 @@ export async function POST(request: Request) {
       );
 
       await Promise.all(promises);
-      await syncOpenDraftPayrollRunsForMonth(String(date).substring(0, 7));
+      await syncOpenDraftPayrollRunsForMonth(String(date).substring(0, 7), tenant.companyId);
       return NextResponse.json({ success: true, count: employees.length });
     }
 
@@ -750,7 +776,7 @@ export async function POST(request: Request) {
       }
 
       const activeEmployees = await prisma.employeeOrLabour.findMany({
-        where: { status: "ACTIVE" },
+        where: { status: "ACTIVE", companyId: tenant.companyId },
       });
 
       let markedCount = 0;
@@ -769,6 +795,7 @@ export async function POST(request: Request) {
               workNotes: "Weekly Off (Sunday)",
               category: emp.category,
               companyUnit: emp.companyUnit,
+              companyId: tenant.companyId,
             },
             create: {
               employeeId: emp.id,
@@ -777,6 +804,7 @@ export async function POST(request: Request) {
               workNotes: "Weekly Off (Sunday)",
               category: emp.category,
               companyUnit: emp.companyUnit,
+              companyId: tenant.companyId,
             },
           })
         );
@@ -784,7 +812,7 @@ export async function POST(request: Request) {
         markedCount += activeEmployees.length;
       }
 
-      await syncOpenDraftPayrollRunsForMonth(month);
+      await syncOpenDraftPayrollRunsForMonth(month, tenant.companyId);
 
       return NextResponse.json({
         success: true,
@@ -803,6 +831,7 @@ export async function POST(request: Request) {
       const yesterdayRecords = await prisma.attendanceRecord.findMany({
         where: {
           date: prevDate,
+          companyId: tenant.companyId,
           siteName: { not: null },
         },
       });
@@ -820,6 +849,7 @@ export async function POST(request: Request) {
             status: y.status || "P",
             category: y.category,
             companyUnit: y.companyUnit,
+            companyId: tenant.companyId,
           },
           create: {
             employeeId: y.employeeId,
@@ -828,6 +858,7 @@ export async function POST(request: Request) {
             status: y.status || "P",
             category: y.category,
             companyUnit: y.companyUnit,
+            companyId: tenant.companyId,
           },
         })
       );
@@ -852,6 +883,10 @@ export async function POST(request: Request) {
 
       let log;
       if (id) {
+        const existingLog = await prisma.contractorDailyLog.findFirst({ where: { id, companyId: tenant.companyId } });
+        if (!existingLog) {
+          return NextResponse.json({ success: false, error: "Log not found in active organization" }, { status: 404 });
+        }
         log = await prisma.contractorDailyLog.update({
           where: { id },
           data: {
@@ -874,6 +909,7 @@ export async function POST(request: Request) {
             workerBreakdown,
             siteWorkStatus: siteWorkStatus || "Active Work",
             remarks,
+            companyId: tenant.companyId,
           },
         });
       }

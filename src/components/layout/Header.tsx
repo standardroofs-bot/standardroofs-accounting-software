@@ -25,6 +25,9 @@ import {
   CheckCircle2,
   LogOut,
   Menu,
+  ChevronDown,
+  Lock,
+  Check,
 } from "lucide-react";
 import Link from "next/link";
 import { useSidebar } from "./AppShell";
@@ -38,6 +41,8 @@ export function Header({ onQuickCreate }: HeaderProps) {
   const [isDark, setIsDark] = useState(false);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showOrgSwitcher, setShowOrgSwitcher] = useState(false);
+  const [switchingOrg, setSwitchingOrg] = useState(false);
   const [selectedFY, setSelectedFY] = useState("2026-27");
   const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -52,6 +57,35 @@ export function Header({ onQuickCreate }: HeaderProps) {
     const isDarkMode = document.documentElement.classList.contains("dark");
     setIsDark(isDarkMode);
   }, []);
+
+  const handleSwitchCompany = async (companyId: string) => {
+    if (switchingOrg || companyId === currentUser?.activeCompanyId) {
+      setShowOrgSwitcher(false);
+      return;
+    }
+    setSwitchingOrg(true);
+    try {
+      const res = await fetch("/api/auth/switch-company", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        try {
+          Object.keys(sessionStorage)
+            .filter((k) => k.startsWith("sr_att_cache_"))
+            .forEach((k) => sessionStorage.removeItem(k));
+        } catch {}
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error("Failed to switch company:", err);
+    } finally {
+      setSwitchingOrg(false);
+      setShowOrgSwitcher(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -109,12 +143,23 @@ export function Header({ onQuickCreate }: HeaderProps) {
   };
 
   const displayName =
-    currentUser?.email === "admin@standardroofs.in" || currentUser?.role === "SUPER_ADMIN"
-      ? "Prabhakaran T"
-      : currentUser?.name || "Managing Director";
+    currentUser?.name ||
+    (currentUser?.email === "admin@standardroofs.in" ? "Prabhakaran T" : "Administrator");
 
   const displayRole =
     currentUser?.role === "SUPER_ADMIN" ? "Super Admin" : currentUser?.role?.replace(/_/g, " ") || "Administrator";
+
+  const allowedCompanies: any[] = Array.isArray(currentUser?.allowedCompanies)
+    ? currentUser.allowedCompanies
+    : [];
+  const activeCompany = currentUser?.activeCompany || {
+    id: "standard-roofs",
+    code: "STANDARD_ROOFS",
+    name: "Standard Roofs",
+    tagline: "Construction & Roofing • Erode",
+  };
+  const isInviActive = activeCompany.id === "invi-creation" || activeCompany.code === "INVI_CREATION";
+  const canSwitchOrg = allowedCompanies.length > 1;
 
   const initials =
     displayName
@@ -126,7 +171,7 @@ export function Header({ onQuickCreate }: HeaderProps) {
 
   return (
     <header className="h-14 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs flex items-center justify-between px-3 sm:px-5 lg:px-6 sticky top-0 z-30 transition-colors whitespace-nowrap select-none">
-      {/* Left: Hamburger (mobile) + Organization context + Search */}
+      {/* Left: Hamburger (mobile) + Organization Switcher / Active Tenant + Search */}
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         {/* Mobile Hamburger Drawer Button */}
         <button
@@ -138,21 +183,97 @@ export function Header({ onQuickCreate }: HeaderProps) {
           <Menu size={20} />
         </button>
 
-        <Link
-          href="/"
-          className="flex items-center gap-2 hover:opacity-85 transition group cursor-pointer"
-          title="Return to Home"
-        >
-          <Building className="text-slate-900 dark:text-slate-100 group-hover:scale-105 transition shrink-0" size={18} />
-          <div className="flex flex-col">
-            <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition leading-none">
-              Standard Roofs
-            </span>
-            <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-none mt-0.5 hidden xs:inline">
-              Books & Roofing ERP
-            </span>
-          </div>
-        </Link>
+        <div className="relative">
+          {canSwitchOrg ? (
+            <button
+              type="button"
+              onClick={() => setShowOrgSwitcher((v) => !v)}
+              disabled={switchingOrg}
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition cursor-pointer ${
+                isInviActive
+                  ? "bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-950"
+                  : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-900"
+              }`}
+              title="Switch Active Organization"
+            >
+              <Building
+                className={`shrink-0 ${isInviActive ? "text-purple-600" : "text-indigo-600"}`}
+                size={17}
+              />
+              <div className="flex flex-col text-left">
+                <span className="font-bold text-xs sm:text-sm leading-none flex items-center gap-1">
+                  {activeCompany.name}
+                  <ChevronDown size={13} className="text-slate-500" />
+                </span>
+                <span className="text-[10px] text-slate-500 font-medium leading-none mt-0.5 hidden sm:inline">
+                  {activeCompany.tagline || (isInviActive ? "Digital Hub • Erode" : "Books & Roofing ERP")}
+                </span>
+              </div>
+            </button>
+          ) : (
+            <div
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border ${
+                isInviActive
+                  ? "bg-purple-50 border-purple-200 text-purple-950"
+                  : "bg-slate-50 border-slate-200 text-slate-900"
+              }`}
+              title={`Locked to ${activeCompany.name}`}
+            >
+              <Building
+                className={`shrink-0 ${isInviActive ? "text-purple-600" : "text-slate-800"}`}
+                size={17}
+              />
+              <div className="flex flex-col text-left">
+                <span className="font-bold text-xs sm:text-sm leading-none flex items-center gap-1">
+                  {activeCompany.name}
+                  <Lock size={11} className="text-slate-400" />
+                </span>
+                <span className="text-[10px] text-slate-500 font-medium leading-none mt-0.5 hidden sm:inline">
+                  {activeCompany.tagline || (isInviActive ? "Digital Hub • Erode" : "Books & Roofing ERP")}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {canSwitchOrg && showOrgSwitcher && (
+            <div className="absolute left-0 mt-2 w-72 rounded-xl bg-white border border-slate-200 shadow-2xl py-2 z-50 text-xs">
+              <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Select Active Organization
+              </div>
+              {allowedCompanies.map((org) => {
+                const isSelected = org.id === activeCompany.id;
+                const isInvi = org.id === "invi-creation" || org.code === "INVI_CREATION";
+                return (
+                  <button
+                    key={org.id}
+                    type="button"
+                    onClick={() => handleSwitchCompany(org.id)}
+                    className={`w-full px-3 py-2.5 flex items-center justify-between text-left transition cursor-pointer ${
+                      isSelected ? "bg-indigo-50/70" : "hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center font-extrabold text-xs shrink-0 ${
+                          isInvi ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"
+                        }`}
+                      >
+                        {isInvi ? "IC" : "SR"}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 truncate">{org.name}</div>
+                        <div className="text-[10.5px] text-slate-500 truncate">
+                          {org.tagline || (isInvi ? "Women's Ethnic Wear & Digital Hub" : "Construction & Roofing • Erode")}
+                        </div>
+                      </div>
+                    </div>
+                    {isSelected && <Check size={15} className="text-indigo-600 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Financial Year Selector */}
         <div className="hidden sm:flex items-center gap-1.5 ml-2 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200">

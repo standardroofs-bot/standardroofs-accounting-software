@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ function isInFinancialYear(month: string, fy: string): boolean {
 
 export async function GET(req: NextRequest) {
   try {
+    const tenant = await getActiveTenantContext();
     const { searchParams } = new URL(req.url);
     const employeeId = searchParams.get("employeeId");
     const employeeCode = searchParams.get("employeeCode");
@@ -27,8 +29,8 @@ export async function GET(req: NextRequest) {
 
     let employee = null;
     if (employeeId) {
-      employee = await prisma.employeeOrLabour.findUnique({
-        where: { id: employeeId },
+      employee = await prisma.employeeOrLabour.findFirst({
+        where: { id: employeeId, companyId: tenant.companyId },
         select: {
           id: true,
           name: true,
@@ -42,8 +44,8 @@ export async function GET(req: NextRequest) {
         },
       });
     } else if (employeeCode) {
-      employee = await prisma.employeeOrLabour.findUnique({
-        where: { employeeCode },
+      employee = await prisma.employeeOrLabour.findFirst({
+        where: { employeeCode, companyId: tenant.companyId },
         select: {
           id: true,
           name: true,
@@ -78,7 +80,10 @@ export async function GET(req: NextRequest) {
     }
 
     const rawItems = await prisma.payrollItem.findMany({
-      where: { OR: whereOr },
+      where: {
+        OR: whereOr,
+        payrollRun: { companyId: tenant.companyId },
+      },
       include: {
         payrollRun: {
           select: {

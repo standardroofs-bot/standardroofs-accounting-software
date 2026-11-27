@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { getNextVoucherNumber, postDoubleEntryTransaction } from "@/lib/accounting";
 import { requireAuthorizedSession } from "@/lib/rbac";
 import { VoucherType, CashFlowType } from "@prisma/client";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export async function POST(req: NextRequest) {
   try {
     const auth = await requireAuthorizedSession("labour", "APPROVE");
     if (auth.error) return auth.error;
+    const tenant = await getActiveTenantContext();
 
     const body = await req.json();
     const { payrollRunId } = body;
@@ -19,14 +21,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const run = await prisma.payrollRun.findUnique({
-      where: { id: payrollRunId },
+    const run = await prisma.payrollRun.findFirst({
+      where: { id: payrollRunId, companyId: tenant.companyId },
       include: { items: true },
     });
 
     if (!run) {
       return NextResponse.json(
-        { success: false, error: "Payroll run not found" },
+        { success: false, error: "Payroll run not found in active organization" },
         { status: 404 }
       );
     }

@@ -462,14 +462,16 @@ export function Sidebar() {
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="font-extrabold text-lg tracking-tight text-slate-900 leading-tight">
-                  SR-Books
+                  {currentUser?.activeCompany?.id === "invi-creation" ? "Invi-Books" : "SR-Books"}
                 </span>
-                <span className="bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md leading-none shadow-2xs">
+                <span className={`${currentUser?.activeCompany?.id === "invi-creation" ? "bg-purple-600" : "bg-indigo-600"} text-white text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md leading-none shadow-2xs`}>
                   v2.6
                 </span>
               </div>
               <span className="text-[10.5px] font-semibold tracking-wider uppercase text-slate-600 truncate mt-0.5 leading-none">
-                STANDARD ROOFS · ERODE
+                {currentUser?.activeCompany?.id === "invi-creation"
+                  ? "INVI CREATION · ERODE"
+                  : "STANDARD ROOFS · ERODE"}
               </span>
             </div>
           )}

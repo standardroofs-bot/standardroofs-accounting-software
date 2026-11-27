@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserSession } from "@/lib/auth";
 import { syncEmployeeToOpenDraftRuns, syncOpenDraftPayrollRunsForMonth } from "@/lib/payrollAttendanceSync";
+import { getActiveTenantContext } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -11,11 +12,12 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ success: false, error: "Authentication required." }, { status: 401 });
     }
+    const tenant = await getActiveTenantContext();
 
     const isAuthorized =
-      session.role === "SUPER_ADMIN" ||
-      session.role === "MANAGING_DIRECTOR" ||
-      session.role === "HR_MANAGER";
+      tenant.role === "SUPER_ADMIN" ||
+      tenant.role === "MANAGING_DIRECTOR" ||
+      tenant.role === "HR_MANAGER";
 
     if (!isAuthorized) {
       return NextResponse.json(
@@ -31,12 +33,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Item ID is required." }, { status: 400 });
     }
 
-    const item = await prisma.recycleBinItem.findUnique({
-      where: { id },
+    const item = await prisma.recycleBinItem.findFirst({
+      where: { id, companyId: tenant.companyId },
     });
 
     if (!item) {
-      return NextResponse.json({ success: false, error: "Recycle bin item not found." }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Recycle bin item not found in active organization." }, { status: 404 });
     }
 
     const payload = JSON.parse(item.payloadJson);
@@ -208,13 +210,13 @@ export async function POST(request: Request) {
     });
 
     if (item.entityType === "EMPLOYEE_LABOUR") {
-      await syncEmployeeToOpenDraftRuns();
+      await syncEmployeeToOpenDraftRuns(tenant.companyId);
     } else if (item.entityType === "ATTENDANCE_RECORD" && payload?.date) {
-      await syncOpenDraftPayrollRunsForMonth(new Date(payload.date).toISOString().slice(0, 7));
+      await syncOpenDraftPayrollRunsForMonth(new Date(payload.date).toISOString().slice(0, 7), tenant.companyId);
     } else if (item.entityType === "COMPANY_HOLIDAY" && payload?.date) {
-      await syncOpenDraftPayrollRunsForMonth(new Date(payload.date).toISOString().slice(0, 7));
+      await syncOpenDraftPayrollRunsForMonth(new Date(payload.date).toISOString().slice(0, 7), tenant.companyId);
     } else if (item.entityType === "LEAVE_REQUEST" && payload?.startDate) {
-      await syncOpenDraftPayrollRunsForMonth(new Date(payload.startDate).toISOString().slice(0, 7));
+      await syncOpenDraftPayrollRunsForMonth(new Date(payload.startDate).toISOString().slice(0, 7), tenant.companyId);
     }
 
     return NextResponse.json({

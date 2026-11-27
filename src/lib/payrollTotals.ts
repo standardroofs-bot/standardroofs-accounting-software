@@ -45,7 +45,7 @@ export function getPayrollItemVoucherPrefix(month: string, itemId: string): stri
 export async function syncPayrollItemCashBookLegs(
   prisma: PrismaClient,
   item: PayrollItem,
-  payrollRun: Pick<PayrollRun, "month" | "cycleType">,
+  payrollRun: Pick<PayrollRun, "month" | "cycleType" | "companyId">,
   options?: {
     bankWallet?: string | null;
     gpayWallet?: string | null;
@@ -68,6 +68,7 @@ export async function syncPayrollItemCashBookLegs(
 
   if (!fy || !sysUser) return;
 
+  const companyId = payrollRun.companyId || "standard-roofs";
   const isOffice = item.category === "OFFICE" || payrollRun.cycleType === "MONTHLY_OFFICE";
   const category = isOffice ? "Employee Salary" : "Labour Wages";
   const refSuffix = item.paymentRef ? ` [Ref: ${item.paymentRef}]` : "";
@@ -103,6 +104,7 @@ export async function syncPayrollItemCashBookLegs(
         walletName: leg.wallet,
         counterpartyName: item.employeeName,
         isOfficeExpense: isOffice,
+        companyId,
       },
       create: {
         voucherNumber: leg.voucherNumber,
@@ -114,6 +116,7 @@ export async function syncPayrollItemCashBookLegs(
         walletName: leg.wallet,
         counterpartyName: item.employeeName,
         isOfficeExpense: isOffice,
+        companyId,
         financialYearId: fy.id,
         createdById: sysUser.id,
       },

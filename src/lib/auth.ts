@@ -57,6 +57,8 @@ export interface SessionPayload {
   name: string;
   role: UserRole;
   employeeId?: string;
+  activeCompanyId?: string;
+  allowedCompanyIds?: string[];
   permissions?: UserPermissions;
 }
 
